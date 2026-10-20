@@ -7,12 +7,10 @@
 #include <memory>
 #include <charconv>
 #include <cstdlib>
-#include <filesystem>
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
-#include <vector>
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -20,12 +18,8 @@
 #include <GLFW/glfw3.h>
 
 #include "EditorApp.hpp"
-#include "Compiler.hpp"
-#include "Exporter.hpp"
-#include "Presets.hpp"
 #include "Theme.hpp"
 #include "Widgets.hpp"
-#include "SettingsJson.hpp"
 
 namespace {
 

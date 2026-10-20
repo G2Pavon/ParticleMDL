@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <fstream>
 #include <limits>
 #include <stdexcept>
 #include <unordered_map>
@@ -395,16 +394,6 @@ std::vector<std::uint8_t> encode_indexed_bmp(const IndexedImage& img)
     }
 
     return out;
-}
-
-void write_indexed_bmp(const std::filesystem::path& path, const RgbImage& img)
-{
-    const std::vector<std::uint8_t> bytes = encode_indexed_bmp(img);
-    std::ofstream f(path, std::ios::binary);
-    f.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
-    f.close();
-    if (!f)
-        throw std::runtime_error("cannot write " + path.string());
 }
 
 } // namespace gs

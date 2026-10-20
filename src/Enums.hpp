@@ -110,15 +110,6 @@ constexpr std::optional<E> enum_from_id(std::string_view id) noexcept
 }
 
 template <typename E>
-constexpr std::optional<E> enum_from_label(std::string_view label) noexcept
-{
-    for (const auto& n : enum_names<E>())
-        if (label == n.label)
-            return n.value;
-    return std::nullopt;
-}
-
-template <typename E>
 constexpr bool table_in_declaration_order() noexcept
 {
     for (std::size_t i = 0; i < enum_names<E>().size(); ++i)

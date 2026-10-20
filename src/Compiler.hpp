@@ -20,6 +20,7 @@ struct CompileResult {
     enum class Status { Ok, CompilerNotFound, Failed, TimedOut, Cancelled };
     Status status = Status::Failed;
     std::string output;   // compiler stdout + stderr
+    bool exit_zero = false;   // the compiler ended with status 0 (compile_model also wants the .mdl)
 };
 
 // One command-line argument as Windows programs read it back (CommandLineToArgvW

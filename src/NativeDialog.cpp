@@ -90,11 +90,11 @@ void DialogJob::start(Request request)
     future_ = std::async(std::launch::async, [request = std::move(request)] { return run(request); });
 }
 
-std::optional<std::optional<fs::path>> DialogJob::poll()
+std::optional<DialogJob::Result> DialogJob::poll()
 {
     if (!future_.valid() || future_.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
         return std::nullopt;
-    return future_.get();
+    return Result{future_.get()};
 }
 
 } // namespace gs::native

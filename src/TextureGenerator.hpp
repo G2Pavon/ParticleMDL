@@ -3,7 +3,6 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <filesystem>
 #include <vector>
 
 #include "Settings.hpp"
@@ -59,6 +58,5 @@ RgbaImage to_rgba(const RgbImage& img);   // opaque
 // 8-bit indexed, uncompressed BMP as GoldSrc's studiomdl expects.
 std::vector<std::uint8_t> encode_indexed_bmp(const IndexedImage& img);
 std::vector<std::uint8_t> encode_indexed_bmp(const RgbImage& img);   // quantizes first
-void write_indexed_bmp(const std::filesystem::path& path, const RgbImage& img);
 
 } // namespace gs

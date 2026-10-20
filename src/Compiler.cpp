@@ -64,11 +64,9 @@ struct WinRun {
     const std::stop_token* stop;
 };
 
-CompileResult run_compiler(const std::string& compiler, const std::string& qc, const CompileOptions& options,
-                           bool& exit_ok)
+CompileResult run_compiler(const std::string& compiler, const std::string& qc, const CompileOptions& options)
 {
     CompileResult result;
-    exit_ok = false;
 
     // CreateProcess may edit the command line, so it gets a writable buffer.
     std::wstring command = quote_windows_argument(from_utf8(compiler).wstring()) + L" " +
@@ -90,7 +88,7 @@ CompileResult run_compiler(const std::string& compiler, const std::string& qc, c
     const ProcessResult run_result = run_process(command.data(), work_dir.c_str(), timeout, callbacks);
     switch (run_result.status) {
     case ProcessStatus::Exited:
-        exit_ok = run_result.exit_code == 0;
+        result.exit_zero = run_result.exit_code == 0;
         break;
     case ProcessStatus::NotFound:
         result.status = CompileResult::Status::CompilerNotFound;
@@ -154,11 +152,9 @@ private:
     int fd_[2] = {-1, -1};
 };
 
-CompileResult run_compiler(const std::string& compiler, const std::string& qc, const CompileOptions& options,
-                           bool& exit_ok)
+CompileResult run_compiler(const std::string& compiler, const std::string& qc, const CompileOptions& options)
 {
     CompileResult result;
-    exit_ok = false;
     Pipe out;
 
     SpawnActions actions;
@@ -235,7 +231,7 @@ CompileResult run_compiler(const std::string& compiler, const std::string& qc, c
         result.status = *stopped;
         return result;
     }
-    exit_ok = WIFEXITED(wstatus) && WEXITSTATUS(wstatus) == 0;
+    result.exit_zero = WIFEXITED(wstatus) && WEXITSTATUS(wstatus) == 0;
     return result;
 }
 
@@ -245,13 +241,12 @@ CompileResult run_compiler(const std::string& compiler, const std::string& qc, c
 
 CompileResult compile_model(const std::string& compiler, const std::string& safe_name, const CompileOptions& options)
 {
-    bool exit_ok = false;
-    CompileResult result = run_compiler(resolve_compiler(compiler), safe_name + ".qc", options, exit_ok);
+    CompileResult result = run_compiler(resolve_compiler(compiler), safe_name + ".qc", options);
     if (result.status == CompileResult::Status::CompilerNotFound || result.status == CompileResult::Status::TimedOut ||
         result.status == CompileResult::Status::Cancelled)
         return result;
 
-    if (!exit_ok || !fs::exists(options.work_dir / from_utf8(safe_name + ".mdl"))) {
+    if (!result.exit_zero || !fs::exists(options.work_dir / from_utf8(safe_name + ".mdl"))) {
         result.status = CompileResult::Status::Failed;
         return result;
     }

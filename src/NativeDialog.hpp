@@ -40,8 +40,12 @@ public:
 
     void start(Request request);
     bool busy() const { return future_.valid(); }
-    // The result once the dialog closed: a path, or nothing if it was cancelled.
-    std::optional<std::optional<std::filesystem::path>> poll();
+    // Set once the dialog closed: a path, or nothing if it was cancelled.
+    struct Result {
+        std::optional<std::filesystem::path> path;
+    };
+    // The result on the first call after the dialog closed, else nullopt.
+    std::optional<Result> poll();
 
 private:
     std::future<std::optional<std::filesystem::path>> future_;

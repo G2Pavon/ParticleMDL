@@ -377,7 +377,7 @@ void EditorApp::draw_frame(double delta)
     // Results of the operating system's dialog, and of the editor's own dialogs.
     if (auto result = native_job_.poll()) {
         if (pending_dialog_)
-            finish_dialog(*pending_dialog_, *result);
+            finish_dialog(*pending_dialog_, result->path);
         pending_dialog_.reset();
     }
     if (auto p = save_dialog_.draw())
