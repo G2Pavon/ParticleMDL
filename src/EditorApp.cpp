@@ -601,7 +601,19 @@ void EditorApp::draw_left_panel()
                             ImGuiSliderFlags_AlwaysClamp);
     changed |= reset_slider("duration", "Duration (s)", s.duration, kSliderDuration.lo, kSliderDuration.hi, 3.0, "%.2f");
     changed |= reset_slider("lifespan", "Lifespan (%)", s.lifespan, kSliderLifespan.lo, kSliderLifespan.hi, 0.85, "%.2f");
+    changed |= reset_slider("lifespan_variance", "Lifespan Variance", s.lifespan_variance, 0.0, 0.9, 0.0, "%.2f");
+    ImGui::SetItemTooltip("Each particle lives up to this fraction shorter than the lifespan, at random");
     changed |= reset_slider("fps", "FPS", s.fps, kMinFps, kMaxFps, 30, ImGuiSliderFlags_AlwaysClamp);
+    {
+        ImGui::SetNextItemWidth(ui::px(-150));
+        changed |= ImGui::InputInt("Random Seed", &s.seed, 0, 0);
+        ImGui::SetItemTooltip("Which random numbers the particles use. 0 is the original effect; another number gives\na different one with the same settings.");
+        ImGui::SameLine();
+        if (ImGui::Button("New##seed", ImVec2(ui::px(60), 0))) {
+            s.seed = static_cast<int>(static_cast<unsigned>(ImGui::GetTime() * 1000.0) & 0x7FFFFFFFu);
+            changed = true;
+        }
+    }
     changed |= enum_combo("End Behavior", s.end_behavior);
     ImGui::SetItemTooltip("What a particle does after its lifespan:\n"
                           "Drop Through Floor: falls, then hides below the effect\n"
@@ -652,6 +664,8 @@ void EditorApp::draw_left_panel()
     changed |= reset_slider("burst", "Vertical Burst", s.burst, -300, 300, 120);
     changed |= reset_slider("spread", "Spread", s.spread, 0, 150, 30);
     changed |= reset_slider("gravity", "Gravity", s.gravity, -600, 200, -150);
+    changed |= reset_slider("drag", "Drag", s.drag, 0.0, 5.0, 0.0, "%.2f");
+    ImGui::SetItemTooltip("How fast the velocity dies away, per second (0 = none).\nWith gravity it gives a terminal speed.");
     changed |= reset_slider("turbulence", "Turbulence", s.turbulence, 0, 200, 0);
     changed |= reset_slider("vortex_spin", "Vortex Spin", s.vortex_spin, -720, 720, 0);
     changed |= reset_slider("vortex_pull", "Vortex Pull", s.vortex_pull, -300, 300, 0);
@@ -802,6 +816,8 @@ void EditorApp::draw_right_panel()
     changed |= enum_combo("Type", s.geometry);
     changed |= reset_slider("quad_width", "Width", s.quad_width, 1, 100, 6);
     changed |= reset_slider("quad_height", "Height", s.quad_height, 1, 100, 6);
+    changed |= reset_slider("size_variance", "Size Variance", s.size_variance, 0.0, 0.9, 0.0, "%.2f");
+    ImGui::SetItemTooltip("Each particle is up to this fraction larger or smaller, at random");
     changed |= ImGui::Checkbox("Double Sided", &s.double_sided);
     changed |= reset_slider("mesh_rotation.x", "Rot X (Pitch)", s.mesh_rotation.x, -180, 180, 0);
     changed |= reset_slider("mesh_rotation.y", "Rot Y (Yaw)", s.mesh_rotation.y, -180, 180, 0);

@@ -55,6 +55,13 @@ private:
 };
 
 constexpr std::uint64_t kParticleSeed = 0x5EED'0F'9A27'1C1Eull;
+constexpr std::uint64_t kVarianceStream = 0xD1B54A32D192ED03ull;
+
+// Seed 0 is the sequence every effect has always had; other seeds are other sequences.
+std::uint64_t seed_of(int seed)
+{
+    return kParticleSeed ^ (static_cast<std::uint64_t>(static_cast<std::uint32_t>(seed)) * 0x9E3779B97F4A7C15ull);
+}
 
 } // namespace
 
@@ -99,7 +106,10 @@ ParticleSystem::ParticleSystem(const Settings& settings) : settings_(validated(s
 
     // Deterministic pseudo-random seeds: the same settings always give the same effect.
     particles_.reserve(num_particles);
-    ParticleRng rng(kParticleSeed);
+    ParticleRng rng(seed_of(s.seed));
+    // The draws that were added later come from a stream of their own, so the original ones are the
+    // same as before and every effect made without them still looks the same.
+    ParticleRng extra(seed_of(s.seed) ^ kVarianceStream);
     int current_bone_id = 1;
     const double angle_rad = radians(s.emission_angle);
     for (int i = 0; i < num_particles; ++i) {
@@ -189,6 +199,8 @@ ParticleSystem::ParticleSystem(const Settings& settings) : settings_(validated(s
                   radians(s.particle_spin.z) + radians(s.spin_spread) * rot_jitter_z};
         p.turb_freq = turb_freq;
         p.turb_phase = turb_phase;
+        p.lifespan = std::max(s.lifespan * (1.0 - s.lifespan_variance * extra.unit()), kMinLifespan);
+        p.size = 1.0 + s.size_variance * extra.signed_unit();
         particles_.push_back(p);
     }
 
@@ -223,7 +235,7 @@ ParticleSystem::ParticleSystem(const Settings& settings) : settings_(validated(s
                      s.volume_height / (max_z_raw_ - min_z_raw_)};
 
     // A static quad (or box) extends at most max(w, h) * 0.87 from its bone.
-    hide_z_ = min_z_raw_ * volume_scale_.z - std::max(s.quad_width, s.quad_height);
+    hide_z_ = min_z_raw_ * volume_scale_.z - std::max(s.quad_width, s.quad_height) * (1.0 + s.size_variance);
     drop_acceleration_ = std::max(std::abs(s.gravity * volume_scale_.z), 600.0);
 }
 
@@ -268,7 +280,7 @@ LifeState ParticleSystem::life_state(const Particle& p, double loop_time) const
         }
     }
     st.eval_time = p_time;
-    if ((p_time / loop) <= settings_.lifespan)
+    if ((p_time / loop) <= p.lifespan)
         return st;
 
     st.phase = LifeState::Phase::Lingering;
@@ -279,7 +291,7 @@ LifeState ParticleSystem::life_state(const Particle& p, double loop_time) const
         st.phase = LifeState::Phase::Dead;
         break;
     case EndBehavior::StopAndStay:
-        st.eval_time = settings_.lifespan * loop;
+        st.eval_time = p.lifespan * loop;
         break;
     case EndBehavior::EndlessLoop:
         break;
@@ -302,21 +314,21 @@ ParticlePose ParticleSystem::pose_at(const Particle& p, double loop_time) const
     const LifeState st = life_state(p, loop_time);
     const bool vertex_bones = settings_.scale_mode == ScaleMode::VertexBone;
     if (st.unborn())
-        return {{0.0, 0.0, hide_z_}, {}, vertex_bones ? 0.0 : 1.0, false};   // waits out of sight, whatever the end behavior
+        return {{0.0, 0.0, hide_z_}, {}, vertex_bones ? 0.0 : p.size, false};   // waits out of sight, whatever the end behavior
     if (st.moved_by_motion())
         return {position_at(p, st.eval_time), rotation_at(p, st.eval_time),
-                vertex_bones ? scale_factor_at(st.eval_time, st.past_lifespan()) : 1.0, true};
+                vertex_bones ? scale_factor_at(p, st.eval_time, st.past_lifespan()) * p.size : p.size, true};
 
     // Parked out of sight. Bones have no scale, so only vertex-bone quads can
     // collapse; static quads rely on where they are parked.
-    ParticlePose hidden{{0.0, 0.0, hide_z_}, {}, vertex_bones ? 0.0 : 1.0, false};
+    ParticlePose hidden{{0.0, 0.0, hide_z_}, {}, vertex_bones ? 0.0 : p.size, false};
     switch (settings_.end_behavior) {
     case EndBehavior::HideInCore:
         hidden.pos = {};
         hidden.visible = !vertex_bones;   // a static quad stays visible at the center
         return hidden;
     case EndBehavior::DropThroughFloor: {
-        const double death = settings_.lifespan * loop_duration();
+        const double death = p.lifespan * loop_duration();
         const Vec3 at_death = position_at(p, death);
         const double fall = st.eval_time - death;
         const double z = at_death.z - 0.5 * drop_acceleration_ * fall * fall;
@@ -324,7 +336,7 @@ ParticlePose ParticleSystem::pose_at(const Particle& p, double loop_time) const
             hidden.pos = {at_death.x, at_death.y, hide_z_};
             return hidden;
         }
-        return {{at_death.x, at_death.y, z}, rotation_at(p, death), vertex_bones ? settings_.scale_end : 1.0, true};
+        return {{at_death.x, at_death.y, z}, rotation_at(p, death), vertex_bones ? settings_.scale_end * p.size : p.size, true};
     }
     default:   // Hide Underground
         return hidden;
@@ -337,9 +349,27 @@ Vec3 ParticleSystem::motion(const Particle& p, double t, Vec3 scale) const
     const double turb_x = std::sin((t * p.turb_freq.x) + p.turb_phase.x) * s.turbulence * t;
     const double turb_y = std::cos((t * p.turb_freq.y) + p.turb_phase.y) * s.turbulence * t;
 
-    double x = p.spawn.x + (p.velocity.x * t) + turb_x;
-    double y = p.spawn.y + (p.velocity.y * t) + turb_y;
-    const double z = p.spawn.z + (p.velocity.z * t) + (0.5 * s.gravity * (t * t));
+    double x, y, z;
+    if (s.drag > 0.0) {
+        // dv/dt = gravity - drag * v, whose position has a closed form: v(t) = g/k + (v0 - g/k) e^(-kt),
+        // so x(t) = x0 + g/k * t + (v0 - g/k) * (1 - e^(-kt)) / k. It is written as
+        //   x0 + v0 * reach + g/k * (t - reach),   reach = (1 - e^(-kt)) / k,
+        // because for a small drag g/k is huge and the two terms of the first form cancel. Both
+        // reach and t - reach are computed without that cancellation.
+        const double k = s.drag, x_kt = k * t;
+        const double reach = -std::expm1(-x_kt) / k;
+        const double deficit = x_kt < 0.05 ? t * (x_kt / 2.0 - x_kt * x_kt / 6.0 + x_kt * x_kt * x_kt / 24.0 -
+                                                  x_kt * x_kt * x_kt * x_kt / 120.0 +
+                                                  x_kt * x_kt * x_kt * x_kt * x_kt / 720.0)
+                                           : t - reach;
+        x = p.spawn.x + (p.velocity.x * reach) + turb_x;
+        y = p.spawn.y + (p.velocity.y * reach) + turb_y;
+        z = p.spawn.z + (p.velocity.z * reach) + (s.gravity / k) * deficit;
+    } else {
+        x = p.spawn.x + (p.velocity.x * t) + turb_x;
+        y = p.spawn.y + (p.velocity.y * t) + turb_y;
+        z = p.spawn.z + (p.velocity.z * t) + (0.5 * s.gravity * (t * t));
+    }
 
     // In the same (unscaled) units as every other motion parameter, so the
     // volume fit sees exactly the motion that is exported.
@@ -366,16 +396,16 @@ Vec3 ParticleSystem::rotation_at(const Particle& p, double t) const
     return {floor_mod(t * p.spin.x, kPi * 2), floor_mod(t * p.spin.y, kPi * 2), floor_mod(t * p.spin.z, kPi * 2)};
 }
 
-double ParticleSystem::scale_progress(double t) const noexcept
+double ParticleSystem::scale_progress(const Particle& p, double t) const noexcept
 {
-    return t / (settings_.lifespan * loop_duration());
+    return t / (p.lifespan * loop_duration());
 }
 
-double ParticleSystem::scale_factor_at(double t, bool dead) const noexcept
+double ParticleSystem::scale_factor_at(const Particle& p, double t, bool dead) const noexcept
 {
     if (dead)
         return settings_.scale_end;
-    return settings_.scale_start + (settings_.scale_end - settings_.scale_start) * scale_progress(t);
+    return settings_.scale_start + (settings_.scale_end - settings_.scale_start) * scale_progress(p, t);
 }
 
 } // namespace gs

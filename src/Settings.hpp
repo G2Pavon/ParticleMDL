@@ -53,6 +53,9 @@ struct Settings {
     // the duration (0: all at the start) and the sequence ends on its last frame.
     bool loop = true;
     double burst_window = 0;   // fraction of the duration, one-shot only
+    int seed = 0;                     // 0 is the original sequence; any other number gives another effect
+    double lifespan_variance = 0;     // each particle lives up to this fraction shorter, at random
+    double size_variance = 0;         // each particle is up to this fraction larger or smaller, at random
 
     // Volume the motion is fitted into
     double volume_width = 128;   // X
@@ -82,6 +85,7 @@ struct Settings {
     double burst = 120;   // vertical, units/s
     double spread = 30;   // random +- on speed and burst
     double gravity = -150;
+    double drag = 0;          // 1/s: how fast the velocity dies away
     double turbulence = 0;
     double vortex_spin = 0;   // deg/s
     double vortex_pull = 0;   // units/s toward the axis
@@ -122,6 +126,9 @@ void for_each_field(S& s, F&& f)
     f("end_behavior", s.end_behavior);
     f("loop", s.loop);
     f("burst_window", s.burst_window);
+    f("seed", s.seed);
+    f("lifespan_variance", s.lifespan_variance);
+    f("size_variance", s.size_variance);
     f("volume_width", s.volume_width);
     f("volume_depth", s.volume_depth);
     f("volume_height", s.volume_height);
@@ -137,6 +144,7 @@ void for_each_field(S& s, F&& f)
     f("burst", s.burst);
     f("spread", s.spread);
     f("gravity", s.gravity);
+    f("drag", s.drag);
     f("turbulence", s.turbulence);
     f("vortex_spin", s.vortex_spin);
     f("vortex_pull", s.vortex_pull);
@@ -173,6 +181,8 @@ inline constexpr double kMinDuration = 0.1, kMaxDuration = 60.0;
 inline constexpr double kMinLifespan = 0.01;
 inline constexpr int kMinFps = 1, kMaxFps = 60;
 inline constexpr double kMaxBurstWindow = 1.0;
+inline constexpr double kMaxVariance = 0.9;
+inline constexpr double kMaxDrag = 10.0;
 inline constexpr double kMinHardness = 0.05, kMaxHardness = 20.0;
 inline constexpr double kMaxScale = 100.0;
 inline constexpr double kMaxVolume = 65536;

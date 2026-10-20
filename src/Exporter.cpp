@@ -82,9 +82,11 @@ std::string make_ref_smd(const ParticleSystem& sys, const std::string& tex_ref)
     out += "end\ntriangles\n";
 
     // Pre-rotate by -90 deg around Z to cancel studiomdl's +90 deg: (x, y) -> (y, -x).
+    // Static quads have their size in the mesh; with vertex bones the mesh is at scale 1 and the bones scale it.
+    double size = 1.0;
     auto write_vertex = [&](int bone, const QuadVertex& v) {
-        emit(out, "  {} {:.6f} {:.6f} {:.6f} {:.6f} {:.6f} {:.6f} {} {}\n", bone, v.pos.y, -v.pos.x, v.pos.z,
-             v.normal.y, -v.normal.x, v.normal.z, v.u, v.v);
+        emit(out, "  {} {:.6f} {:.6f} {:.6f} {:.6f} {:.6f} {:.6f} {} {}\n", bone, v.pos.y * size, -v.pos.x * size,
+             v.pos.z * size, v.normal.y, -v.normal.x, v.normal.z, v.u, v.v);
     };
     auto write_tri = [&](int b0, const QuadVertex& v0, int b1, const QuadVertex& v1, int b2, const QuadVertex& v2) {
         out += tex_ref;
@@ -97,6 +99,7 @@ std::string make_ref_smd(const ParticleSystem& sys, const std::string& tex_ref)
     const bool vertex_bones = sys.corners_per_particle() > 0;
     const bool back_faces = sys.settings().double_sided && sys.settings().geometry != Geometry::VolumetricBox;
     for (const Particle& p : sys.particles()) {
+        size = vertex_bones ? 1.0 : p.size;
         for (int qi = 0; qi < static_cast<int>(sys.quads().size()); ++qi) {
             const Quad& q = sys.quads()[qi];
             // Each corner hangs on a bone of its own with vertex bones (quads that meet share it),

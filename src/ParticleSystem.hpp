@@ -20,6 +20,8 @@ struct Particle {
     int base_bone = 0;          // its corner bones (vertex bones) follow directly
     double phase_offset = 0;    // looping: birth time as a fraction of the loop
     double birth = 0;           // one-shot: when it starts, in seconds
+    double lifespan = 1.0;      // fraction of the duration it lives
+    double size = 1.0;          // multiplies the size of its quads
     Vec3 spawn;                 // unscaled start position
     Vec3 velocity;              // unscaled, per second
     Vec3 spin;                  // rad/s
@@ -75,8 +77,8 @@ public:
     // Per-particle euler angles (radians, wrapped to [0, 2pi)).
     Vec3 rotation_at(const Particle& p, double eval_time) const;
     // Fraction of a particle's life at eval_time, and its vertex-bone scale then.
-    double scale_progress(double eval_time) const noexcept;
-    double scale_factor_at(double eval_time, bool dead) const noexcept;
+    double scale_progress(const Particle& p, double eval_time) const noexcept;
+    double scale_factor_at(const Particle& p, double eval_time, bool dead) const noexcept;
 
     // Box around points; see animation_bounds() in Baking.hpp.
     struct Bounds {
