@@ -188,6 +188,8 @@ void EditorApp::export_data()
 
         if (auto_compile_) {
             set_status("Compiling .mdl in " + export_dir_ + "...", StatusTone::Warning);
+            compiling_.emplace(sys);
+            compiling_mdl_ = folder / from_utf8(safe + ".mdl");
             compile_job_.start(compiler_path_, safe, folder, keep_sources_);
         } else {
             set_status("Success! Textures, SMDs, and " + safe + ".qc written to " + export_dir_ + ".", StatusTone::Success);
@@ -204,11 +206,27 @@ void EditorApp::poll_compile()
         if (!result)
             return;
         switch (result->status) {
-        case CompileResult::Status::Ok:
-            set_log(result->output);   // the output of a compile that worked: there, but not unfolded
-            open_log_ = false;
-            set_status("Success! " + compile_job_.model_name() + ".mdl", StatusTone::Success);
+        case CompileResult::Status::Ok: {
+            // Read the model back: what the compiler made, and whether it is what was exported.
+            std::string summary, problems;
+            try {
+                const MdlInfo model = read_mdl_file(compiling_mdl_);
+                summary = describe_mdl(model);
+                if (compiling_)
+                    for (const std::string& problem : compare_with_export(model, *compiling_))
+                        problems += "Check: " + problem + "\n";
+            } catch (const std::exception& e) {
+                problems = std::string("Check: the compiled model could not be read: ") + e.what() + "\n";
+            }
+            set_log(problems + result->output);
+            open_log_ = !problems.empty();   // unfolded only when the check found something
+            if (problems.empty())
+                set_status("Success! " + compile_job_.model_name() + ".mdl (" + summary + ")", StatusTone::Success);
+            else
+                set_status("Compiled " + compile_job_.model_name() + ".mdl, but it differs from the export: see the log",
+                           StatusTone::Warning);
             break;
+        }
         case CompileResult::Status::CompilerNotFound:
             std::fprintf(stderr, "Compiler not found: '%s'\n", compiler_path_.c_str());
             set_log("Compiler not found: '" + compiler_path_ + "'");

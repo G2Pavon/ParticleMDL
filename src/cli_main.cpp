@@ -156,9 +156,20 @@ int run(const Args& args)
     const gs::CompileResult result = gs::compile_model(args.compiler, safe, options);
     using Status = gs::CompileResult::Status;
     switch (result.status) {
-    case Status::Ok:
-        std::printf("Wrote %s\n", gs::to_utf8(out / gs::from_utf8(safe + ".mdl")).c_str());
+    case Status::Ok: {
+        const fs::path mdl = out / gs::from_utf8(safe + ".mdl");
+        std::printf("Wrote %s\n", gs::to_utf8(mdl).c_str());
+        // Read the model back: what the compiler made, and whether it is what was exported.
+        try {
+            const gs::MdlInfo info = gs::read_mdl_file(mdl);
+            std::printf("  %s\n", gs::describe_mdl(info).c_str());
+            for (const std::string& problem : gs::compare_with_export(info, sys))
+                std::fprintf(stderr, "warning: %s\n", problem.c_str());
+        } catch (const std::exception& e) {
+            std::fprintf(stderr, "warning: the compiled model could not be checked: %s\n", e.what());
+        }
         return kOk;
+    }
     case Status::CompilerNotFound:
         std::fprintf(stderr, "error: compiler not found: '%s'\n", args.compiler.c_str());
         break;

@@ -86,6 +86,8 @@ private:
     bool keep_sources_ = false;   // keep the .qc, .smd and .bmp after a successful compile
     std::string compiler_path_;
     CompileJob compile_job_;
+    std::optional<ParticleSystem> compiling_;   // the export being compiled, to check the model against
+    std::filesystem::path compiling_mdl_;
 
     std::string status_;
     std::string log_;          // compiler output and load warnings, shown under the Export button
