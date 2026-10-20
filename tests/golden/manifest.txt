@@ -6,6 +6,10 @@ campfire_sparks/.bmp 5174 8e8ed4db4b5565a4
 campfire_sparks/.qc 251 e9675775f90c907
 campfire_sparks/_anim.smd 203927 cefb13ca20ab49bd
 campfire_sparks/_ref.smd 23370 c92b68acded6c4b3
+explosion/.bmp 5174 9796cd5b74f4efa4
+explosion/.qc 228 8584c912a3ecbebb
+explosion/_anim.smd 371486 418d6bf8f1e3fdc8
+explosion/_ref.smd 31208 e10f352e391ab6cb
 fire/.bmp 5174 b5972d5250fb454c
 fire/.qc 209 b07a6dd95e474279
 fire/_anim.smd 445785 f1a86060f2cba1c7

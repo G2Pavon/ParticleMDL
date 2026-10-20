@@ -100,6 +100,7 @@ bool validate(Settings& s)
     changed |= clamp_value(s.duration, kMinDuration, kMaxDuration);
     changed |= clamp_value(s.lifespan, kMinLifespan, 1.0);
     changed |= clamp_value(s.fps, kMinFps, kMaxFps);
+    changed |= clamp_value(s.burst_window, 0.0, kMaxBurstWindow);
     changed |= clamp_value(s.texture.hardness, kMinHardness, kMaxHardness);
     changed |= clamp_value(s.scale_start, 0.0, kMaxScale);
     changed |= clamp_value(s.scale_end, 0.0, kMaxScale);

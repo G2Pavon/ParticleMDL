@@ -24,8 +24,8 @@ bool hides_with_scale(const Settings& s) noexcept
 }
 
 // Where in a particle's frames its pose jumps: a new life starts (death and
-// rebirth with a hidden stretch in between, or the wrap of a loop), or the
-// particle is parked and brought back.
+// rebirth with a hidden stretch in between, or the wrap of a loop), the
+// particle is parked and brought back, or a one-shot particle is born.
 std::vector<Seam> find_seams(const ParticleSystem& sys, const Particle& p)
 {
     const int steps = sys.loop_steps();
@@ -35,11 +35,13 @@ std::vector<Seam> find_seams(const ParticleSystem& sys, const Particle& p)
     std::vector<Seam> seams;
     for (int f = 0; f < steps; ++f) {
         const double t0 = sys.frame_time(f);
-        const double t1 = loop * (f + 1) / steps;   // not wrapped: the closing frame is one loop on
+        const double t1 = loop * (f + 1) / steps;   // not wrapped: a loop's closing frame is one loop on
+        const LifeState before = sys.life_state(p, t0), after = sys.life_state(p, t1);
         const bool new_life = sys.generation(p, t0) != sys.generation(p, t1);
-        const bool toggled = sys.life_state(p, t0).past_lifespan() != sys.life_state(p, t1).past_lifespan();
-        if (new_life || (dead_is_a_jump && toggled))
-            seams.push_back({f, (f + 1) % steps});
+        const bool toggled = before.past_lifespan() != after.past_lifespan();
+        const bool born = before.unborn() != after.unborn();
+        if (new_life || born || (dead_is_a_jump && toggled))
+            seams.push_back({f, sys.looping() ? (f + 1) % steps : f + 1});
     }
     return seams;
 }
@@ -62,11 +64,13 @@ BakedPoses bake(const ParticleSystem& sys)
     const Settings& s = sys.settings();
     BakedPoses b;
     b.steps_ = sys.loop_steps();
+    b.looping_ = sys.looping();
     b.particles_ = sys.num_particles();
     b.loop_ = sys.loop_duration();
-    b.poses_.resize(static_cast<std::size_t>(b.steps_) * b.particles_);
+    const int stored = b.stored_frames();
+    b.poses_.resize(static_cast<std::size_t>(stored) * b.particles_);
 
-    for (int f = 0; f < b.steps_; ++f)
+    for (int f = 0; f < stored; ++f)
         for (int i = 0; i < b.particles_; ++i)
             b.at_mut(f, i) = sys.pose_at(sys.particles()[i], sys.frame_time(f));
 
@@ -89,8 +93,8 @@ BakedPoses bake(const ParticleSystem& sys)
         }
 
         // Where the particle was and will be, before this loop changes anything.
-        std::vector<ParticlePose> ideal(static_cast<std::size_t>(b.steps_));
-        for (int f = 0; f < b.steps_; ++f)
+        std::vector<ParticlePose> ideal(static_cast<std::size_t>(stored));
+        for (int f = 0; f < stored; ++f)
             ideal[static_cast<std::size_t>(f)] = b.at(f, i);
 
         if (!dives) {
@@ -136,7 +140,9 @@ SampledPose to_sampled(const ParticlePose& pose)
 
 SampledPose BakedPoses::sample(int particle, double loop_time) const
 {
-    const double f = floor_mod(loop_time, loop_) / loop_ * steps_;
+    // In a loop the time wraps; a one-shot sequence stops at its ends.
+    const double within = looping_ ? floor_mod(loop_time, loop_) : std::clamp(loop_time, 0.0, loop_);
+    const double f = within / loop_ * steps_;
     const int i = std::min(static_cast<int>(f), steps_ - 1);
     const double t = f - i;
 
@@ -154,7 +160,7 @@ ParticleSystem::Bounds animation_bounds(const ParticleSystem& sys, const BakedPo
 {
     constexpr double inf = std::numeric_limits<double>::infinity();
     ParticleSystem::Bounds b{{inf, inf, inf}, {-inf, -inf, -inf}};
-    for (int f = 0; f < baked.steps(); ++f) {   // the closing frame repeats frame 0
+    for (int f = 0; f < baked.stored_frames(); ++f) {
         for (int i = 0; i < baked.particles(); ++i) {
             const ParticlePose& pose = baked.at(f, i);
             for (const Quad& q : sys.quads()) {

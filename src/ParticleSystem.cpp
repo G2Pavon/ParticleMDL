@@ -121,8 +121,9 @@ ParticleSystem::ParticleSystem(const Settings& settings) : settings_(validated(s
         const Vec2 turb_freq{3.0 + rng.signed_unit() * 2.0, 2.0 + rng.signed_unit() * 2.0};
         const Vec2 turb_phase{rng.unit() * 2.0 * kPi, rng.unit() * 2.0 * kPi};
 
-        // Births are evenly spaced over the loop for a steady flow.
-        const double phase = static_cast<double>(i + 1) / num_particles;
+        // Births are evenly spaced over the loop for a steady flow; a one-shot effect is born in a burst.
+        const double phase = s.loop ? static_cast<double>(i + 1) / num_particles : 0.0;
+        p.birth = s.loop ? 0.0 : s.burst_window * s.duration * i / num_particles;
         const double p_speed = s.speed + (speed_jitter * s.spread);
         const double p_burst = s.burst + (burst_jitter * s.spread);
 
@@ -197,7 +198,8 @@ ParticleSystem::ParticleSystem(const Settings& settings) : settings_(validated(s
     double max_x = 0.001, max_y = 0.001;
     min_z_raw_ = inf;
     max_z_raw_ = -inf;
-    for (int f = 0; f < loop_steps_; ++f) {   // the closing frame repeats frame 0
+    const int fitted_frames = s.loop ? loop_steps_ : loop_steps_ + 1;   // a loop's closing frame repeats frame 0
+    for (int f = 0; f < fitted_frames; ++f) {
         const double ct = frame_time(f);
         for (const Particle& p : particles_) {
             const LifeState st = life_state(p, ct);
@@ -255,7 +257,16 @@ LifeState ParticleSystem::life_state(const Particle& p, double loop_time) const
 {
     LifeState st;
     const double loop = loop_duration();
-    const double p_time = floor_mod(loop_time + (p.phase_offset * loop), loop);
+    double p_time;
+    if (settings_.loop) {
+        p_time = floor_mod(loop_time + (p.phase_offset * loop), loop);
+    } else {
+        p_time = loop_time - p.birth;   // no wrap: it is born once
+        if (p_time < 0.0) {
+            st.phase = LifeState::Phase::Unborn;
+            return st;
+        }
+    }
     st.eval_time = p_time;
     if ((p_time / loop) <= settings_.lifespan)
         return st;
@@ -278,6 +289,8 @@ LifeState ParticleSystem::life_state(const Particle& p, double loop_time) const
 
 long long ParticleSystem::generation(const Particle& p, double loop_time) const
 {
+    if (!settings_.loop)
+        return 0;   // born once
     const double loop = loop_duration();
     const double x = loop_time + (p.phase_offset * loop);
     // x minus its position in the loop is a whole number of loops.
@@ -288,6 +301,8 @@ ParticlePose ParticleSystem::pose_at(const Particle& p, double loop_time) const
 {
     const LifeState st = life_state(p, loop_time);
     const bool vertex_bones = settings_.scale_mode == ScaleMode::VertexBone;
+    if (st.unborn())
+        return {{0.0, 0.0, hide_z_}, {}, vertex_bones ? 0.0 : 1.0, false};   // waits out of sight, whatever the end behavior
     if (st.moved_by_motion())
         return {position_at(p, st.eval_time), rotation_at(p, st.eval_time),
                 vertex_bones ? scale_factor_at(st.eval_time, st.past_lifespan()) : 1.0, true};

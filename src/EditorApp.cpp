@@ -610,6 +610,13 @@ void EditorApp::draw_left_panel()
                           "Stop & Stay: freezes where it is\n"
                           "Endless Loop: keeps moving\n"
                           "With Vertex Bone scaling hidden particles also shrink to nothing.");
+    changed |= ImGui::Checkbox("Loop", &s.loop);
+    ImGui::SetItemTooltip("On: particles are born all through the loop and the animation repeats.\n"
+                          "Off: it plays once, like an explosion or an impact, and holds its last frame.");
+    if (!s.loop) {
+        changed |= reset_slider("burst_window", "Burst Window", s.burst_window, 0.0, 1.0, 0.0, "%.2f");
+        ImGui::SetItemTooltip("The part of the duration the particles are born in (0 = all at once)");
+    }
 
     group_label("Volume");
     changed |= reset_slider("volume_width", "Width (X)", s.volume_width, 1, 1024, 128);

@@ -61,7 +61,7 @@ std::string make_qc(const ParticleSystem& sys, const BakedPoses& baked, const st
 
     emit(out, "$texrendermode \"{}\" additive\n\n", tex_ref);
     emit(out, "$body \"studio\" \"{}_ref\"\n\n", safe);
-    emit(out, "$sequence \"idle\" \"{}_anim\" loop fps {}\n", safe, static_cast<int>(sys.export_fps()));
+    emit(out, "$sequence \"idle\" \"{}_anim\"{} fps {}\n", safe, sys.looping() ? " loop" : "", static_cast<int>(sys.export_fps()));
     return out;
 }
 
@@ -423,8 +423,8 @@ std::vector<std::string> compare_with_export(const MdlInfo& mdl, const ParticleS
         if (static_cast<double>(seq.fps) != sys.export_fps())
             problems.push_back(std::format("the sequence runs at {:g} fps, the export says {:g}", static_cast<double>(seq.fps),
                                            sys.export_fps()));
-        if (!(seq.flags & kMdlSequenceLooping))
-            problems.push_back("the sequence does not loop");
+        if (((seq.flags & kMdlSequenceLooping) != 0) != sys.looping())
+            problems.push_back(sys.looping() ? "the sequence does not loop" : "the sequence loops, the export does not");
         if (!seq.external) {
             const std::size_t measured = seq.value_bytes + 12;   // studiomdl's measure: from the last offset entry
             const std::size_t predicted = sequence_bytes(sys);

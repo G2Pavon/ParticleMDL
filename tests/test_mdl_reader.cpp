@@ -296,3 +296,17 @@ TEST_CASE("a box with vertex bones compiles with shared corner bones")
     CHECK(compare_with_export(m, sys).empty());
     CHECK(m.sequences[0].value_bytes + 12 == sequence_bytes(sys));
 }
+
+TEST_CASE("a one-shot effect compiles to a sequence that does not loop")
+{
+    const MdlInfo m = read_mdl(read_bytes(kFixtures / "one_shot.mdl"));
+    REQUIRE(m.sequences.size() == 1);
+    CHECK((m.sequences[0].flags & kMdlSequenceLooping) == 0);
+    CHECK(m.sequences[0].frames == 46);   // 45 steps and the frame the effect ends on
+    CHECK(m.sequences[0].fps == 30.0f);
+
+    const ParticleSystem sys(settings_of("one_shot"));
+    CHECK_FALSE(sys.looping());
+    CHECK(compare_with_export(m, sys).empty());
+    CHECK(m.sequences[0].value_bytes + 12 == sequence_bytes(sys));
+}

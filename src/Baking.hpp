@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <vector>
 
 #include "ParticleSystem.hpp"
@@ -30,15 +31,19 @@ struct SampledPose {
 // pose_at() stays the ideal motion; this is the same motion as it can be played.
 class BakedPoses {
 public:
-    int frames() const noexcept { return steps_ + 1; }   // the closing frame repeats frame 0
+    int frames() const noexcept { return steps_ + 1; }   // in a loop the closing frame repeats frame 0
     int steps() const noexcept { return steps_; }
+    // Frames that hold poses of their own: a loop's closing frame is frame 0 again.
+    int stored_frames() const noexcept { return looping_ ? steps_ : steps_ + 1; }
+    bool looping() const noexcept { return looping_; }
     int particles() const noexcept { return particles_; }
     double loop_duration() const noexcept { return loop_; }
 
-    // `frame` may be the closing frame (steps()).
+    // `frame` may be the last one (steps()): a loop's is frame 0 again, a one-shot sequence's its end.
     const ParticlePose& at(int frame, int particle) const noexcept
     {
-        return poses_[static_cast<std::size_t>(frame % steps_) * particles_ + particle];
+        const int stored = looping_ ? frame % steps_ : std::min(frame, steps_);
+        return poses_[static_cast<std::size_t>(stored) * particles_ + particle];
     }
 
     // The pose at `loop_time`: linear between the two baked frames around it.
@@ -57,10 +62,11 @@ private:
     }
 
     int steps_ = 1;
+    bool looping_ = true;
     int particles_ = 0;
     double loop_ = 1.0;
     double unhidden_jump_ = 0.0;
-    std::vector<ParticlePose> poses_;   // frame-major, steps_ frames
+    std::vector<ParticlePose> poses_;   // frame-major, stored_frames() frames
 };
 
 BakedPoses bake(const ParticleSystem& sys);

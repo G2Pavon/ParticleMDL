@@ -48,6 +48,11 @@ struct Settings {
     double lifespan = 0.85;  // fraction of the loop a particle lives
     int fps = 30;            // exported frames per second
     EndBehavior end_behavior = EndBehavior::HideUnderground;
+    // Looping: particles are born evenly over the loop and the sequence repeats. Without it the
+    // effect plays once (an explosion, an impact): particles are born in the first burst_window of
+    // the duration (0: all at the start) and the sequence ends on its last frame.
+    bool loop = true;
+    double burst_window = 0;   // fraction of the duration, one-shot only
 
     // Volume the motion is fitted into
     double volume_width = 128;   // X
@@ -115,6 +120,8 @@ void for_each_field(S& s, F&& f)
     f("lifespan", s.lifespan);
     f("fps", s.fps);
     f("end_behavior", s.end_behavior);
+    f("loop", s.loop);
+    f("burst_window", s.burst_window);
     f("volume_width", s.volume_width);
     f("volume_depth", s.volume_depth);
     f("volume_height", s.volume_height);
@@ -165,6 +172,7 @@ void enforce_bone_limits(Settings& s) noexcept;
 inline constexpr double kMinDuration = 0.1, kMaxDuration = 60.0;
 inline constexpr double kMinLifespan = 0.01;
 inline constexpr int kMinFps = 1, kMaxFps = 60;
+inline constexpr double kMaxBurstWindow = 1.0;
 inline constexpr double kMinHardness = 0.05, kMaxHardness = 20.0;
 inline constexpr double kMaxScale = 100.0;
 inline constexpr double kMaxVolume = 65536;

@@ -18,7 +18,8 @@ using Quad = std::array<QuadVertex, 4>;
 // One particle's seed values; trivially copyable.
 struct Particle {
     int base_bone = 0;          // its corner bones (vertex bones) follow directly
-    double phase_offset = 0;    // birth time as a fraction of the loop
+    double phase_offset = 0;    // looping: birth time as a fraction of the loop
+    double birth = 0;           // one-shot: when it starts, in seconds
     Vec3 spawn;                 // unscaled start position
     Vec3 velocity;              // unscaled, per second
     Vec3 spin;                  // rad/s
@@ -28,6 +29,7 @@ struct Particle {
 // Where a particle is in its life cycle at a given loop time.
 struct LifeState {
     enum class Phase {
+        Unborn,      // one-shot only: before its birth
         Alive,       // within the lifespan
         Lingering,   // past it, but still moved by the motion equations (Endless Loop, Stop & Stay)
         Dead,        // past it and handed to the end behavior (hidden, parked, falling)
@@ -35,8 +37,9 @@ struct LifeState {
     Phase phase = Phase::Alive;
     double eval_time = 0;   // time fed into the motion equations
 
-    bool past_lifespan() const noexcept { return phase != Phase::Alive; }
-    bool moved_by_motion() const noexcept { return phase != Phase::Dead; }
+    bool past_lifespan() const noexcept { return phase == Phase::Lingering || phase == Phase::Dead; }
+    bool moved_by_motion() const noexcept { return phase == Phase::Alive || phase == Phase::Lingering; }
+    bool unborn() const noexcept { return phase == Phase::Unborn; }
 };
 
 // Everything needed to draw (or export) one particle at one moment.
@@ -96,13 +99,19 @@ public:
 
     double loop_duration() const noexcept { return settings_.duration; }
     double export_fps() const noexcept { return export_fps_; }
-    // Steps in one loop. GoldSrc plays a looping sequence over numframes - 1
-    // steps and studiomdl overwrites its last frame with the first, so the
-    // sequence holds one more frame that repeats frame 0.
+    bool looping() const noexcept { return settings_.loop; }
+    // Steps in the duration. GoldSrc plays a looping sequence over numframes - 1
+    // steps and studiomdl overwrites its last frame with the first, so a looping
+    // sequence holds one more frame that repeats frame 0. A one-shot sequence has
+    // that one more frame as its real end, at the full duration.
     int loop_steps() const noexcept { return loop_steps_; }
     int export_frames() const noexcept { return loop_steps_ + 1; }
-    // Loop time of an exported frame; the closing frame is frame 0 again.
-    double frame_time(int frame) const noexcept { return (frame % loop_steps_) * loop_duration() / loop_steps_; }
+    // Time of an exported frame; in a loop the closing frame is frame 0 again.
+    double frame_time(int frame) const noexcept
+    {
+        return settings_.loop ? (frame % loop_steps_) * loop_duration() / loop_steps_
+                              : frame * loop_duration() / loop_steps_;
+    }
     Vec3 emitter_rotation() const noexcept { return emit_rot_; }   // radians
     bool has_micro_rotation() const noexcept { return has_micro_rotation_; }
 
