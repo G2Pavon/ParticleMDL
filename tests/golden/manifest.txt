@@ -20,12 +20,12 @@ laser_burst/_anim.smd 168628 7375d446a15da931
 laser_burst/_ref.smd 215059 81abd9cf4f8fa7c5
 orbs/.bmp 5174 a090a2762233bca5
 orbs/.qc 211 e2a4c28527560a80
-orbs/_anim.smd 197476 17418501ea1ddec0
+orbs/_anim.smd 198493 7214860cafa0f873
 orbs/_ref.smd 177229 1ba94722724732e1
 smoke/.bmp 5174 afc82faa8a61259a
-smoke/.qc 212 195185f37a9f55a6
-smoke/_anim.smd 384202 c1c4668ee3458ec3
-smoke/_ref.smd 22661 1c32e7976b496553
+smoke/.qc 212 e20ab552eb848611
+smoke/_anim.smd 382813 2435f0ee00bf6426
+smoke/_ref.smd 30808 10178570d6345b0f
 sun/.bmp 66614 a15b2d2bc52f4346
 sun/.qc 203 bae68786c9ae63a5
 sun/_anim.smd 247197 213a93a091bfcad8

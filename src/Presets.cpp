@@ -28,7 +28,7 @@ std::span<const Preset> builtin_presets()
             .geometry = Geometry::SingleQuad, .quad_width = 3, .quad_height = 3, .double_sided = true, .mesh_rotation = {0, 0, 0},
             .particle_spin = {45, 45, 90}, .spin_spread = 90}},
         Preset{"Orbs", {
-            .count = 70, .duration = 2.7, .lifespan = 0.85, .fps = 15, .end_behavior = EndBehavior::HideInCore,
+            .count = 70, .duration = 2.7, .lifespan = 0.85, .fps = 15, .end_behavior = EndBehavior::HideUnderground,
             .volume_width = 256, .volume_depth = 256, .volume_height = 128, .velocity = {0, 0, 0}, .spin = {0, 30, 0},
             .emission_angle = 360, .spawn_radius = 0, .spawn_height = 0, .emitter_tilt = {0, 0, 0}, .hollow_ring = false,
             .speed = 35, .burst = 70, .spread = 25, .gravity = -40, .turbulence = 60, .vortex_spin = 0, .vortex_pull = 0,
@@ -64,13 +64,13 @@ std::span<const Preset> builtin_presets()
             .geometry = Geometry::TriPlanarQuads, .quad_width = 50, .quad_height = 50, .double_sided = true, .mesh_rotation = {0, 0, 0},
             .particle_spin = {0, 0, 0}, .spin_spread = 32}},
         Preset{"Smoke", {
-            .count = 110, .duration = 3.1, .lifespan = 0.2, .fps = 15, .end_behavior = EndBehavior::EndlessLoop,
+            .count = 25, .duration = 3.1, .lifespan = 0.2, .fps = 15, .end_behavior = EndBehavior::EndlessLoop,
             .volume_width = 40, .volume_depth = 40, .volume_height = 126, .velocity = {0, 0, 0}, .spin = {0, 0, 0},
             .emission_angle = 360, .spawn_radius = 291, .spawn_height = 0, .emitter_tilt = {0, 0, 0}, .hollow_ring = false,
             .speed = 10, .burst = 40, .spread = 20, .gravity = 30, .turbulence = 198, .vortex_spin = 0, .vortex_pull = 0,
             .pattern = TexPattern::SoftCloud, .color_mode = ColorMode::SolidColor, .core_color = {110, 110, 115}, .edge_color = {0, 0, 0}, .texture_size = 64, .hardness = 0.5, .texture_file = {},
             .scale_mode = ScaleMode::VertexBone, .scale_start = 3.1, .scale_end = 1.2,
-            .geometry = Geometry::VolumetricBox, .quad_width = 21, .quad_height = 22, .double_sided = true, .mesh_rotation = {0, 0, 0},
+            .geometry = Geometry::SingleQuad, .quad_width = 21, .quad_height = 22, .double_sided = true, .mesh_rotation = {0, 0, 0},
             .particle_spin = {45, 45, 90}, .spin_spread = 90}},
         Preset{"Sun", {
             .count = 50, .duration = 5.0, .lifespan = 0.95, .fps = 15, .end_behavior = EndBehavior::EndlessLoop,
