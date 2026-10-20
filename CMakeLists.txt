@@ -82,7 +82,7 @@ if(WIN32)
 endif()
 
 # ---------------------------------------------------------------------------
-# Core: simulation, textures, export, settings, preview scene (no GUI dependencies)
+# Core: settings, simulation, textures, export and compiler (no GUI dependencies)
 # ---------------------------------------------------------------------------
 add_library(particles_core STATIC
     src/Settings.cpp
@@ -90,18 +90,15 @@ add_library(particles_core STATIC
     src/Presets.cpp
     src/ParticleSystem.cpp
     src/TextureGenerator.cpp
+    src/ImageImport.cpp
     src/Exporter.cpp
     src/Compiler.cpp
-    src/CompileJob.cpp
-    src/PathInput.cpp
-    src/OrbitCamera.cpp
-    src/PreviewScene.cpp
-    src/ImageImport.cpp
-    src/NativeDialog.cpp)
+    src/CompileJob.cpp)
 target_include_directories(particles_core PUBLIC src)
-target_link_libraries(particles_core PRIVATE stb tinyfiledialogs)
 find_package(Threads REQUIRED)
-target_link_libraries(particles_core PUBLIC nlohmann_json::nlohmann_json Threads::Threads PRIVATE gs_flags)
+target_link_libraries(particles_core
+    PUBLIC nlohmann_json::nlohmann_json Threads::Threads
+    PRIVATE stb gs_flags)
 
 # posix_spawn_file_actions_addchdir_np (glibc 2.29+, macOS 10.15+) lets the
 # compiler run inside the export folder without changing our own directory.
@@ -114,6 +111,19 @@ if(GS_HAVE_SPAWN_ADDCHDIR)
 endif()
 
 # ---------------------------------------------------------------------------
+# Editor support: preview camera and scene, path input, native dialogs. No
+# ImGui or OpenGL, so it can be built and tested without a window.
+# ---------------------------------------------------------------------------
+add_library(particles_editor_support STATIC
+    src/OrbitCamera.cpp
+    src/PreviewScene.cpp
+    src/PathInput.cpp
+    src/NativeDialog.cpp)
+target_link_libraries(particles_editor_support
+    PUBLIC particles_core
+    PRIVATE tinyfiledialogs gs_flags)
+
+# ---------------------------------------------------------------------------
 # Application
 # ---------------------------------------------------------------------------
 add_executable(particlemdl
@@ -124,7 +134,7 @@ add_executable(particlemdl
     src/PreviewRenderer.cpp
     src/GlTexture.cpp
     src/FileDialog.cpp)
-target_link_libraries(particlemdl PRIVATE particles_core imgui gs_flags tinyfiledialogs)
+target_link_libraries(particlemdl PRIVATE particles_editor_support imgui gs_flags)
 target_compile_definitions(particlemdl PRIVATE GS_VERSION="${PROJECT_VERSION}")
 if(WIN32)
     # GUI subsystem: double-clicking the exe opens no console window.
