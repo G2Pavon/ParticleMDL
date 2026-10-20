@@ -65,7 +65,7 @@ private:
 
     Settings settings_;
     std::optional<ParticleSystem> system_;
-    std::optional<Settings> texture_settings_;   // settings the preview textures were made from
+    std::optional<TextureSettings> texture_settings_;   // what the preview textures were made from
     bool dirty_ = true;
     int preset_index_ = 0;   // -1: no preset selected
 

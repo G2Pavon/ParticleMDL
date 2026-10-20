@@ -94,18 +94,18 @@ void EditorApp::rebuild()
     name_problem_ = model_name_problem(settings_.model_name);
     refresh_preset_label();
     // Quantizing the texture is the slow part; physics sliders do not need it.
-    if (!texture_settings_ || !same_texture_inputs(*texture_settings_, settings_)) {
+    if (!texture_settings_ || *texture_settings_ != settings_.texture) {
         texture_problem_.reset();
         try {
-            renderer_.update_textures(settings_);
+            renderer_.update_textures(settings_.texture);
         } catch (const std::exception& e) {
             // Preview the pattern instead; the export refuses until the image is fixed.
             texture_problem_ = e.what();
-            Settings pattern = settings_;
-            pattern.texture_file.clear();
+            TextureSettings pattern = settings_.texture;
+            pattern.file.clear();
             renderer_.update_textures(pattern);
         }
-        texture_settings_ = settings_;
+        texture_settings_ = settings_.texture;
     }
     dirty_ = false;
 }
@@ -321,7 +321,7 @@ void EditorApp::finish_dialog(DialogPurpose purpose, const std::optional<std::fi
     case DialogPurpose::ExportFolder: set_export_dir(to_utf8(*path)); break;
     case DialogPurpose::Compiler: compiler_path_ = to_utf8(*path); break;
     case DialogPurpose::Texture:
-        settings_.texture_file = to_utf8(*path);
+        settings_.texture.file = to_utf8(*path);
         dirty_ = true;
         set_status("Texture: " + to_utf8(path->filename()), StatusTone::Success);
         break;
@@ -710,15 +710,15 @@ void EditorApp::draw_right_panel()
 
     group_label("Image");
     ImGui::SetNextItemWidth(ui::px(-150));
-    std::string file = s.texture_file;
+    std::string file = s.texture.file;
     ImGui::InputTextWithHint("##texture_file", "custom image", &file, ImGuiInputTextFlags_ReadOnly);
     ImGui::SameLine();
     if (ImGui::Button("Browse##texture", ImVec2(ui::px(70), 0)))
         open_dialog(DialogPurpose::Texture);
     ImGui::SameLine();
-    ImGui::BeginDisabled(s.texture_file.empty());
+    ImGui::BeginDisabled(s.texture.file.empty());
     if (ImGui::Button("Clear##texture", ImVec2(ui::px(70), 0))) {
-        s.texture_file.clear();
+        s.texture.file.clear();
         changed = true;
     }
     ImGui::EndDisabled();
@@ -727,19 +727,19 @@ void EditorApp::draw_right_panel()
 
     group_label("Texture");
     // An imported image replaces the pattern and colours, so those are greyed out.
-    const bool imported = !s.texture_file.empty();
+    const bool imported = !s.texture.file.empty();
     if (imported)
         ImGui::TextColored(kMuted, "Pattern and colours are replaced by the image.");
     ImGui::BeginDisabled(imported);
-    changed |= enum_combo("Pattern", s.pattern);
-    changed |= enum_combo("Color Mode", s.color_mode);
+    changed |= enum_combo("Pattern", s.texture.pattern);
+    changed |= enum_combo("Color Mode", s.texture.color_mode);
     ImGui::SetNextItemWidth(ui::field_width());
-    changed |= color_edit("Core Color", s.core_color);
+    changed |= color_edit("Core Color", s.texture.core_color);
     ImGui::SetNextItemWidth(ui::field_width());
-    changed |= color_edit("Edge Color", s.edge_color);
-    changed |= reset_slider("hardness", "Hardness", s.hardness, kSliderHardness.lo, kSliderHardness.hi, 0.8, "%.2f");
+    changed |= color_edit("Edge Color", s.texture.edge_color);
+    changed |= reset_slider("hardness", "Hardness", s.texture.hardness, kSliderHardness.lo, kSliderHardness.hi, 0.8, "%.2f");
     ImGui::EndDisabled();
-    changed |= int_combo("Resolution", s.texture_size, kTextureSizes);
+    changed |= int_combo("Resolution", s.texture.size, kTextureSizes);
 
     group_label("Scaling");
     changed |= enum_combo("Mode", s.scale_mode);

@@ -410,7 +410,7 @@ void export_model(const ParticleSystem& sys, const fs::path& out_dir)
         throw ExportBlocked(std::move(report.blockers));
 
     StagedFiles files(out_dir);
-    files.add(from_utf8(tex_ref), as_chars(encode_indexed_bmp(export_texture(sys.settings()))));
+    files.add(from_utf8(tex_ref), as_chars(encode_indexed_bmp(export_texture(sys.settings().texture))));
     files.add(from_utf8(safe + ".qc"), make_qc(sys, baked, safe, tex_ref));
     files.add(from_utf8(safe + "_ref.smd"), make_ref_smd(sys, tex_ref));
     files.add(from_utf8(safe + "_anim.smd"), make_anim_smd(sys, table));

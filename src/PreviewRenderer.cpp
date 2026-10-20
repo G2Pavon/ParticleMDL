@@ -27,7 +27,7 @@ void set_additive_blend(const ImDrawList*, const ImDrawCmd*)
 
 } // namespace
 
-void PreviewRenderer::update_textures(const Settings& s)
+void PreviewRenderer::update_textures(const TextureSettings& s)
 {
     game_.upload(to_rgba(expand(export_texture(s))));
 }

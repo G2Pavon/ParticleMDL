@@ -34,9 +34,7 @@ using RgbaImage = Image<4>;
 double pattern_intensity(TexPattern pattern, double dx, double dy, double dist) noexcept;
 
 // Export texture (tex_res x tex_res), color premultiplied by intensity.
-RgbImage make_export_texture(const Settings& s);
-// True when both settings produce the same textures.
-bool same_texture_inputs(const Settings& a, const Settings& b);
+RgbImage make_export_texture(const TextureSettings& s);
 
 struct IndexedImage {
     int width = 0, height = 0;
@@ -50,8 +48,8 @@ IndexedImage quantize(const RgbImage& img);
 // Floyd-Steinberg dithering. Slower; better colours and gradients.
 IndexedImage quantize_refined(const RgbImage& img);
 // What the BMP holds and the preview shows: the procedural pattern, or the
-// imported image when Settings::texture_file is set. Throws if it cannot be read.
-IndexedImage export_texture(const Settings& s);
+// imported image when TextureSettings::file is set. Throws if it cannot be read.
+IndexedImage export_texture(const TextureSettings& s);
 RgbImage expand(const IndexedImage& img);
 RgbaImage to_rgba(const RgbImage& img);   // opaque
 

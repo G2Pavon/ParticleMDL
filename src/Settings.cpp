@@ -95,7 +95,7 @@ bool validate(Settings& s)
     changed |= clamp_value(s.duration, kMinDuration, kMaxDuration);
     changed |= clamp_value(s.lifespan, kMinLifespan, 1.0);
     changed |= clamp_value(s.fps, kMinFps, kMaxFps);
-    changed |= clamp_value(s.hardness, kMinHardness, kMaxHardness);
+    changed |= clamp_value(s.texture.hardness, kMinHardness, kMaxHardness);
     changed |= clamp_value(s.scale_start, 0.0, kMaxScale);
     changed |= clamp_value(s.scale_end, 0.0, kMaxScale);
     changed |= clamp_value(s.volume_width, 1.0, kMaxVolume);
@@ -103,8 +103,8 @@ bool validate(Settings& s)
     changed |= clamp_value(s.volume_height, 1.0, kMaxVolume);
     changed |= clamp_value(s.quad_width, 1.0, kMaxQuadSize);
     changed |= clamp_value(s.quad_height, 1.0, kMaxQuadSize);
-    if (const int size = nearest_texture_size(s.texture_size); size != s.texture_size) {
-        s.texture_size = size;
+    if (const int size = nearest_texture_size(s.texture.size); size != s.texture.size) {
+        s.texture.size = size;
         changed = true;
     }
     return changed;
@@ -129,8 +129,7 @@ Settings blank_settings()
         .burst = 0,
         .spread = 0,
         .gravity = 0,
-        .core_color = {255, 255, 255},
-        .texture_file = {},
+        .texture = {.core_color = {255, 255, 255}},
         .geometry = Geometry::SingleQuad,
     };
 }

@@ -14,7 +14,7 @@ public:
     static constexpr int kSwatchSize = 200;
 
     // Rebuilds the texture from the current settings.
-    void update_textures(const Settings& s);
+    void update_textures(const TextureSettings& s);
     // The exported texture, palettized exactly as written to the BMP.
     ImTextureID swatch() const { return game_.imgui_id(); }
 

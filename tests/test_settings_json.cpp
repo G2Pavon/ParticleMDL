@@ -61,11 +61,11 @@ TEST_CASE("awkward values survive a write and a read")
 {
     Settings s;
     s.model_name = "with \"quotes\", \\ and ünïcode";
-    s.texture_file = "dir/with space/tex.png";
+    s.texture.file = "dir/with space/tex.png";
     s.duration = 0.1 + 0.2;   // not exactly representable
     s.gravity = -1e-7;
     s.velocity = {1.0 / 3.0, -2.5, 1e6};
-    s.core_color = {0, 1, 255};
+    s.texture.core_color = {0, 1, 255};
 
     const SettingsLoad loaded = settings_from_json(json::parse(settings_file_text(s)), Settings{});
     CHECK(loaded.settings == s);
@@ -135,7 +135,7 @@ TEST_CASE("colors are clamped and extra entries are ignored")
     Settings s;
     const auto warnings = apply_json(s, json{{"core_color", json::array({300, -5, 127.6, 99})}});
     CHECK(warnings.empty());
-    CHECK(s.core_color == Rgb{255, 0, 128});
+    CHECK(s.texture.core_color == Rgb{255, 0, 128});
 }
 
 TEST_CASE("unknown keys are reported and ignored")
@@ -174,7 +174,7 @@ TEST_CASE("loading validates, reports what changed and leaves the base alone")
     CHECK(loaded.settings.duration == kMaxDuration);
     CHECK(loaded.settings.fps == kMinFps);
     CHECK(loaded.settings.count == 126);
-    CHECK(loaded.settings.texture_size == 128);
+    CHECK(loaded.settings.texture.size == 128);
     CHECK(loaded.warnings.size() == 4);
     CHECK(has_warning(loaded.warnings, "duration"));
     CHECK(has_warning(loaded.warnings, "is out of range, using"));

@@ -87,22 +87,22 @@ TEST_CASE("an imported texture is found by its UTF-8 path in the settings")
     write_bmp(file);
 
     Settings s;
-    s.texture_file = to_utf8(file);
-    const IndexedImage img = export_texture(s);
-    CHECK(img.width == s.texture_size);
+    s.texture.file = to_utf8(file);
+    const IndexedImage img = export_texture(s.texture);
+    CHECK(img.width == s.texture.size);
 }
 
 TEST_CASE("settings keep a non-ASCII texture path through a settings file")
 {
     const TempDir dir(kJose + "_settings");
     Settings s;
-    s.texture_file = to_utf8(dir.path / from_utf8(kJapanese + ".png"));
+    s.texture.file = to_utf8(dir.path / from_utf8(kJapanese + ".png"));
 
     const fs::path file = dir.path / from_utf8(kEmoji + ".json");
     std::ofstream(file, std::ios::binary) << settings_file_text(s);
 
     const SettingsLoad loaded = read_settings_file(file, Settings{});
-    CHECK(loaded.settings.texture_file == s.texture_file);
+    CHECK(loaded.settings.texture.file == s.texture.file);
     CHECK(loaded.warnings.empty());
 
     // The path is stored as the UTF-8 text itself, not escaped or converted.

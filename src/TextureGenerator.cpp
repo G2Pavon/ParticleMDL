@@ -19,7 +19,7 @@ struct Color {
     double r, g, b;   // 0..255
 };
 
-Color base_color(const Settings& s, double dist)
+Color base_color(const TextureSettings& s, double dist)
 {
     const double t = std::min(1.0, std::max(0.0, dist));
     const Rgb& c1 = s.core_color;
@@ -31,7 +31,7 @@ Color base_color(const Settings& s, double dist)
 
 // Calls fn(x, y, color, intensity) for every pixel of a size x size sprite.
 template <typename Fn>
-void for_each_texel(const Settings& s, int size, Fn&& fn)
+void for_each_texel(const TextureSettings& s, int size, Fn&& fn)
 {
     const double center = size / 2.0;
     for (int y = 0; y < size; ++y) {
@@ -166,9 +166,9 @@ double pattern_intensity(TexPattern pattern, double dx, double dy, double dist) 
     return std::max(0.0, 1.0 - dist);
 }
 
-RgbImage make_export_texture(const Settings& s)
+RgbImage make_export_texture(const TextureSettings& s)
 {
-    const int size = s.texture_size;
+    const int size = s.size;
     RgbImage img(size, size);
     for_each_texel(s, size, [&](int x, int y, Color c, double intensity) {
         std::uint8_t* px = img.pixel(x, y);
@@ -313,11 +313,11 @@ IndexedImage quantize_refined(const RgbImage& img)
     return out;
 }
 
-IndexedImage export_texture(const Settings& s)
+IndexedImage export_texture(const TextureSettings& s)
 {
-    if (s.texture_file.empty())
+    if (s.file.empty())
         return quantize(make_export_texture(s));   // procedural: the same as always
-    return quantize_refined(fit_to_square(load_image_file(from_utf8(s.texture_file)), s.texture_size));
+    return quantize_refined(fit_to_square(load_image_file(from_utf8(s.file)), s.size));
 }
 
 RgbImage expand(const IndexedImage& img)
@@ -336,13 +336,6 @@ RgbaImage to_rgba(const RgbImage& img)
         out.pixel(i)[3] = 255;
     }
     return out;
-}
-
-bool same_texture_inputs(const Settings& a, const Settings& b)
-{
-    return a.pattern == b.pattern && a.color_mode == b.color_mode && a.core_color == b.core_color &&
-           a.edge_color == b.edge_color && a.texture_size == b.texture_size && a.hardness == b.hardness &&
-           a.texture_file == b.texture_file;
 }
 
 std::vector<std::uint8_t> encode_indexed_bmp(const RgbImage& img)

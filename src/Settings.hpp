@@ -23,6 +23,20 @@ struct Rgb {
     friend bool operator==(const Rgb&, const Rgb&) = default;
 };
 
+// Everything the sprite texture is made from. Two equal values give the same texture,
+// so comparing them tells whether a texture has to be made again.
+struct TextureSettings {
+    TexPattern pattern = TexPattern::RadialOrb;
+    ColorMode color_mode = ColorMode::SolidColor;
+    Rgb core_color{255, 170, 85};
+    Rgb edge_color{0, 0, 0};
+    int size = 64;
+    double hardness = 0.8;
+    std::string file{};   // imported image, a UTF-8 path; empty: the procedural pattern above
+
+    friend bool operator==(const TextureSettings&, const TextureSettings&) = default;
+};
+
 // Every value the editor exposes. Angles are in degrees, distances in model
 // units, times in seconds.
 struct Settings {
@@ -61,13 +75,7 @@ struct Settings {
     double vortex_pull = 0;   // units/s toward the axis
 
     // Texture
-    TexPattern pattern = TexPattern::RadialOrb;
-    ColorMode color_mode = ColorMode::SolidColor;
-    Rgb core_color{255, 170, 85};
-    Rgb edge_color{0, 0, 0};
-    int texture_size = 64;
-    double hardness = 0.8;
-    std::string texture_file;   // imported image, a UTF-8 path; empty: the procedural pattern above
+    TextureSettings texture;
 
     // Vertex-bone scaling over a particle's life
     ScaleMode scale_mode = ScaleMode::Static;
@@ -117,13 +125,13 @@ void for_each_field(S& s, F&& f)
     f("turbulence", s.turbulence);
     f("vortex_spin", s.vortex_spin);
     f("vortex_pull", s.vortex_pull);
-    f("pattern", s.pattern);
-    f("color_mode", s.color_mode);
-    f("core_color", s.core_color);
-    f("edge_color", s.edge_color);
-    f("texture_size", s.texture_size);
-    f("hardness", s.hardness);
-    f("texture_file", s.texture_file);
+    f("pattern", s.texture.pattern);
+    f("color_mode", s.texture.color_mode);
+    f("core_color", s.texture.core_color);
+    f("edge_color", s.texture.edge_color);
+    f("texture_size", s.texture.size);
+    f("hardness", s.texture.hardness);
+    f("texture_file", s.texture.file);
     f("scale_mode", s.scale_mode);
     f("scale_start", s.scale_start);
     f("scale_end", s.scale_end);

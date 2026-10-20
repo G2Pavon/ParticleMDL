@@ -4,6 +4,9 @@
 #include <limits>
 
 #include "Settings.hpp"
+#include "SettingsJson.hpp"
+
+#include <nlohmann/json.hpp>
 
 using namespace gs;
 
@@ -60,14 +63,14 @@ TEST_CASE("validate replaces out-of-range enum values with the defaults")
     Settings s;
     s.geometry = static_cast<Geometry>(99);
     s.end_behavior = static_cast<EndBehavior>(-1);
-    s.pattern = static_cast<TexPattern>(1000);
-    s.color_mode = static_cast<ColorMode>(2);
+    s.texture.pattern = static_cast<TexPattern>(1000);
+    s.texture.color_mode = static_cast<ColorMode>(2);
     s.scale_mode = static_cast<ScaleMode>(2);
     CHECK(validate(s));
     CHECK(s.geometry == defaults.geometry);
     CHECK(s.end_behavior == defaults.end_behavior);
-    CHECK(s.pattern == defaults.pattern);
-    CHECK(s.color_mode == defaults.color_mode);
+    CHECK(s.texture.pattern == defaults.texture.pattern);
+    CHECK(s.texture.color_mode == defaults.texture.color_mode);
     CHECK(s.scale_mode == defaults.scale_mode);
 }
 
@@ -77,7 +80,7 @@ TEST_CASE("validate clamps numbers to their hard limits")
     s.duration = 1000;
     s.lifespan = 5;
     s.fps = 1000;
-    s.hardness = 0;
+    s.texture.hardness = 0;
     s.scale_start = -1;
     s.scale_end = 1e9;
     s.volume_width = 0;
@@ -89,7 +92,7 @@ TEST_CASE("validate clamps numbers to their hard limits")
     CHECK(s.duration == kMaxDuration);
     CHECK(s.lifespan == 1.0);
     CHECK(s.fps == kMaxFps);
-    CHECK(s.hardness == kMinHardness);
+    CHECK(s.texture.hardness == kMinHardness);
     CHECK(s.scale_start == 0.0);
     CHECK(s.scale_end == kMaxScale);
     CHECK(s.volume_width == 1.0);
@@ -102,12 +105,12 @@ TEST_CASE("validate clamps numbers to their hard limits")
     low.duration = 0;
     low.lifespan = -1;
     low.fps = -5;
-    low.hardness = 1e6;
+    low.texture.hardness = 1e6;
     CHECK(validate(low));
     CHECK(low.duration == kMinDuration);
     CHECK(low.lifespan == kMinLifespan);
     CHECK(low.fps == kMinFps);
-    CHECK(low.hardness == kMaxHardness);
+    CHECK(low.texture.hardness == kMaxHardness);
 }
 
 TEST_CASE("validate keeps values on the limits")
@@ -116,7 +119,7 @@ TEST_CASE("validate keeps values on the limits")
     s.duration = kMaxDuration;
     s.lifespan = kMinLifespan;
     s.fps = kMinFps;
-    s.hardness = kMaxHardness;
+    s.texture.hardness = kMaxHardness;
     CHECK_FALSE(validate(s));
 }
 
@@ -155,9 +158,9 @@ TEST_CASE("validate snaps the texture size to a supported one")
 {
     auto snapped = [](int size) {
         Settings s;
-        s.texture_size = size;
+        s.texture.size = size;
         validate(s);
-        return s.texture_size;
+        return s.texture.size;
     };
     CHECK(snapped(64) == 64);
     CHECK(snapped(128) == 128);
@@ -183,4 +186,41 @@ TEST_CASE("validated is validate on a copy and is idempotent")
     Settings again = fixed;
     CHECK_FALSE(validate(again));
     CHECK(again == fixed);
+}
+
+TEST_CASE("texture settings compare equal exactly when they give the same texture")
+{
+    const TextureSettings base;
+    CHECK(base == TextureSettings{});
+
+    auto changed = [&](auto change) {
+        TextureSettings t;
+        change(t);
+        return t != base;
+    };
+    CHECK(changed([](TextureSettings& t) { t.pattern = TexPattern::HollowRing; }));
+    CHECK(changed([](TextureSettings& t) { t.color_mode = ColorMode::Gradient; }));
+    CHECK(changed([](TextureSettings& t) { t.core_color.r = 1; }));
+    CHECK(changed([](TextureSettings& t) { t.edge_color.b = 9; }));
+    CHECK(changed([](TextureSettings& t) { t.size = 128; }));
+    CHECK(changed([](TextureSettings& t) { t.hardness = 1.5; }));
+    CHECK(changed([](TextureSettings& t) { t.file = "image.png"; }));
+
+    // The physics and the geometry do not change the texture.
+    Settings a, b;
+    b.gravity = -1;
+    b.count = 3;
+    b.geometry = Geometry::VolumetricBox;
+    CHECK(a.texture == b.texture);
+}
+
+TEST_CASE("the settings file stays flat although the texture settings are grouped")
+{
+    Settings s;
+    s.texture.hardness = 2.5;
+    s.texture.size = 256;
+    const nlohmann::json j = to_json(s);
+    CHECK(j.at("hardness") == 2.5);
+    CHECK(j.at("texture_size") == 256);
+    CHECK_FALSE(j.contains("texture"));
 }
