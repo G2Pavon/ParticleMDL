@@ -24,10 +24,13 @@ jobs:
             libwayland-dev wayland-protocols libxkbcommon-dev
 
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DGS_WERROR=ON
 
       - name: Build
         run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
 
       - name: Package
         run: tar -C build -czf particlemdl-ubuntu-24.04-x86_64.tar.gz particlemdl
@@ -51,10 +54,13 @@ jobs:
             libXi-devel wayland-devel wayland-protocols-devel libxkbcommon-devel
 
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DGS_WERROR=ON
 
       - name: Build
         run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
 
       - name: Package
         run: tar -C build -czf particlemdl-fedora-44-x86_64.tar.gz particlemdl
@@ -82,6 +88,9 @@ jobs:
       - name: Build
         run: cmake --build build --config Release --parallel
 
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+
       - name: Package
         run: |
           mkdir -p dist
@@ -92,3 +101,52 @@ jobs:
         with:
           name: particlemdl-windows-x64
           path: particlemdl-windows-x64.zip
+
+  macos:
+    name: macOS (Clang)
+    runs-on: macos-14
+    # New job, never run before: it may not pass at first. Remove this line
+    # once it is green.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: brew install glfw
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  sanitizers:
+    name: Ubuntu 24.04 (GCC, ASan + UBSan)
+    runs-on: ubuntu-24.04
+    env:
+      ASAN_OPTIONS: detect_leaks=1:strict_string_checks=1
+      UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ libglfw3-dev libgl-dev libx11-dev \
+            libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libwayland-dev wayland-protocols libxkbcommon-dev
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DGS_SANITIZE=ON -DGS_WERROR=ON
+
+      # The editor needs a display; the tests and the CLI cover the rest.
+      - name: Build
+        run: cmake --build build --parallel --target particlemdl_tests particlemdl_cli
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure

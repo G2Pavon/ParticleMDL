@@ -11,4 +11,22 @@ add_executable(particlemdl_tests
     test_golden.cpp)
 target_link_libraries(particlemdl_tests PRIVATE particles_editor_support doctest gs_flags)
 target_compile_definitions(particlemdl_tests PRIVATE GS_GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/golden")
-add_test(NAME unit COMMAND particlemdl_tests)
+# The golden snapshots were recorded on Linux/glibc. libm is not bit-exact
+# across platforms (audit M9), so elsewhere the golden tests are left out.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_test(NAME unit COMMAND particlemdl_tests)
+else()
+    add_test(NAME unit COMMAND particlemdl_tests "--test-case-exclude=golden*")
+endif()
+
+# Command-line exporter: argument handling, then a real export of a small fixture.
+add_test(NAME cli_help COMMAND particlemdl_cli --help)
+set_tests_properties(cli_help PROPERTIES PASS_REGULAR_EXPRESSION "Usage: particlemdl_cli")
+add_test(NAME cli_version COMMAND particlemdl_cli --version)
+set_tests_properties(cli_version PROPERTIES PASS_REGULAR_EXPRESSION "particlemdl_cli [0-9]+\\.[0-9]+")
+add_test(NAME cli_export
+    COMMAND ${CMAKE_COMMAND}
+        -DCLI=$<TARGET_FILE:particlemdl_cli>
+        -DSETTINGS=${CMAKE_CURRENT_SOURCE_DIR}/fixtures/minimal.json
+        -DOUT=${CMAKE_CURRENT_BINARY_DIR}/cli_export
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/cli_smoke.cmake)

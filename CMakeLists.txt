@@ -9,6 +9,18 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
+option(GS_WERROR "Treat warnings in our own code as errors (CI turns this on)" OFF)
+option(GS_SANITIZE "Build everything with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+
+if(GS_SANITIZE)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        add_compile_options(-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
+        add_link_options(-fsanitize=address,undefined)
+    else()
+        message(FATAL_ERROR "GS_SANITIZE needs GCC or Clang")
+    endif()
+endif()
+
 # Libraries under third_party/ are vendored.
 # GLFW is the only system dependency.
 
@@ -58,8 +70,14 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     # -ffp-contract=off: no fused multiply-add, so the simulation produces the
     # same doubles (and byte-identical exports) on every architecture.
     target_compile_options(gs_flags INTERFACE -Wall -Wextra -Wpedantic -ffp-contract=off)
+    if(GS_WERROR)
+        target_compile_options(gs_flags INTERFACE -Werror)
+    endif()
 elseif(MSVC)
     target_compile_options(gs_flags INTERFACE /W4 /fp:precise)
+    if(GS_WERROR)
+        target_compile_options(gs_flags INTERFACE /WX)
+    endif()
 endif()
 
 # ---------------------------------------------------------------------------

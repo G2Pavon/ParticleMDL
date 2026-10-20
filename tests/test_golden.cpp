@@ -15,6 +15,7 @@
 // bit-exact between platforms, so another platform may need its own run.
 #include <doctest/doctest.h>
 
+#include <cctype>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
