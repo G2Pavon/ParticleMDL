@@ -58,6 +58,9 @@ public:
     Vec3 apply_macro_spin(Vec3 p, double eval_time) const;
 
     LifeState life_state(const Particle& p, double loop_time) const;
+    // Which life of the particle `loop_time` falls in. A time within one loop
+    // of the particle's birth gives the same number; the next birth adds one.
+    long long generation(const Particle& p, double loop_time) const;
     // The particle as drawn at `loop_time`, end behavior included. The preview
     // and the exporter both use this, so the game shows what the editor shows.
     ParticlePose pose_at(const Particle& p, double loop_time) const;
@@ -69,13 +72,10 @@ public:
     double scale_progress(double eval_time) const noexcept;
     double scale_factor_at(double eval_time, bool dead) const noexcept;
 
-    // Smallest box around every quad corner of every particle in every
-    // exported frame (dead, parked particles included).
+    // Box around points; see animation_bounds() in Baking.hpp.
     struct Bounds {
         Vec3 min, max;
     };
-    Bounds animation_bounds() const;
-
 
     const Settings& settings() const noexcept { return settings_; }
     const std::vector<Particle>& particles() const noexcept { return particles_; }

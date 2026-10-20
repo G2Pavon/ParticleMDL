@@ -74,7 +74,8 @@ void EditorApp::rebuild()
 {
     validate(settings_);   // the panels show the values actually used
     system_.emplace(settings_);
-    export_report_ = analyze_export(*system_);
+    baked_ = bake(*system_);
+    export_report_ = analyze_export(*system_, animation_table(*system_, baked_), baked_);
     name_problem_ = model_name_problem(settings_.model_name);
     refresh_preset_label();
     // Quantizing the texture is the slow part; physics sliders do not need it.
@@ -598,6 +599,12 @@ void EditorApp::draw_middle_panel()
     ImGui::Checkbox("Bounds", &scene_options_.bounds);
     ImGui::SameLine();
     ImGui::Checkbox("Emitter", &scene_options_.emitter);
+    ImGui::SameLine();
+    ImGui::Checkbox("Game view", &scene_options_.game_accurate);
+    if (ImGui::BeginItemTooltip()) {
+        ImGui::TextUnformatted("Show the exported frames blended the way GoldSrc plays them,\nrespawn streaks included. Off: the ideal, smooth motion.");
+        ImGui::EndTooltip();
+    }
 
     const ImVec2 avail = ImGui::GetContentRegionAvail();
     draw_canvas(ImVec2(std::max(avail.x, 10.0f), std::max(avail.y - bottom_height_, 10.0f)));
@@ -731,7 +738,7 @@ void EditorApp::draw_canvas(ImVec2 size)
 
     camera_.set_focal_length(OrbitCamera::kFocalLength * ui::scale());
     const Point2 center{origin.x + size.x / 2, origin.y + size.y / 2};
-    build_scene(*system_, camera_, preview_time_, center, scene_options_, scene_);
+    build_scene(*system_, baked_, camera_, preview_time_, center, scene_options_, scene_);
     renderer_.draw(ImGui::GetWindowDrawList(), origin, size, canvas_bg_, scene_);
 }
 

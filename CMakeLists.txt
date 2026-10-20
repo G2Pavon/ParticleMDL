@@ -107,6 +107,7 @@ add_library(particles_core STATIC
     src/SettingsJson.cpp
     src/Presets.cpp
     src/ParticleSystem.cpp
+    src/Baking.cpp
     src/TextureGenerator.cpp
     src/ImageImport.cpp
     src/Exporter.cpp

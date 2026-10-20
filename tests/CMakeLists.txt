@@ -8,6 +8,7 @@ add_executable(particlemdl_tests
     test_settings_json.cpp
     test_model_name.cpp
     test_path_input.cpp
+    test_baking.cpp
     test_export_blockers.cpp
     test_golden.cpp)
 target_link_libraries(particlemdl_tests PRIVATE particles_editor_support doctest gs_flags)

@@ -10,6 +10,7 @@
 #include <string_view>
 #include <vector>
 
+#include "Baking.hpp"
 #include "ParticleSystem.hpp"
 
 namespace gs {
@@ -44,7 +45,8 @@ struct AnimationTable {
         return values[static_cast<std::size_t>(frame) * bones + bone];
     }
 };
-AnimationTable animation_table(const ParticleSystem& sys);
+AnimationTable animation_table(const ParticleSystem& sys);                          // bakes first
+AnimationTable animation_table(const ParticleSystem& sys, const BakedPoses& baked);
 
 // studiomdl refuses a sequence when, after writing any bone, the distance from
 // that bone's offset entry to the end of the compressed values exceeds this.
@@ -77,6 +79,7 @@ struct ExportReport {
 };
 ExportReport analyze_export(const ParticleSystem& sys);
 ExportReport analyze_export(const ParticleSystem& sys, const AnimationTable& table);   // reuses a table
+ExportReport analyze_export(const ParticleSystem& sys, const AnimationTable& table, const BakedPoses& baked);
 
 // Thrown by export_model() when the export has blockers. Nothing is written.
 class ExportBlocked : public std::runtime_error {

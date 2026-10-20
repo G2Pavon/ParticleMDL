@@ -117,16 +117,17 @@ void add_emitter(Scene& out, const ParticleSystem& sys, const OrbitCamera& cam, 
         line({0, 0, -s.spawn_height}, {0, 0, s.spawn_height});
 }
 
-void add_particles(Scene& out, const ParticleSystem& sys, const OrbitCamera& cam, double time, Point2 center)
+void add_particles(Scene& out, const ParticleSystem& sys, const BakedPoses& baked, bool game_accurate,
+                   const OrbitCamera& cam, double time, Point2 center)
 {
-    for (const Particle& p : sys.particles()) {
-        const ParticlePose pose = sys.pose_at(p, time);
-        if (!pose.visible)
+    for (int i = 0; i < sys.num_particles(); ++i) {
+        const SampledPose pose = game_accurate ? baked.sample(i, time) : to_sampled(sys.pose_at(sys.particles()[i], time));
+        // A quad of no size (a collapsed vertex-bone quad) draws nothing.
+        if (!pose.visible || pose.scale <= 0.0)
             continue;
         const Vec3 pos = pose.pos;
         // Vertex bones scale the quad; the texture itself never changes.
         const double scale_factor = pose.scale;
-        const Vec3 rot = pose.rot;
 
         for (const Quad& q : sys.quads()) {
             SceneFace face{};
@@ -134,7 +135,7 @@ void add_particles(Scene& out, const ParticleSystem& sys, const OrbitCamera& cam
             bool visible = true;
             for (int k = 0; k < 4; ++k) {
                 const QuadVertex& v = q[k];
-                const Vec3 local = ParticleSystem::apply_static_rotation(v.pos * scale_factor, rot.x, rot.y, rot.z);
+                const Vec3 local = rotate(pose.rot, v.pos * scale_factor);
                 const auto projected = cam.project(pos + local, center);
                 if (!projected) {
                     visible = false;
@@ -177,8 +178,8 @@ std::array<Vec3, 8> bounds_corners(const ParticleSystem& sys, double time)
     return c;
 }
 
-void build_scene(const ParticleSystem& sys, const OrbitCamera& camera, double time, Point2 center,
-                 const SceneOptions& options, Scene& out)
+void build_scene(const ParticleSystem& sys, const BakedPoses& baked, const OrbitCamera& camera, double time,
+                 Point2 center, const SceneOptions& options, Scene& out)
 {
     out.lines.clear();
     out.faces.clear();
@@ -191,7 +192,7 @@ void build_scene(const ParticleSystem& sys, const OrbitCamera& camera, double ti
         add_bounds(out, sys, camera, time, center);
     if (options.emitter)
         add_emitter(out, sys, camera, time, center);
-    add_particles(out, sys, camera, time, center);
+    add_particles(out, sys, baked, options.game_accurate, camera, time, center);
 }
 
 } // namespace gs

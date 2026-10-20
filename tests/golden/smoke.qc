@@ -3,7 +3,7 @@ $cd "."
 $cdtexture "."
 $scale 1.0
 
-$bbox -45.00 -48.00 -40.00 51.00 49.00 147.00
+$bbox -45.00 -48.00 -40.00 51.00 49.00 144.00
 
 $texrendermode "smoke.bmp" additive
 

@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <vector>
 
+#include "Baking.hpp"
 #include "TextureGenerator.hpp"
 
 namespace gs {
@@ -95,14 +96,15 @@ void write_nodes(std::string& out, const ParticleSystem& sys)
     out += "end\n";
 }
 
-std::string make_qc(const ParticleSystem& sys, const std::string& safe, const std::string& tex_ref)
+std::string make_qc(const ParticleSystem& sys, const BakedPoses& baked, const std::string& safe,
+                    const std::string& tex_ref)
 {
     std::string out;
     emit(out, "$modelname \"{}.mdl\"\n$cd \".\"\n$cdtexture \".\"\n$scale 1.0\n\n", safe);
 
     // The exact extent of the animation with a unit of margin. studiomdl
     // computes the sequence box (used for culling) itself; this is the header box.
-    const ParticleSystem::Bounds b = sys.animation_bounds();
+    const ParticleSystem::Bounds b = animation_bounds(sys, baked);
     emit(out, "$bbox {:.2f} {:.2f} {:.2f} {:.2f} {:.2f} {:.2f}\n\n", std::floor(b.min.x) - 1, std::floor(b.min.y) - 1,
          std::floor(b.min.z) - 1, std::ceil(b.max.x) + 1, std::ceil(b.max.y) + 1, std::ceil(b.max.z) + 1);
 
@@ -227,15 +229,20 @@ std::size_t encoded_entries(std::span<const short> value)
 
 AnimationTable animation_table(const ParticleSystem& sys)
 {
+    return animation_table(sys, bake(sys));
+}
+
+AnimationTable animation_table(const ParticleSystem& sys, const BakedPoses& baked)
+{
     AnimationTable t;
     t.frames = sys.export_frames();
     t.bones = 1 + sys.num_particles() * (1 + sys.corners_per_particle());
     t.values.assign(static_cast<std::size_t>(t.frames) * t.bones, {});   // root stays at zero
     for (int frame = 0; frame < t.frames; ++frame) {
-        const double ct = sys.frame_time(frame);
-        for (const Particle& p : sys.particles()) {
+        for (int i = 0; i < sys.num_particles(); ++i) {
+            const Particle& p = sys.particles()[static_cast<std::size_t>(i)];
             // Every bone in every frame: studiomdl puts a missing bone at the origin.
-            const ParticlePose pose = sys.pose_at(p, ct);
+            const ParticlePose& pose = baked.at(frame, i);
             const Vec3 rot = sys.has_micro_rotation() ? studio_angles(pose.rot) : Vec3{};
             // Same -90 deg Z correction for translations as for the geometry.
             t.values[static_cast<std::size_t>(frame) * t.bones + p.base_bone] = {pose.pos.y, -pose.pos.x, pose.pos.z,
@@ -353,10 +360,15 @@ std::string kilobytes(std::size_t bytes)
 
 ExportReport analyze_export(const ParticleSystem& sys)
 {
-    return analyze_export(sys, animation_table(sys));
+    return analyze_export(sys, animation_table(sys), bake(sys));
 }
 
 ExportReport analyze_export(const ParticleSystem& sys, const AnimationTable& table)
+{
+    return analyze_export(sys, table, bake(sys));
+}
+
+ExportReport analyze_export(const ParticleSystem& sys, const AnimationTable& table, const BakedPoses& baked)
 {
     const Settings& s = sys.settings();
     ExportReport r;
@@ -385,6 +397,10 @@ ExportReport analyze_export(const ParticleSystem& sys, const AnimationTable& tab
 
     if (s.end_behavior == EndBehavior::HideInCore && s.scale_mode == ScaleMode::Static)
         r.warnings.push_back("Hide in Core needs Vertex Bone scaling: static particles stay visible at the center");
+    else if (s.scale_mode == ScaleMode::Static && baked.unhidden_jump() > std::max(s.quad_width, s.quad_height) &&
+             (s.end_behavior == EndBehavior::EndlessLoop || s.end_behavior == EndBehavior::StopAndStay))
+        r.warnings.push_back("Static quads cannot hide a respawn: each particle visibly jumps back to its start for one "
+                             "frame. Vertex Bone scaling removes the jump.");
     return r;
 }
 
@@ -409,13 +425,14 @@ void export_model(const ParticleSystem& sys, const fs::path& out_dir)
 
     // The animation is built once: the limits are checked against it, and it
     // becomes the animation SMD.
-    const AnimationTable table = animation_table(sys);
-    if (ExportReport report = analyze_export(sys, table); !report.blockers.empty())
+    const BakedPoses baked = bake(sys);
+    const AnimationTable table = animation_table(sys, baked);
+    if (ExportReport report = analyze_export(sys, table, baked); !report.blockers.empty())
         throw ExportBlocked(std::move(report.blockers));
 
     StagedFiles files(out_dir);
     files.add(tex_ref, as_chars(encode_indexed_bmp(export_texture(sys.settings()))));
-    files.add(safe + ".qc", make_qc(sys, safe, tex_ref));
+    files.add(safe + ".qc", make_qc(sys, baked, safe, tex_ref));
     files.add(safe + "_ref.smd", make_ref_smd(sys, tex_ref));
     files.add(safe + "_anim.smd", make_anim_smd(sys, table));
     files.commit();

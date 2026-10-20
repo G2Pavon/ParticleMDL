@@ -3,7 +3,7 @@ $cd "."
 $cdtexture "."
 $scale 1.0
 
-$bbox -29.00 -30.00 -137.00 30.00 30.00 142.00
+$bbox -28.00 -29.00 -137.00 29.00 29.00 140.00
 
 $texrendermode "fire.bmp" additive
 

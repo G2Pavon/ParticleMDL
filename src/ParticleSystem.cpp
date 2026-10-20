@@ -222,6 +222,14 @@ LifeState ParticleSystem::life_state(const Particle& p, double loop_time) const
     return st;
 }
 
+long long ParticleSystem::generation(const Particle& p, double loop_time) const
+{
+    const double loop = loop_duration();
+    const double x = loop_time + (p.phase_offset * loop);
+    // x minus its position in the loop is a whole number of loops.
+    return std::llround((x - floor_mod(x, loop)) / loop);
+}
+
 ParticlePose ParticleSystem::pose_at(const Particle& p, double loop_time) const
 {
     const LifeState st = life_state(p, loop_time);
@@ -299,25 +307,6 @@ double ParticleSystem::scale_factor_at(double t, bool dead) const noexcept
     if (dead)
         return settings_.scale_end;
     return settings_.scale_start + (settings_.scale_end - settings_.scale_start) * scale_progress(t);
-}
-
-ParticleSystem::Bounds ParticleSystem::animation_bounds() const
-{
-    constexpr double inf = std::numeric_limits<double>::infinity();
-    Bounds b{{inf, inf, inf}, {-inf, -inf, -inf}};
-    for (int f = 0; f < loop_steps_; ++f) {   // the closing frame repeats frame 0
-        for (const Particle& p : particles_) {
-            const ParticlePose pose = pose_at(p, frame_time(f));
-            for (const Quad& q : quads_) {
-                for (const QuadVertex& v : q) {
-                    const Vec3 c = pose.pos + apply_static_rotation(v.pos * pose.scale, pose.rot.x, pose.rot.y, pose.rot.z);
-                    b.min = {std::min(b.min.x, c.x), std::min(b.min.y, c.y), std::min(b.min.z, c.z)};
-                    b.max = {std::max(b.max.x, c.x), std::max(b.max.y, c.y), std::max(b.max.z, c.z)};
-                }
-            }
-        }
-    }
-    return b;
 }
 
 } // namespace gs
