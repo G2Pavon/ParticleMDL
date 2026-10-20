@@ -114,7 +114,7 @@ void EditorApp::poll_texture()
     if (!result || result->settings != settings_.texture)
         return;   // nothing yet, or made for a picture that was changed since
     if (result->image) {
-        renderer_.set_texture(*result->image);
+        renderer_.set_texture(*result->image, result->settings.blend);
         return;
     }
     // Preview the pattern instead; the export refuses until the image is fixed.
@@ -804,6 +804,12 @@ void EditorApp::draw_right_panel()
     changed |= reset_slider("hardness", "Hardness", s.texture.hardness, kSliderHardness.lo, kSliderHardness.hi, 0.8, "%.2f");
     ImGui::EndDisabled();
     changed |= int_combo("Resolution", s.texture.size, kTextureSizes);
+    changed |= enum_combo("Blend", s.texture.blend);
+    ImGui::SetItemTooltip("Additive: the colour is added to what is behind, black is invisible (glow, fire, sparks).\n"
+                          "Masked: the pixels of the pattern that are strong enough are drawn, the rest is transparent\n"
+                          "(palette entry 255): debris, leaves. Solid: every pixel is drawn.");
+    changed |= ImGui::Checkbox("Fullbright", &s.texture.fullbright);
+    ImGui::SetItemTooltip("Ignore the lighting of the map: the particles are always shown at their own brightness.");
 
     group_label("Scaling");
     changed |= enum_combo("Mode", s.scale_mode);

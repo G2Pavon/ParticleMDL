@@ -20,5 +20,7 @@ RgbaImage load_image_file(const std::filesystem::path& path);
 // rest black. Transparent pixels are premultiplied over black, so they add
 // nothing in additive blending.
 RgbImage fit_to_square(const RgbaImage& img, int size);
+// The same, keeping the alpha: colours times alpha, then the alpha (0 outside the picture).
+RgbaImage fit_to_square_rgba(const RgbaImage& img, int size);
 
 } // namespace gs

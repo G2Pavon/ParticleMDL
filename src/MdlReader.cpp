@@ -234,8 +234,20 @@ std::string describe_mdl(const MdlInfo& info)
     }
     text += std::format("{}{} bones, {} texture{}", text.empty() ? "" : ", ", info.bones.size(), info.textures.size(),
                         info.textures.size() == 1 ? "" : "s");
-    if (info.textures.size() == 1 && (info.textures[0].flags & kMdlTextureAdditive))
-        text += " (additive)";
+    if (info.textures.size() == 1) {
+        std::string flags;
+        auto add = [&](int bit, const char* name) {
+            if (info.textures[0].flags & bit)
+                flags += (flags.empty() ? "" : ", ") + std::string(name);
+        };
+        add(kMdlTextureAdditive, "additive");
+        add(kMdlTextureMasked, "masked");
+        add(kMdlTextureFullbright, "fullbright");
+        add(kMdlTextureFlatShade, "flat shaded");
+        add(kMdlTextureChrome, "chrome");
+        if (!flags.empty())
+            text += " (" + flags + ")";
+    }
     return text;
 }
 

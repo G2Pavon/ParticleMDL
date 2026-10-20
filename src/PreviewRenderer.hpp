@@ -15,8 +15,8 @@ public:
 
     // Rebuilds the texture from the current settings.
     void update_textures(const TextureSettings& s);
-    // Shows a texture that was made elsewhere (see TextureJob).
-    void set_texture(const IndexedImage& image);
+    // Shows a texture that was made elsewhere (see TextureJob), drawn the way `blend` says.
+    void set_texture(const IndexedImage& image, BlendMode blend);
     // The exported texture, palettized exactly as written to the BMP.
     ImTextureID swatch() const { return game_.imgui_id(); }
 
@@ -26,6 +26,7 @@ public:
 
 private:
     GlTexture game_;   // export texture: color premultiplied by intensity, palettized
+    BlendMode blend_ = BlendMode::Additive;
 };
 
 } // namespace gs

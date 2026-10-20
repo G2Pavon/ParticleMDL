@@ -66,9 +66,9 @@ RgbaImage load_image_file(const std::filesystem::path& path)
     return img;
 }
 
-RgbImage fit_to_square(const RgbaImage& img, int size)
+RgbaImage fit_to_square_rgba(const RgbaImage& img, int size)
 {
-    RgbImage out(size, size);
+    RgbaImage out(size, size);
     if (img.width <= 0 || img.height <= 0)
         return out;
 
@@ -80,7 +80,7 @@ RgbImage fit_to_square(const RgbaImage& img, int size)
     // Premultiplied colour of a source pixel, in 0..1.
     auto premultiplied = [&](int x, int y, int channel) {
         const std::uint8_t* p = img.pixel(x, y);
-        return p[channel] / 255.0 * (p[3] / 255.0);
+        return channel == 3 ? p[3] / 255.0 : p[channel] / 255.0 * (p[3] / 255.0);
     };
     // Bilinear sample between source pixels: enough when the picture is enlarged.
     auto sample = [&](double u, double v, int channel) {
@@ -116,7 +116,7 @@ RgbImage fit_to_square(const RgbaImage& img, int size)
             if (x + 0.5 < left || x + 0.5 > left + dst_w || y + 0.5 < top || y + 0.5 > top + dst_h)
                 continue;   // padding stays black
             std::uint8_t* px = out.pixel(x, y);
-            for (int c = 0; c < 3; ++c) {
+            for (int c = 0; c < 4; ++c) {
                 const double value =
                     scale < 1.0 ? average((x - left) / scale, (y - top) / scale, (x + 1 - left) / scale,
                                           (y + 1 - top) / scale, c)
@@ -125,6 +125,15 @@ RgbImage fit_to_square(const RgbaImage& img, int size)
             }
         }
     }
+    return out;
+}
+
+RgbImage fit_to_square(const RgbaImage& img, int size)
+{
+    const RgbaImage fitted = fit_to_square_rgba(img, size);
+    RgbImage out(size, size);
+    for (std::size_t i = 0; i < out.pixel_count(); ++i)
+        std::copy_n(fitted.pixel(i), 3, out.pixel(i));
     return out;
 }
 

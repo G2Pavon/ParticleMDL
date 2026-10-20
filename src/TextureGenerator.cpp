@@ -179,7 +179,43 @@ RgbImage make_export_texture(const TextureSettings& s)
     return img;
 }
 
-IndexedImage quantize(const RgbImage& img)
+MaskedTexture make_masked_texture(const TextureSettings& s)
+{
+    const int size = s.size;
+    MaskedTexture out{RgbImage(size, size), std::vector<bool>(static_cast<std::size_t>(size) * static_cast<std::size_t>(size))};
+    for_each_texel(s, size, [&](int x, int y, Color c, double intensity) {
+        if (intensity < kMaskThreshold)
+            return;   // transparent: the colour does not matter
+        std::uint8_t* px = out.colors.pixel(x, y);
+        px[0] = static_cast<std::uint8_t>(std::clamp(static_cast<int>(c.r), 0, 255));
+        px[1] = static_cast<std::uint8_t>(std::clamp(static_cast<int>(c.g), 0, 255));
+        px[2] = static_cast<std::uint8_t>(std::clamp(static_cast<int>(c.b), 0, 255));
+        out.opaque[static_cast<std::size_t>(y) * static_cast<std::size_t>(size) + static_cast<std::size_t>(x)] = true;
+    });
+    return out;
+}
+
+namespace {
+
+// The colours a quantizer works from: the opaque pixels, or all of them.
+bool is_opaque(const std::vector<bool>* opaque, std::size_t i)
+{
+    return !opaque || (*opaque)[i];
+}
+
+// Gives a masked image its transparent colour at index 255.
+void finish_masked(IndexedImage& out)
+{
+    out.masked = true;
+    if (out.palette.empty())
+        out.palette.push_back({0, 0, 0});
+    out.palette.resize(256, {0, 0, 0});
+    out.palette[kTransparentIndex] = kTransparentColor;
+}
+
+} // namespace
+
+IndexedImage quantize(const RgbImage& img, const std::vector<bool>* opaque)
 {
     const std::size_t n = img.pixel_count();
     auto key_of = [&](std::size_t i) {
@@ -189,7 +225,8 @@ IndexedImage quantize(const RgbImage& img)
 
     std::unordered_map<std::uint32_t, std::uint32_t> hist;
     for (std::size_t i = 0; i < n; ++i)
-        ++hist[key_of(i)];
+        if (is_opaque(opaque, i))
+            ++hist[key_of(i)];
 
     std::vector<HistEntry> entries;
     entries.reserve(hist.size());
@@ -198,7 +235,12 @@ IndexedImage quantize(const RgbImage& img)
     // Deterministic order (unordered_map iteration order is not).
     std::sort(entries.begin(), entries.end(), [](const HistEntry& a, const HistEntry& b) { return a.rgb < b.rgb; });
 
-    IndexedImage out{img.width, img.height, std::vector<std::uint8_t>(n), median_cut(std::move(entries), 256)};
+    // A masked image keeps index 255 for the transparent pixels.
+    const std::size_t max_colors = opaque ? 255 : 256;
+    std::vector<std::array<std::uint8_t, 3>> colors;
+    if (!entries.empty())
+        colors = median_cut(std::move(entries), max_colors);
+    IndexedImage out{img.width, img.height, std::vector<std::uint8_t>(n), std::move(colors)};
     const auto& palette = out.palette;
 
     std::unordered_map<std::uint32_t, std::uint8_t> index_of;
@@ -216,7 +258,9 @@ IndexedImage quantize(const RgbImage& img)
         index_of[key] = static_cast<std::uint8_t>(best);
     }
     for (std::size_t i = 0; i < n; ++i)
-        out.indices[i] = index_of[key_of(i)];
+        out.indices[i] = is_opaque(opaque, i) ? index_of[key_of(i)] : static_cast<std::uint8_t>(kTransparentIndex);
+    if (opaque)
+        finish_masked(out);
     return out;
 }
 
@@ -242,7 +286,7 @@ std::size_t nearest_entry(const Palette& pal, const std::array<double, 3>& c) no
 
 } // namespace
 
-IndexedImage quantize_refined(const RgbImage& img)
+IndexedImage quantize_refined(const RgbImage& img, const std::vector<bool>* opaque)
 {
     const std::size_t n = img.pixel_count();
     auto key_of = [&](std::size_t i) {
@@ -253,7 +297,8 @@ IndexedImage quantize_refined(const RgbImage& img)
     // Distinct colours with their pixel counts, in a fixed order.
     std::unordered_map<std::uint32_t, std::uint32_t> hist;
     for (std::size_t i = 0; i < n; ++i)
-        ++hist[key_of(i)];
+        if (is_opaque(opaque, i))
+            ++hist[key_of(i)];
     std::vector<HistEntry> entries;
     entries.reserve(hist.size());
     for (const auto& [key, count] : hist)
@@ -263,8 +308,11 @@ IndexedImage quantize_refined(const RgbImage& img)
     // Start from median cut, then let each entry move to the weighted mean of the
     // colours it represents (k-means on the histogram). Usually converges in a few passes.
     Palette pal;
-    for (const auto& c : median_cut(entries, 256))
-        pal.push_back({double(c[0]), double(c[1]), double(c[2])});
+    if (!entries.empty())   // a masked image keeps index 255 for the transparent pixels
+        for (const auto& c : median_cut(entries, opaque ? 255 : 256))
+            pal.push_back({double(c[0]), double(c[1]), double(c[2])});
+    else
+        pal.push_back({0.0, 0.0, 0.0});
     for (int pass = 0; pass < 8; ++pass) {
         Palette sum(pal.size(), {0.0, 0.0, 0.0});
         std::vector<double> weight(pal.size(), 0.0);
@@ -294,6 +342,10 @@ IndexedImage quantize_refined(const RgbImage& img)
     for (int y = 0; y < img.height; ++y) {
         std::fill(err_next.begin(), err_next.end(), 0.0);
         for (std::size_t x = 0; x < w; ++x) {
+            if (!is_opaque(opaque, static_cast<std::size_t>(y) * w + x)) {
+                out.indices[static_cast<std::size_t>(y) * w + x] = static_cast<std::uint8_t>(kTransparentIndex);
+                continue;   // transparent: nothing to match and no error to hand on
+            }
             const std::uint8_t* p = img.pixel(static_cast<int>(x), y);
             std::array<double, 3> want{};
             for (int ch = 0; ch < 3; ++ch)
@@ -310,14 +362,35 @@ IndexedImage quantize_refined(const RgbImage& img)
         }
         std::swap(err_now, err_next);
     }
+    if (opaque)
+        finish_masked(out);
     return out;
 }
 
 IndexedImage export_texture(const TextureSettings& s)
 {
-    if (s.file.empty())
-        return quantize(make_export_texture(s));   // procedural: the same as always
-    return quantize_refined(fit_to_square(load_image_file(from_utf8(s.file)), s.size));
+    const bool masked = s.blend == BlendMode::Masked;
+    if (s.file.empty()) {
+        if (!masked)
+            return quantize(make_export_texture(s));   // procedural: the same as always
+        const MaskedTexture texture = make_masked_texture(s);
+        return quantize(texture.colors, &texture.opaque);
+    }
+
+    const RgbaImage fitted = fit_to_square_rgba(load_image_file(from_utf8(s.file)), s.size);
+    RgbImage colors(fitted.width, fitted.height);
+    std::vector<bool> opaque(fitted.pixel_count());
+    for (std::size_t i = 0; i < fitted.pixel_count(); ++i) {
+        const std::uint8_t* p = fitted.pixel(i);   // colour times alpha, then alpha
+        if (masked) {
+            opaque[i] = p[3] >= 128;
+            for (int c = 0; c < 3; ++c)   // back to the colour itself, without the alpha
+                colors.pixel(i)[c] = p[3] == 0 ? 0 : static_cast<std::uint8_t>(std::min(255, (p[c] * 255 + p[3] / 2) / p[3]));
+        } else {
+            std::copy_n(p, 3, colors.pixel(i));
+        }
+    }
+    return masked ? quantize_refined(colors, &opaque) : quantize_refined(colors);
 }
 
 RgbImage expand(const IndexedImage& img)
@@ -325,6 +398,16 @@ RgbImage expand(const IndexedImage& img)
     RgbImage out(img.width, img.height);
     for (std::size_t i = 0; i < img.indices.size(); ++i)
         std::ranges::copy(img.palette[img.indices[i]], out.pixel(i));
+    return out;
+}
+
+RgbaImage expand_rgba(const IndexedImage& img)
+{
+    RgbaImage out(img.width, img.height);
+    for (std::size_t i = 0; i < img.indices.size(); ++i) {
+        std::copy_n(img.palette[img.indices[i]].begin(), 3, out.pixel(i));
+        out.pixel(i)[3] = img.masked && img.indices[i] == kTransparentIndex ? 0 : 255;
+    }
     return out;
 }
 

@@ -310,3 +310,23 @@ TEST_CASE("a one-shot effect compiles to a sequence that does not loop")
     CHECK(compare_with_export(m, sys).empty());
     CHECK(m.sequences[0].value_bytes + 12 == sequence_bytes(sys));
 }
+
+TEST_CASE("a masked fullbright texture compiles with both render flags")
+{
+    const MdlInfo m = read_mdl(read_bytes(kFixtures / "masked_fullbright.mdl"));
+    REQUIRE(m.textures.size() == 1);
+    CHECK(m.textures[0].flags == (kMdlTextureMasked | kMdlTextureFullbright));
+    CHECK(describe_mdl(m).find("(masked, fullbright)") != std::string::npos);
+
+    const ParticleSystem sys(settings_of("masked_fullbright"));
+    CHECK(compare_with_export(m, sys).empty());
+
+    // The same model asked for as an additive one differs in its render flags.
+    Settings additive = settings_of("masked_fullbright");
+    additive.texture.blend = BlendMode::Additive;
+    additive.texture.fullbright = false;
+    const std::vector<std::string> problems = compare_with_export(m, ParticleSystem(additive));
+    REQUIRE(problems.size() == 1);
+    CHECK(problems[0].find("render flags 0x44") != std::string::npos);
+    CHECK(problems[0].find("asks for 0x20") != std::string::npos);
+}
