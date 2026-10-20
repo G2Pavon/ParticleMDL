@@ -101,10 +101,8 @@ ParticleSystem::ParticleSystem(const Settings& settings) : settings_(validated(s
         const double rot_jitter_x = rng.signed_unit();
         const double rot_jitter_y = rng.signed_unit();
         const double rot_jitter_z = rng.signed_unit();
-        const double turb_freq_x = 3.0 + rng.signed_unit() * 2.0;
-        const double turb_freq_y = 2.0 + rng.signed_unit() * 2.0;
-        const double turb_phase_x = rng.unit() * 2.0 * kPi;
-        const double turb_phase_y = rng.unit() * 2.0 * kPi;
+        const Vec2 turb_freq{3.0 + rng.signed_unit() * 2.0, 2.0 + rng.signed_unit() * 2.0};
+        const Vec2 turb_phase{rng.unit() * 2.0 * kPi, rng.unit() * 2.0 * kPi};
 
         // Births are evenly spaced over the loop for a steady flow.
         const double phase = static_cast<double>(i + 1) / num_particles;
@@ -129,10 +127,8 @@ ParticleSystem::ParticleSystem(const Settings& settings) : settings_(validated(s
         p.spin = {radians(s.particle_spin.x) + radians(s.spin_spread) * rot_jitter_x,
                   radians(s.particle_spin.y) + radians(s.spin_spread) * rot_jitter_y,
                   radians(s.particle_spin.z) + radians(s.spin_spread) * rot_jitter_z};
-        p.turb_freq_x = turb_freq_x;
-        p.turb_freq_y = turb_freq_y;
-        p.turb_phase_x = turb_phase_x;
-        p.turb_phase_y = turb_phase_y;
+        p.turb_freq = turb_freq;
+        p.turb_phase = turb_phase;
         particles_.push_back(p);
     }
 
@@ -146,9 +142,9 @@ ParticleSystem::ParticleSystem(const Settings& settings) : settings_(validated(s
         const double ct = frame_time(f);
         for (const Particle& p : particles_) {
             const LifeState st = life_state(p, ct);
-            if (st.kind != LifeState::Kind::Alive)
+            if (!st.moved_by_motion())
                 continue;
-            const Vec3 m = motion(p, st.eval_time, 1.0, 1.0, 1.0);
+            const Vec3 m = motion(p, st.eval_time, {1.0, 1.0, 1.0});
             max_x = std::max(max_x, std::abs(m.x));
             max_y = std::max(max_y, std::abs(m.y));
             min_z_raw_ = std::min(min_z_raw_, m.z);
@@ -162,13 +158,12 @@ ParticleSystem::ParticleSystem(const Settings& settings) : settings_(validated(s
         min_z_raw_ = max_z_raw_ = 0.0;
     if (max_z_raw_ == min_z_raw_)
         max_z_raw_ = min_z_raw_ + 0.1;
-    scale_x_ = (s.volume_width / 2.0) / max_x;
-    scale_y_ = (s.volume_depth / 2.0) / max_y;
-    scale_z_ = s.volume_height / (max_z_raw_ - min_z_raw_);
+    volume_scale_ = {(s.volume_width / 2.0) / max_x, (s.volume_depth / 2.0) / max_y,
+                     s.volume_height / (max_z_raw_ - min_z_raw_)};
 
     // A static quad (or box) extends at most max(w, h) * 0.87 from its bone.
-    hide_z_ = min_z_raw_ * scale_z_ - std::max(s.quad_width, s.quad_height);
-    drop_acceleration_ = std::max(std::abs(s.gravity * scale_z_), 600.0);
+    hide_z_ = min_z_raw_ * volume_scale_.z - std::max(s.quad_width, s.quad_height);
+    drop_acceleration_ = std::max(std::abs(s.gravity * volume_scale_.z), 600.0);
 }
 
 Vec3 ParticleSystem::apply_static_rotation(Vec3 p, double rad_x, double rad_y, double rad_z)
@@ -202,22 +197,22 @@ LifeState ParticleSystem::life_state(const Particle& p, double loop_time) const
     LifeState st;
     const double loop = loop_duration();
     const double p_time = floor_mod(loop_time + (p.phase_offset * loop), loop);
-    st.dead = (p_time / loop) > settings_.lifespan;
     st.eval_time = p_time;
+    if ((p_time / loop) <= settings_.lifespan)
+        return st;
 
-    if (st.dead) {
-        switch (settings_.end_behavior) {
-        case EndBehavior::DropThroughFloor:
-        case EndBehavior::HideUnderground:
-        case EndBehavior::HideInCore:
-            st.kind = LifeState::Kind::Dead;
-            break;
-        case EndBehavior::StopAndStay:
-            st.eval_time = settings_.lifespan * loop;
-            break;
-        case EndBehavior::EndlessLoop:
-            break;
-        }
+    st.phase = LifeState::Phase::Lingering;
+    switch (settings_.end_behavior) {
+    case EndBehavior::DropThroughFloor:
+    case EndBehavior::HideUnderground:
+    case EndBehavior::HideInCore:
+        st.phase = LifeState::Phase::Dead;
+        break;
+    case EndBehavior::StopAndStay:
+        st.eval_time = settings_.lifespan * loop;
+        break;
+    case EndBehavior::EndlessLoop:
+        break;
     }
     return st;
 }
@@ -234,9 +229,9 @@ ParticlePose ParticleSystem::pose_at(const Particle& p, double loop_time) const
 {
     const LifeState st = life_state(p, loop_time);
     const bool vertex_bones = settings_.scale_mode == ScaleMode::VertexBone;
-    if (st.kind == LifeState::Kind::Alive)
+    if (st.moved_by_motion())
         return {position_at(p, st.eval_time), rotation_at(p, st.eval_time),
-                vertex_bones ? scale_factor_at(st.eval_time, st.dead) : 1.0, true};
+                vertex_bones ? scale_factor_at(st.eval_time, st.past_lifespan()) : 1.0, true};
 
     // Parked out of sight. Bones have no scale, so only vertex-bone quads can
     // collapse; static quads rely on where they are parked.
@@ -262,15 +257,15 @@ ParticlePose ParticleSystem::pose_at(const Particle& p, double loop_time) const
     }
 }
 
-Vec3 ParticleSystem::motion(const Particle& p, double t, double sx, double sy, double sz) const
+Vec3 ParticleSystem::motion(const Particle& p, double t, Vec3 scale) const
 {
     const Settings& s = settings_;
-    const double turb_x = std::sin((t * p.turb_freq_x) + p.turb_phase_x) * s.turbulence * t;
-    const double turb_y = std::cos((t * p.turb_freq_y) + p.turb_phase_y) * s.turbulence * t;
+    const double turb_x = std::sin((t * p.turb_freq.x) + p.turb_phase.x) * s.turbulence * t;
+    const double turb_y = std::cos((t * p.turb_freq.y) + p.turb_phase.y) * s.turbulence * t;
 
     double x = p.spawn.x + (p.velocity.x * t) + turb_x;
     double y = p.spawn.y + (p.velocity.y * t) + turb_y;
-    const double z = p.spawn.z + (p.velocity.z * t) + (0.5 * s.gravity * std::pow(t, 2.0));
+    const double z = p.spawn.z + (p.velocity.z * t) + (0.5 * s.gravity * (t * t));
 
     // In the same (unscaled) units as every other motion parameter, so the
     // volume fit sees exactly the motion that is exported.
@@ -282,12 +277,12 @@ Vec3 ParticleSystem::motion(const Particle& p, double t, double sx, double sy, d
         x = std::cos(ang) * dist;
         y = std::sin(ang) * dist;
     }
-    return {x * sx, y * sy, z * sz};
+    return {x * scale.x, y * scale.y, z * scale.z};
 }
 
 Vec3 ParticleSystem::position_at(const Particle& p, double t) const
 {
-    return apply_macro_spin(motion(p, t, scale_x_, scale_y_, scale_z_), t);
+    return apply_macro_spin(motion(p, t, volume_scale_), t);
 }
 
 Vec3 ParticleSystem::rotation_at(const Particle& p, double t) const

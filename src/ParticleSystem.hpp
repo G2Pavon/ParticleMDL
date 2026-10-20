@@ -22,18 +22,21 @@ struct Particle {
     Vec3 spawn;                 // unscaled start position
     Vec3 velocity;              // unscaled, per second
     Vec3 spin;                  // rad/s
-    double turb_freq_x = 0, turb_freq_y = 0;
-    double turb_phase_x = 0, turb_phase_y = 0;
+    Vec2 turb_freq, turb_phase;   // of the sideways wobble, per axis
 };
 
 // Where a particle is in its life cycle at a given loop time.
 struct LifeState {
-    // Alive: moved by the motion equations, which includes dead particles of
-    // Endless Loop and Stop & Stay. Dead: handled by the end behavior.
-    enum class Kind { Alive, Dead };
-    Kind kind = Kind::Alive;
-    bool dead = false;      // past its lifespan
+    enum class Phase {
+        Alive,       // within the lifespan
+        Lingering,   // past it, but still moved by the motion equations (Endless Loop, Stop & Stay)
+        Dead,        // past it and handed to the end behavior (hidden, parked, falling)
+    };
+    Phase phase = Phase::Alive;
     double eval_time = 0;   // time fed into the motion equations
+
+    bool past_lifespan() const noexcept { return phase != Phase::Alive; }
+    bool moved_by_motion() const noexcept { return phase != Phase::Dead; }
 };
 
 // Everything needed to draw (or export) one particle at one moment.
@@ -102,9 +105,7 @@ public:
     // into vol_width x vol_height.
     double min_z_raw() const noexcept { return min_z_raw_; }
     double max_z_raw() const noexcept { return max_z_raw_; }
-    double scale_x() const noexcept { return scale_x_; }
-    double scale_y() const noexcept { return scale_y_; }
-    double scale_z() const noexcept { return scale_z_; }
+    Vec3 volume_scale() const noexcept { return volume_scale_; }
     // Height dead particles are parked at: below the lowest point of the
     // effect by more than a quad's size.
     double hide_z() const noexcept { return hide_z_; }
@@ -113,7 +114,7 @@ public:
 
 private:
     // Linear motion + gravity + turbulence + vortex, then scaled (no system spin).
-    Vec3 motion(const Particle& p, double t, double scale_x, double scale_y, double scale_z) const;
+    Vec3 motion(const Particle& p, double t, Vec3 scale) const;
 
     Settings settings_;
     Vec3 emit_rot_;
@@ -124,7 +125,7 @@ private:
     std::vector<Quad> quads_;
     std::vector<Particle> particles_;
     double min_z_raw_ = 0, max_z_raw_ = 0;
-    double scale_x_ = 1, scale_y_ = 1, scale_z_ = 1;
+    Vec3 volume_scale_{1, 1, 1};
     double hide_z_ = 0;
     double drop_acceleration_ = 0;
 };

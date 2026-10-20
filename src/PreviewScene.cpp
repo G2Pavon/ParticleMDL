@@ -78,7 +78,8 @@ Vec3 emitter_point(const ParticleSystem& sys, Vec3 p, double time)
 {
     const Vec3 er = sys.emitter_rotation();
     p = ParticleSystem::apply_static_rotation(p, er.x, er.y, er.z);
-    p = Vec3{p.x * sys.scale_x(), p.y * sys.scale_y(), p.z * sys.scale_z()};
+    const Vec3 scale = sys.volume_scale();
+    p = Vec3{p.x * scale.x, p.y * scale.y, p.z * scale.z};
     return sys.apply_macro_spin(p, time);
 }
 
@@ -170,8 +171,8 @@ std::array<Vec3, 8> bounds_corners(const ParticleSystem& sys, double time)
 {
     const double w = sys.settings().volume_width / 2.0;
     const double d = sys.settings().volume_depth / 2.0;
-    const double z_min = sys.min_z_raw() * sys.scale_z();
-    const double z_max = sys.max_z_raw() * sys.scale_z();
+    const double z_min = sys.min_z_raw() * sys.volume_scale().z;
+    const double z_max = sys.max_z_raw() * sys.volume_scale().z;
     std::array<Vec3, 8> c = {{{-w, -d, z_min}, {w, -d, z_min}, {w, d, z_min}, {-w, d, z_min},
                               {-w, -d, z_max}, {w, -d, z_max}, {w, d, z_max}, {-w, d, z_max}}};
     for (Vec3& p : c)

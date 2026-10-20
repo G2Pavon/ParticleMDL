@@ -39,14 +39,14 @@ TEST_CASE("a particle is alive up to and including its lifespan")
     const Particle& p = sys.particles().back();
 
     const LifeState before = sys.life_state(p, kBeforeDeath);
-    CHECK(before.kind == LifeState::Kind::Alive);
-    CHECK_FALSE(before.dead);
+    CHECK(before.phase == LifeState::Phase::Alive);
+    CHECK_FALSE(before.past_lifespan());
     CHECK(before.eval_time == doctest::Approx(kBeforeDeath));
 
     // Dying is "ratio > lifespan": exactly at the lifespan it still lives.
     const LifeState at = sys.life_state(p, kAtDeath);
-    CHECK(at.kind == LifeState::Kind::Alive);
-    CHECK_FALSE(at.dead);
+    CHECK(at.phase == LifeState::Phase::Alive);
+    CHECK_FALSE(at.past_lifespan());
 }
 
 TEST_CASE("particles are born evenly over the loop and wrap around it")
@@ -58,7 +58,7 @@ TEST_CASE("particles are born evenly over the loop and wrap around it")
 
     // The first particle is 0.5 s ahead: at loop time 1.6 it was born again 0.1 s ago.
     const LifeState st = sys.life_state(sys.particles()[0], 1.6);
-    CHECK(st.kind == LifeState::Kind::Alive);
+    CHECK(st.phase == LifeState::Phase::Alive);
     CHECK(st.eval_time == doctest::Approx(0.1));
 }
 
@@ -68,8 +68,9 @@ TEST_CASE("hide behaviors and drop through floor hand a dead particle to the end
         CAPTURE(enum_id(end));
         const ParticleSystem sys = make_system(end);
         const LifeState st = sys.life_state(sys.particles().back(), kAfterDeath);
-        CHECK(st.kind == LifeState::Kind::Dead);
-        CHECK(st.dead);
+        CHECK(st.phase == LifeState::Phase::Dead);
+        CHECK(st.past_lifespan());
+        CHECK_FALSE(st.moved_by_motion());
         CHECK(st.eval_time == doctest::Approx(kAfterDeath));
     }
 }
@@ -78,8 +79,9 @@ TEST_CASE("stop and stay freezes time at the end of life")
 {
     const ParticleSystem sys = make_system(EndBehavior::StopAndStay);
     const LifeState st = sys.life_state(sys.particles().back(), kAfterDeath);
-    CHECK(st.kind == LifeState::Kind::Alive);
-    CHECK(st.dead);
+    CHECK(st.phase == LifeState::Phase::Lingering);
+    CHECK(st.past_lifespan());
+    CHECK(st.moved_by_motion());
     CHECK(st.eval_time == doctest::Approx(1.0));
 
     const ParticlePose pose = sys.pose_at(sys.particles().back(), kLate);
@@ -92,8 +94,8 @@ TEST_CASE("endless loop keeps moving past the lifespan")
     const ParticleSystem sys = make_system(EndBehavior::EndlessLoop);
     const Particle& p = sys.particles().back();
     const LifeState st = sys.life_state(p, kAfterDeath);
-    CHECK(st.kind == LifeState::Kind::Alive);
-    CHECK(st.dead);
+    CHECK(st.phase == LifeState::Phase::Lingering);
+    CHECK(st.past_lifespan());
     CHECK(st.eval_time == doctest::Approx(kAfterDeath));
 
     const ParticlePose pose = sys.pose_at(p, kAfterDeath);
@@ -120,7 +122,7 @@ TEST_CASE("hide underground parks a dead particle below the effect")
     CHECK_FALSE(pose.visible);
     CHECK(pose.pos.x == doctest::Approx(0.0));
     CHECK(pose.pos.z == doctest::Approx(sys.hide_z()));
-    CHECK(pose.pos.z < sys.min_z_raw() * sys.scale_z());
+    CHECK(pose.pos.z < sys.min_z_raw() * sys.volume_scale().z);
     CHECK(pose.scale == doctest::Approx(1.0));   // static quads rely on the parking height
 }
 

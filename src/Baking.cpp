@@ -37,7 +37,7 @@ std::vector<Seam> find_seams(const ParticleSystem& sys, const Particle& p)
         const double t0 = sys.frame_time(f);
         const double t1 = loop * (f + 1) / steps;   // not wrapped: the closing frame is one loop on
         const bool new_life = sys.generation(p, t0) != sys.generation(p, t1);
-        const bool toggled = sys.life_state(p, t0).dead != sys.life_state(p, t1).dead;
+        const bool toggled = sys.life_state(p, t0).past_lifespan() != sys.life_state(p, t1).past_lifespan();
         if (new_life || (dead_is_a_jump && toggled))
             seams.push_back({f, (f + 1) % steps});
     }

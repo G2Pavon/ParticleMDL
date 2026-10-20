@@ -27,6 +27,12 @@ inline double floor_mod(double a, double b) noexcept
     return mod;
 }
 
+struct Vec2 {
+    double x = 0.0, y = 0.0;
+
+    friend constexpr bool operator==(const Vec2&, const Vec2&) = default;
+};
+
 struct Vec3 {
     double x = 0.0, y = 0.0, z = 0.0;
 

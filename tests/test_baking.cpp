@@ -62,7 +62,7 @@ Natural natural_steps(const ParticleSystem& sys)
         for (int f = 0; f < steps; ++f) {
             const double t0 = sys.frame_time(f), t1 = loop * (f + 1) / steps;
             if (sys.generation(p, t0) != sys.generation(p, t1) ||
-                sys.life_state(p, t0).dead != sys.life_state(p, t1).dead)
+                sys.life_state(p, t0).past_lifespan() != sys.life_state(p, t1).past_lifespan())
                 continue;
             const Vec3 d = sys.pose_at(p, t1).pos - sys.pose_at(p, t0).pos;
             n.travel = std::max(n.travel, length(d));
