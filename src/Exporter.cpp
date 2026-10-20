@@ -196,6 +196,8 @@ float as_read_by_studiomdl(double v)
     return f;
 }
 
+} // namespace
+
 // Number of 2-byte entries the run-length coder emits for one channel, or 0
 // when the channel is dropped (all zero). Mirrors studiomdl's loop exactly.
 std::size_t encoded_entries(std::span<const short> value)
@@ -223,8 +225,6 @@ std::size_t encoded_entries(std::span<const short> value)
     }
     return (entries == 2 && value[0] == 0) ? 0 : entries;
 }
-
-} // namespace
 
 AnimationTable animation_table(const ParticleSystem& sys)
 {

@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <filesystem>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -47,6 +48,11 @@ AnimationTable animation_table(const ParticleSystem& sys);
 // studiomdl refuses a sequence when, after writing any bone, the distance from
 // that bone's offset entry to the end of the compressed values exceeds this.
 inline constexpr std::size_t kMaxSequenceBytes = 65535;
+
+// Number of 2-byte entries studiomdl's run-length coder emits for one channel
+// of quantized values (at least one value), or 0 when the channel is dropped
+// because every value is zero. Exposed for inspection and tests.
+std::size_t encoded_entries(std::span<const short> value);
 
 // That distance, largest over all bones: studiomdl's own measure, computed with
 // its quantization and run-length coding of the values as written to the SMD.

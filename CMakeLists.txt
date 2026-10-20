@@ -144,3 +144,14 @@ if(WIN32)
         target_link_options(particlemdl PRIVATE /ENTRY:mainCRTStartup)
     endif()
 endif()
+
+# ---------------------------------------------------------------------------
+# Unit tests (ctest; disable with -DBUILD_TESTING=OFF)
+# ---------------------------------------------------------------------------
+include(CTest)
+if(BUILD_TESTING)
+    # doctest 2.4.11 (single header, MIT)
+    add_library(doctest INTERFACE)
+    target_include_directories(doctest SYSTEM INTERFACE third_party/doctest)
+    add_subdirectory(tests)
+endif()
