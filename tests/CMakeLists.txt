@@ -12,6 +12,7 @@ add_executable(particlemdl_tests
     test_path_input.cpp
     test_baking.cpp
     test_export_blockers.cpp
+    test_staged_files.cpp
     test_presets.cpp
     test_utf8_paths.cpp
     test_golden.cpp)

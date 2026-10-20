@@ -110,6 +110,7 @@ add_library(particles_core STATIC
     src/Baking.cpp
     src/TextureGenerator.cpp
     src/ImageImport.cpp
+    src/StagedFiles.cpp
     src/Exporter.cpp
     src/Compiler.cpp
     src/CompileJob.cpp

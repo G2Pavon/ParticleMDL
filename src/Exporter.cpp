@@ -13,6 +13,7 @@
 
 #include "Baking.hpp"
 #include "PathUtil.hpp"
+#include "StagedFiles.hpp"
 #include "TextureGenerator.hpp"
 
 namespace gs {
@@ -27,51 +28,6 @@ std::string replace_all(std::string s, std::string_view from, std::string_view t
         s.replace(pos, from.size(), to);
     return s;
 }
-
-// Writes every file as "<target>.tmp" first and renames them into place only
-// once all of them were written, so a failed export leaves the folder as it was.
-class StagedFiles {
-public:
-    explicit StagedFiles(fs::path dir) : dir_(std::move(dir)) {}
-    StagedFiles(const StagedFiles&) = delete;
-    StagedFiles& operator=(const StagedFiles&) = delete;
-
-    ~StagedFiles()
-    {
-        std::error_code ec;
-        for (const auto& [target, temp] : files_)
-            fs::remove(temp, ec);
-    }
-
-    void add(const std::string& name, std::span<const char> bytes)
-    {
-        const fs::path target = dir_ / from_utf8(name);
-        fs::path temp = target;
-        temp += ".tmp";
-        files_.emplace_back(target, temp);   // registered first: cleaned up even if the write fails
-        std::ofstream f(temp, std::ios::binary);
-        f.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
-        f.close();
-        if (!f)
-            throw std::runtime_error("cannot write " + to_utf8(target));
-    }
-
-    void commit()
-    {
-        for (const auto& [target, temp] : files_) {
-            std::error_code ec;
-            if (fs::exists(target, ec) && !fs::is_regular_file(target, ec))
-                throw std::runtime_error(to_utf8(target) + " exists and is not a regular file");
-        }
-        for (const auto& [target, temp] : files_)
-            fs::rename(temp, target);
-        files_.clear();
-    }
-
-private:
-    fs::path dir_;
-    std::vector<std::pair<fs::path, fs::path>> files_;   // target, temp
-};
 
 std::span<const char> as_chars(const std::vector<std::uint8_t>& bytes)
 {
@@ -435,10 +391,10 @@ void export_model(const ParticleSystem& sys, const fs::path& out_dir)
         throw ExportBlocked(std::move(report.blockers));
 
     StagedFiles files(out_dir);
-    files.add(tex_ref, as_chars(encode_indexed_bmp(export_texture(sys.settings()))));
-    files.add(safe + ".qc", make_qc(sys, baked, safe, tex_ref));
-    files.add(safe + "_ref.smd", make_ref_smd(sys, tex_ref));
-    files.add(safe + "_anim.smd", make_anim_smd(sys, table));
+    files.add(from_utf8(tex_ref), as_chars(encode_indexed_bmp(export_texture(sys.settings()))));
+    files.add(from_utf8(safe + ".qc"), make_qc(sys, baked, safe, tex_ref));
+    files.add(from_utf8(safe + "_ref.smd"), make_ref_smd(sys, tex_ref));
+    files.add(from_utf8(safe + "_anim.smd"), make_anim_smd(sys, table));
     files.commit();
 }
 

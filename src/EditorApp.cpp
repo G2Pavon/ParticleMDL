@@ -9,6 +9,7 @@
 
 #include "Exporter.hpp"
 #include "PathUtil.hpp"
+#include "StagedFiles.hpp"
 #include "Presets.hpp"
 #include "Theme.hpp"
 #include "SettingsJson.hpp"
@@ -123,10 +124,8 @@ void EditorApp::new_system()
 void EditorApp::save_system(const fs::path& path)
 {
     try {
-        std::ofstream f(path);
-        if (!f)
-            throw std::runtime_error("cannot write " + to_utf8(path));
-        f << settings_file_text(settings_);
+        // Written next to the file and moved over it, so a failed save keeps the old one.
+        write_file_atomically(path, settings_file_text(settings_));
         set_status("Saved: " + to_utf8(path.filename()), StatusTone::Success);
     } catch (const std::exception& e) {
         set_status(std::string("Error: ") + e.what(), StatusTone::Error);
