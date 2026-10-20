@@ -8,6 +8,7 @@
 #include <nlohmann/json.hpp>
 
 #include "Exporter.hpp"
+#include "PathUtil.hpp"
 #include "Presets.hpp"
 #include "Theme.hpp"
 #include "SettingsJson.hpp"
@@ -60,7 +61,7 @@ EditorApp::EditorApp()
       compiler_dialog_("Select Compiler", FileDialog::Mode::Open),
       export_dialog_("Export Folder", FileDialog::Mode::Directory),
       texture_dialog_("Choose Image", FileDialog::Mode::Open, {".png", ".jpg", ".jpeg", ".bmp", ".tga"}),
-      export_dir_(std::filesystem::current_path().string())
+      export_dir_(to_utf8(std::filesystem::current_path()))
 {
     set_export_dir(export_dir_);
     apply_preset(0);   // Fountain
@@ -124,9 +125,9 @@ void EditorApp::save_system(const fs::path& path)
     try {
         std::ofstream f(path);
         if (!f)
-            throw std::runtime_error("cannot write " + path.string());
+            throw std::runtime_error("cannot write " + to_utf8(path));
         f << settings_file_text(settings_);
-        set_status("Saved: " + path.filename().string(), StatusTone::Success);
+        set_status("Saved: " + to_utf8(path.filename()), StatusTone::Success);
     } catch (const std::exception& e) {
         set_status(std::string("Error: ") + e.what(), StatusTone::Error);
     }
@@ -142,14 +143,14 @@ void EditorApp::load_system(const fs::path& path)
         preview_time_ = 0.0;
         std::string log;
         for (const std::string& w : loaded.warnings) {
-            std::fprintf(stderr, "%s: %s\n", path.filename().string().c_str(), w.c_str());
-            log += path.filename().string() + ": " + w + "\n";
+            std::fprintf(stderr, "%s: %s\n", to_utf8(path.filename()).c_str(), w.c_str());
+            log += to_utf8(path.filename()) + ": " + w + "\n";
         }
         set_log(std::move(log));
         if (loaded.warnings.empty())
-            set_status("Loaded: " + path.filename().string(), StatusTone::Success);
+            set_status("Loaded: " + to_utf8(path.filename()), StatusTone::Success);
         else
-            set_status("Loaded: " + path.filename().string() + " with " + std::to_string(loaded.warnings.size()) +
+            set_status("Loaded: " + to_utf8(path.filename()) + " with " + std::to_string(loaded.warnings.size()) +
                            " warning(s), see the log", StatusTone::Warning);
     } catch (const std::exception& e) {
         set_status(std::string("Error: ") + e.what(), StatusTone::Error);
@@ -161,7 +162,7 @@ void EditorApp::set_export_dir(std::string dir)
     export_dir_ = std::move(dir);
     std::error_code ec;
     export_dir_problem_.reset();
-    if (!std::filesystem::is_directory(export_dir_, ec))
+    if (!std::filesystem::is_directory(from_utf8(export_dir_), ec))
         export_dir_problem_ = "Folder does not exist";
 }
 
@@ -169,7 +170,7 @@ void EditorApp::export_data()
 {
     try {
         const ParticleSystem sys(settings_);
-        const std::filesystem::path folder = export_dir_;
+        const std::filesystem::path folder = from_utf8(export_dir_);
         export_model(sys, folder);
         const std::string safe = safe_model_name(settings_.model_name);
 
@@ -305,12 +306,12 @@ void EditorApp::finish_dialog(DialogPurpose purpose, const std::optional<std::fi
     switch (purpose) {
     case DialogPurpose::Load: load_system(*path); break;
     case DialogPurpose::Save: save_system(*path); break;
-    case DialogPurpose::ExportFolder: set_export_dir(path->string()); break;
-    case DialogPurpose::Compiler: compiler_path_ = path->string(); break;
+    case DialogPurpose::ExportFolder: set_export_dir(to_utf8(*path)); break;
+    case DialogPurpose::Compiler: compiler_path_ = to_utf8(*path); break;
     case DialogPurpose::Texture:
-        settings_.texture_file = path->string();
+        settings_.texture_file = to_utf8(*path);
         dirty_ = true;
-        set_status("Texture: " + path->filename().string(), StatusTone::Success);
+        set_status("Texture: " + to_utf8(path->filename()), StatusTone::Success);
         break;
     }
 }

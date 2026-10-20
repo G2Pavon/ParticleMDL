@@ -10,6 +10,7 @@
 
 #include "ImageImport.hpp"
 #include "MathUtil.hpp"
+#include "PathUtil.hpp"
 
 namespace gs {
 
@@ -317,7 +318,7 @@ IndexedImage export_texture(const Settings& s)
 {
     if (s.texture_file.empty())
         return quantize(make_export_texture(s));   // procedural: the same as always
-    return quantize_refined(fit_to_square(load_image_file(s.texture_file), s.texture_size));
+    return quantize_refined(fit_to_square(load_image_file(from_utf8(s.texture_file)), s.texture_size));
 }
 
 RgbImage expand(const IndexedImage& img)

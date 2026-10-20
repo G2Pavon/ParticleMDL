@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <vector>
 
+#include "PathUtil.hpp"
 #include "WinProcess.hpp"
 
 #ifndef _WIN32
@@ -37,7 +38,7 @@ std::string resolve_compiler(const std::string& compiler)
 {
     if (compiler.find('/') == std::string::npos && compiler.find('\\') == std::string::npos)
         return compiler;
-    return fs::absolute(compiler).string();
+    return to_utf8(fs::absolute(from_utf8(compiler)));
 }
 
 #ifndef _WIN32
@@ -52,7 +53,7 @@ void remove_intermediates(const fs::path& dir, const std::string& safe_name)
 {
     std::error_code ec;
     for (const char* suffix : {".qc", "_ref.smd", "_anim.smd", ".bmp"})
-        fs::remove(dir / (safe_name + suffix), ec);
+        fs::remove(dir / from_utf8(safe_name + suffix), ec);
 }
 
 #ifdef _WIN32
@@ -69,10 +70,9 @@ CompileResult run_compiler(const std::string& compiler, const std::string& qc, c
     CompileResult result;
     exit_ok = false;
 
-    // Same conversion as every other path in the program, so the .qc is the file that was exported.
     // CreateProcess may edit the command line, so it gets a writable buffer.
-    std::wstring command = quote_windows_argument(fs::path(compiler).wstring()) + L" " +
-                           quote_windows_argument(fs::path(qc).wstring());
+    std::wstring command = quote_windows_argument(from_utf8(compiler).wstring()) + L" " +
+                           quote_windows_argument(from_utf8(qc).wstring());
     const std::wstring work_dir = fs::absolute(options.work_dir).wstring();
 
     WinRun run{&result.output, &options.stop};
@@ -251,7 +251,7 @@ CompileResult compile_model(const std::string& compiler, const std::string& safe
         result.status == CompileResult::Status::Cancelled)
         return result;
 
-    if (!exit_ok || !fs::exists(options.work_dir / (safe_name + ".mdl"))) {
+    if (!exit_ok || !fs::exists(options.work_dir / from_utf8(safe_name + ".mdl"))) {
         result.status = CompileResult::Status::Failed;
         return result;
     }

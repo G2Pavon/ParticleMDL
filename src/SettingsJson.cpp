@@ -16,6 +16,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "PathUtil.hpp"
+
 
 namespace gs {
 
@@ -264,7 +266,7 @@ SettingsLoad read_settings_file(const std::filesystem::path& path, Settings base
 {
     std::ifstream f(path);
     if (!f)
-        throw std::runtime_error("cannot read " + path.string());
+        throw std::runtime_error("cannot read " + to_utf8(path));
     return settings_from_json(json::parse(f), std::move(base));
 }
 

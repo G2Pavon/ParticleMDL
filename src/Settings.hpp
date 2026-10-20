@@ -67,7 +67,7 @@ struct Settings {
     Rgb edge_color{0, 0, 0};
     int texture_size = 64;
     double hardness = 0.8;
-    std::string texture_file;   // imported image; empty: the procedural pattern above
+    std::string texture_file;   // imported image, a UTF-8 path; empty: the procedural pattern above
 
     // Vertex-bone scaling over a particle's life
     ScaleMode scale_mode = ScaleMode::Static;

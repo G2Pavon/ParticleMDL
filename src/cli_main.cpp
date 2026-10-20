@@ -7,10 +7,18 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
+
+#ifdef _WIN32
+#include <cwchar>
+#include <windows.h>
+#include <shellapi.h>
+#endif
 
 #include "Compiler.hpp"
 #include "Exporter.hpp"
 #include "ParticleSystem.hpp"
+#include "PathUtil.hpp"
 #include "SettingsJson.hpp"
 
 namespace {
@@ -36,11 +44,36 @@ struct Args {
     bool help = false, version = false;
 };
 
-// "--name value" or "--name=value". Returns false on a problem, with `error` set.
-bool parse_args(int argc, char** argv, Args& args, std::string& error)
+// The arguments as UTF-8. Windows gives main() the ANSI code page, so there they are
+// taken from the wide command line instead.
+std::vector<std::string> utf8_arguments(int argc, char** argv)
 {
+#ifdef _WIN32
+    int count = 0;
+    wchar_t** wide = CommandLineToArgvW(GetCommandLineW(), &count);
+    if (wide) {
+        std::vector<std::string> out;
+        for (int i = 0; i < count; ++i) {
+            const int length = static_cast<int>(wcslen(wide[i]));
+            const int bytes = WideCharToMultiByte(CP_UTF8, 0, wide[i], length, nullptr, 0, nullptr, nullptr);
+            std::string text(static_cast<std::size_t>(bytes), '\0');
+            if (bytes > 0)
+                WideCharToMultiByte(CP_UTF8, 0, wide[i], length, text.data(), bytes, nullptr, nullptr);
+            out.push_back(std::move(text));
+        }
+        LocalFree(wide);
+        return out;
+    }
+#endif
+    return std::vector<std::string>(argv, argv + argc);
+}
+
+// "--name value" or "--name=value". Returns false on a problem, with `error` set.
+bool parse_args(const std::vector<std::string>& argv, Args& args, std::string& error)
+{
+    const int argc = static_cast<int>(argv.size());
     for (int i = 1; i < argc; ++i) {
-        std::string_view arg = argv[i];
+        std::string_view arg = argv[static_cast<std::size_t>(i)];
         if (arg == "--help" || arg == "-h") {
             args.help = true;
             continue;
@@ -66,7 +99,7 @@ bool parse_args(int argc, char** argv, Args& args, std::string& error)
         if (inline_value) {
             *target = *inline_value;
         } else if (i + 1 < argc) {
-            *target = argv[++i];
+            *target = argv[static_cast<std::size_t>(++i)];
         } else {
             error = std::string(arg) + " needs a value";
             return false;
@@ -81,7 +114,7 @@ bool parse_args(int argc, char** argv, Args& args, std::string& error)
 
 int run(const Args& args)
 {
-    const gs::SettingsLoad loaded = gs::read_settings_file(args.settings, gs::Settings{});
+    const gs::SettingsLoad loaded = gs::read_settings_file(gs::from_utf8(args.settings), gs::Settings{});
     for (const std::string& w : loaded.warnings)
         std::fprintf(stderr, "warning: %s: %s\n", args.settings.c_str(), w.c_str());
 
@@ -101,14 +134,14 @@ int run(const Args& args)
     if (!report.blockers.empty())
         return kLimits;
 
-    const fs::path out = args.out;
+    const fs::path out = gs::from_utf8(args.out);
     fs::create_directories(out);
     gs::export_model(sys, out);
     const std::string safe = gs::safe_model_name(loaded.settings.model_name);
 
     if (args.compiler.empty()) {
         std::printf("Wrote %s.qc, %s_ref.smd, %s_anim.smd and %s.bmp to %s\n", safe.c_str(), safe.c_str(),
-                    safe.c_str(), safe.c_str(), out.string().c_str());
+                    safe.c_str(), safe.c_str(), gs::to_utf8(out).c_str());
         return kOk;
     }
 
@@ -118,7 +151,7 @@ int run(const Args& args)
     using Status = gs::CompileResult::Status;
     switch (result.status) {
     case Status::Ok:
-        std::printf("Wrote %s\n", (out / (safe + ".mdl")).string().c_str());
+        std::printf("Wrote %s\n", gs::to_utf8(out / gs::from_utf8(safe + ".mdl")).c_str());
         return kOk;
     case Status::CompilerNotFound:
         std::fprintf(stderr, "error: compiler not found: '%s'\n", args.compiler.c_str());
@@ -144,7 +177,7 @@ int main(int argc, char** argv)
 {
     Args args;
     std::string error;
-    if (!parse_args(argc, argv, args, error)) {
+    if (!parse_args(utf8_arguments(argc, argv), args, error)) {
         std::fprintf(stderr, "error: %s\n\n%s", error.c_str(), kUsageText);
         return kUsage;
     }

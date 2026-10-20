@@ -74,7 +74,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(gs_flags INTERFACE -Werror)
     endif()
 elseif(MSVC)
-    target_compile_options(gs_flags INTERFACE /W4 /fp:precise)
+    target_compile_options(gs_flags INTERFACE /W4 /fp:precise /utf-8)
     if(GS_WERROR)
         target_compile_options(gs_flags INTERFACE /WX)
     endif()
@@ -171,6 +171,9 @@ endif()
 add_executable(particlemdl_cli src/cli_main.cpp)
 target_link_libraries(particlemdl_cli PRIVATE particles_core gs_flags)
 target_compile_definitions(particlemdl_cli PRIVATE GS_VERSION="${PROJECT_VERSION}")
+if(WIN32)
+    target_link_libraries(particlemdl_cli PRIVATE shell32)   # CommandLineToArgvW: the arguments as UTF-8
+endif()
 
 # ---------------------------------------------------------------------------
 # Unit tests (ctest; disable with -DBUILD_TESTING=OFF)

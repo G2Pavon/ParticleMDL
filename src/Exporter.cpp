@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "Baking.hpp"
+#include "PathUtil.hpp"
 #include "TextureGenerator.hpp"
 
 namespace gs {
@@ -44,7 +45,7 @@ public:
 
     void add(const std::string& name, std::span<const char> bytes)
     {
-        const fs::path target = dir_ / name;
+        const fs::path target = dir_ / from_utf8(name);
         fs::path temp = target;
         temp += ".tmp";
         files_.emplace_back(target, temp);   // registered first: cleaned up even if the write fails
@@ -52,7 +53,7 @@ public:
         f.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
         f.close();
         if (!f)
-            throw std::runtime_error("cannot write " + target.string());
+            throw std::runtime_error("cannot write " + to_utf8(target));
     }
 
     void commit()
@@ -60,7 +61,7 @@ public:
         for (const auto& [target, temp] : files_) {
             std::error_code ec;
             if (fs::exists(target, ec) && !fs::is_regular_file(target, ec))
-                throw std::runtime_error(target.string() + " exists and is not a regular file");
+                throw std::runtime_error(to_utf8(target) + " exists and is not a regular file");
         }
         for (const auto& [target, temp] : files_)
             fs::rename(temp, target);
@@ -344,6 +345,9 @@ std::optional<std::string> model_name_problem(std::string_view name)
         return "Model name must not contain / \\ : or be . or ..";
     if (std::ranges::any_of(name, [](char c) { return c == '"' || static_cast<unsigned char>(c) < 0x20; }))
         return "Model name must not contain quotes or control characters";
+    // The name becomes the .mdl and texture file names, which studiomdl and GoldSrc read as plain ANSI bytes.
+    if (std::ranges::any_of(name, [](char c) { return static_cast<unsigned char>(c) >= 0x80; }))
+        return "Model name must use plain ASCII characters (GoldSrc cannot read other model names)";
     if (name.size() > static_cast<std::size_t>(kMaxModelNameLength))
         return "Model name is too long (max " + std::to_string(kMaxModelNameLength) + " characters)";
     return std::nullopt;
@@ -421,7 +425,7 @@ void export_model(const ParticleSystem& sys, const fs::path& out_dir)
 
     std::error_code ec;
     if (!fs::is_directory(out_dir, ec))
-        throw std::runtime_error("export folder does not exist: " + out_dir.string());
+        throw std::runtime_error("export folder does not exist: " + to_utf8(out_dir));
 
     // The animation is built once: the limits are checked against it, and it
     // becomes the animation SMD.

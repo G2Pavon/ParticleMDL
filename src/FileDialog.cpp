@@ -7,6 +7,7 @@
 #include <imgui_stdlib.h>
 
 #include "PathInput.hpp"
+#include "PathUtil.hpp"
 #include "Theme.hpp"
 #include "Widgets.hpp"
 
@@ -18,7 +19,7 @@ namespace {
 
 bool has_extension(const fs::path& path, const std::vector<std::string>& extensions)
 {
-    std::string ext = path.extension().string();
+    std::string ext = to_utf8(path.extension());
     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return std::find(extensions.begin(), extensions.end(), ext) != extensions.end();
 }
@@ -52,7 +53,7 @@ void FileDialog::refresh()
     error_.clear();
     std::error_code ec;
     for (const auto& e : fs::directory_iterator(dir_, fs::directory_options::skip_permission_denied, ec)) {
-        if (e.path().filename().string().starts_with('.'))
+        if (to_utf8(e.path().filename()).starts_with('.'))
             continue;
         std::error_code type_ec;
         const bool is_dir = e.is_directory(type_ec);
@@ -82,7 +83,7 @@ std::optional<fs::path> FileDialog::draw()
     if (!ImGui::BeginPopupModal(title_.c_str(), nullptr))
         return chosen;
 
-    ImGui::TextUnformatted(dir_.string().c_str());
+    ImGui::TextUnformatted(to_utf8(dir_).c_str());
     if (ImGui::Button("Up") && dir_.has_parent_path()) {
         dir_ = dir_.parent_path();
         refresh();
@@ -126,7 +127,7 @@ std::optional<fs::path> FileDialog::draw()
         for (const auto& e : entries_) {
             std::error_code ec;
             const bool is_dir = e.is_directory(ec);
-            const std::string name = e.path().filename().string();
+            const std::string name = to_utf8(e.path().filename());
             const std::string label = is_dir ? "[" + name + "]" : name;
             if (!is_dir && !extensions_.empty())
                 ImGui::PushStyleColor(ImGuiCol_Text, theme::kLink);
@@ -177,7 +178,7 @@ std::optional<fs::path> FileDialog::draw()
     bool replace = false;
     if (ImGui::BeginPopupModal("Replace file?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::Text("%s already exists.\nDo you want to replace it?",
-                    pending_overwrite_ ? pending_overwrite_->filename().string().c_str() : "");
+                    pending_overwrite_ ? to_utf8(pending_overwrite_->filename()).c_str() : "");
         if (ImGui::Button("Replace", ImVec2(ui::px(90), 0))) {
             replace = true;
             ImGui::CloseCurrentPopup();

@@ -12,7 +12,18 @@ TEST_CASE("model_name_problem accepts ordinary names")
     CHECK_FALSE(model_name_problem("my fire v2"));
     CHECK_FALSE(model_name_problem("a.b"));
     CHECK_FALSE(model_name_problem("custom_particles"));
-    CHECK_FALSE(model_name_problem("Ünïcode"));
+}
+
+TEST_CASE("model_name_problem rejects names that are not plain ASCII")
+{
+    // "Jos" + e-acute, and a Japanese name, as UTF-8 bytes
+    for (const char* name : {"Jos\xC3\xA9", "\xE6\x97\xA5\xE6\x9C\xAC", "caf\xC3\xA9 fire"}) {
+        CAPTURE(name);
+        const auto problem = model_name_problem(name);
+        REQUIRE(problem);
+        CHECK(problem->find("ASCII") != std::string::npos);
+    }
+    CHECK_FALSE(model_name_problem("plain ascii ~!@#$%^&()_+-=[]{};',.`"));
 }
 
 TEST_CASE("model_name_problem rejects an empty name")

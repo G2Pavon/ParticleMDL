@@ -7,6 +7,7 @@
 #include <thread>
 
 #include "Compiler.hpp"
+#include "PathUtil.hpp"
 
 #ifndef _WIN32
 #include <unistd.h>
@@ -25,7 +26,7 @@ std::string self_path;
 struct Folder {
     fs::path path;
 
-    explicit Folder(const char* name) : path(fs::temp_directory_path() / name)
+    explicit Folder(const char* name) : path(fs::temp_directory_path() / from_utf8(name))
     {
         fs::remove_all(path);
         fs::create_directories(path);
@@ -240,4 +241,25 @@ TEST_CASE("compile_model stops a compiler when asked to")
 
     CHECK(r.status == Status::Cancelled);
     CHECK(took < 10s);
+}
+
+// "Jos" + e-acute and "tools" with an o-circumflex, as UTF-8 bytes.
+TEST_CASE("compile_model works in a folder with non-ASCII characters in its name")
+{
+    const Folder dir(("particlemdl_compile_Jos\xC3\xA9_\xE6\x97\xA5\xE6\x9C\xAC"));
+    dir.qc("fx", "ok");
+    CHECK(compile_model(self_path, "fx", in(dir)).status == Status::Ok);
+    CHECK(dir.has("fx.mdl"));
+}
+
+TEST_CASE("compile_model starts a compiler whose path has non-ASCII characters")
+{
+    const Folder tools("particlemdl_t\xC3\xB4ols_\xE6\x97\xA5\xE6\x9C\xAC");
+    const fs::path copy = tools.path / fs::path(self_path).filename();
+    fs::copy_file(self_path, copy);
+
+    const Folder dir("particlemdl_compile_non_ascii_tool");
+    dir.qc("fx", "ok");
+    // The compiler is given as UTF-8 text, the way the editor keeps it.
+    CHECK(compile_model(to_utf8(copy), "fx", in(dir)).status == Status::Ok);
 }

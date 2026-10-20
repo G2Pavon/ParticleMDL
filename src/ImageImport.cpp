@@ -2,9 +2,14 @@
 
 #include <algorithm>
 #include <cmath>
+#include <fstream>
+#include <iterator>
+#include <vector>
 #include <stdexcept>
 #include <system_error>
 #include <string>
+
+#include "PathUtil.hpp"
 
 // The one translation unit that holds stb's implementation.
 #define STB_IMAGE_IMPLEMENTATION
@@ -18,13 +23,19 @@ RgbaImage load_image_file(const std::filesystem::path& path)
 {
     std::error_code ec;
     if (!std::filesystem::is_regular_file(path, ec))
-        throw std::runtime_error("image file not found: " + path.string());
+        throw std::runtime_error("image file not found: " + to_utf8(path));
+    // The file is read here, with a real path, so no file name goes through stb's C API.
+    std::ifstream file(path, std::ios::binary);
+    if (!file)
+        throw std::runtime_error("cannot read image " + to_utf8(path));
+    const std::vector<unsigned char> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    if (bytes.empty())
+        throw std::runtime_error("cannot read image " + to_utf8(path) + ": the file is empty");
     int w = 0, h = 0, channels = 0;
-    // stb takes a C path; a UTF-8 string is what it expects on every platform here.
-    const std::string name = path.string();
-    unsigned char* pixels = stbi_load(name.c_str(), &w, &h, &channels, 4);
+    unsigned char* pixels =
+        stbi_load_from_memory(bytes.data(), static_cast<int>(bytes.size()), &w, &h, &channels, 4);
     if (!pixels)
-        throw std::runtime_error("cannot read image " + name + ": " + stbi_failure_reason());
+        throw std::runtime_error("cannot read image " + to_utf8(path) + ": " + stbi_failure_reason());
     RgbaImage img(w, h);
     std::copy_n(pixels, img.pixels.size(), img.pixels.begin());
     stbi_image_free(pixels);
