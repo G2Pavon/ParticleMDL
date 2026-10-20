@@ -107,6 +107,11 @@ struct Settings {
     double quad_width = 6;
     double quad_height = 6;
     bool double_sided = true;
+    // A cluster puts this many copies of the geometry on each particle's bone, spread at random
+    // inside cluster_radius and turned at random: many quads for the price of one bone. The
+    // copies move together, so it needs static quads (vertex bones scale each quad on its own).
+    int cluster_size = 1;
+    double cluster_radius = 20;
     Vec3 mesh_rotation{};
 
     // Per-particle spin
@@ -168,6 +173,8 @@ void for_each_field(S& s, F&& f)
     f("quad_width", s.quad_width);
     f("quad_height", s.quad_height);
     f("double_sided", s.double_sided);
+    f("cluster_size", s.cluster_size);
+    f("cluster_radius", s.cluster_radius);
     f("mesh_rotation", s.mesh_rotation);
     f("particle_spin", s.particle_spin);
     f("spin_spread", s.spin_spread);
@@ -188,6 +195,8 @@ inline constexpr double kMinLifespan = 0.01;
 inline constexpr int kMinFps = 1, kMaxFps = 60;
 inline constexpr double kMaxBurstWindow = 1.0;
 inline constexpr double kMaxVariance = 0.9;
+inline constexpr int kMaxClusterSize = 64;
+inline constexpr double kMaxClusterRadius = 2000.0;
 inline constexpr double kMaxDrag = 10.0;
 inline constexpr double kMinHardness = 0.05, kMaxHardness = 20.0;
 inline constexpr double kMaxScale = 100.0;

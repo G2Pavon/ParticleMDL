@@ -741,9 +741,11 @@ void EditorApp::draw_middle_panel()
 
     const char* label = auto_compile_ ? "Export .mdl###export" : "Export SMD/QC###export";
     if (!export_report_.blockers.empty())
-        label = export_report_.blockers.front().kind == ExportBlocker::Kind::TooManyFrames
-                    ? "Blocked: too many frames###export"
-                    : "Blocked: animation over 64 KB###export";
+        switch (export_report_.blockers.front().kind) {
+        case ExportBlocker::Kind::TooManyFrames: label = "Blocked: too many frames###export"; break;
+        case ExportBlocker::Kind::SequenceTooLarge: label = "Blocked: animation over 64 KB###export"; break;
+        case ExportBlocker::Kind::TooManyVertices: label = "Blocked: too many vertices###export"; break;
+        }
     ImGui::BeginDisabled(!can_export());
     if (ImGui::Button(label, ImVec2(-1, ui::px(40))))
         export_data();
@@ -825,6 +827,14 @@ void EditorApp::draw_right_panel()
     changed |= reset_slider("size_variance", "Size Variance", s.size_variance, 0.0, 0.9, 0.0, "%.2f");
     ImGui::SetItemTooltip("Each particle is up to this fraction larger or smaller, at random");
     changed |= ImGui::Checkbox("Double Sided", &s.double_sided);
+    ImGui::BeginDisabled(s.scale_mode == ScaleMode::VertexBone);
+    changed |= reset_slider("cluster_size", "Cluster Size", s.cluster_size, 1, 16, 1, ImGuiSliderFlags_AlwaysClamp);
+    ImGui::SetItemTooltip("Copies of the geometry on each particle, spread at random inside the radius below and turned\n"
+                          "at random: many quads for one bone. studiomdl accepts 2048 vertices in a model.\n"
+                          "Needs Static scaling (vertex bones scale each quad on its own).");
+    if (s.cluster_size > 1)
+        changed |= reset_slider("cluster_radius", "Cluster Radius", s.cluster_radius, 0, 200, 20);
+    ImGui::EndDisabled();
     changed |= reset_slider("mesh_rotation.x", "Rot X (Pitch)", s.mesh_rotation.x, -180, 180, 0);
     changed |= reset_slider("mesh_rotation.y", "Rot Y (Yaw)", s.mesh_rotation.y, -180, 180, 0);
     changed |= reset_slider("mesh_rotation.z", "Rot Z (Roll)", s.mesh_rotation.z, -180, 180, 0);

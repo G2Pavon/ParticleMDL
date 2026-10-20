@@ -7,6 +7,8 @@
 // the compiler in CI, so the compiler's answers are recorded here.
 #include <doctest/doctest.h>
 
+#include <algorithm>
+
 #include <nlohmann/json.hpp>
 
 #include "Exporter.hpp"
@@ -104,5 +106,70 @@ TEST_CASE("the compiler's total is the prediction plus the offset tables and the
         const long extra = static_cast<long>(v.compiler_total) - static_cast<long>(v.predicted) - 12L * (v.bones - 1);
         CHECK(extra >= 280);
         CHECK(extra <= 284);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Vertices. studiomdl prints "(N vertices, ...)" for a model it accepts and
+// `too many vertices in model` above 2048.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+struct VertexVerdict {
+    const char* name;
+    const char* settings;
+    int vertices;      // what studiomdl counted, or what vertex_count() says for a model it refused
+    bool accepted;
+};
+
+constexpr VertexVerdict kVertexVerdicts[] = {
+    {"crossed quads", R"({"model_name":"crossed","count":20,"duration":1.0,"fps":10})", 160, true},
+    {"static boxes (eight corners each)",
+     R"({"model_name":"boxstatic","count":8,"duration":1.0,"fps":10,"geometry":"volumetric_box"})", 64, true},
+    {"tri-planar quads",
+     R"({"model_name":"tri","count":10,"duration":1.0,"fps":10,"geometry":"tri_planar_quads"})", 120, true},
+    {"boxes with shared corner bones",
+     R"({"model_name":"boxvb","count":14,"duration":1.0,"fps":10,"geometry":"volumetric_box","scale_mode":"vertex_bone"})", 112,
+     true},
+    {"clusters of crossed quads",
+     R"({"model_name":"clcross","count":30,"duration":1.0,"fps":10,"geometry":"crossed_quads","cluster_size":4,"cluster_radius":30})",
+     960, true},
+    {"clusters of boxes",
+     R"({"model_name":"clbox","count":20,"duration":1.0,"fps":10,"geometry":"volumetric_box","cluster_size":5,"cluster_radius":30})",
+     800, true},
+    {"exactly 2048 vertices",
+     R"({"model_name":"cl8","count":64,"duration":1.0,"fps":10,"geometry":"single_quad","cluster_size":8,"cluster_radius":30})",
+     2048, true},
+    {"2080 vertices",
+     R"({"model_name":"cl8x","count":65,"duration":1.0,"fps":10,"geometry":"single_quad","cluster_size":8,"cluster_radius":30})",
+     2080, false},
+    {"2400 vertices",
+     R"({"model_name":"clbigbox","count":50,"duration":1.0,"fps":10,"geometry":"volumetric_box","cluster_size":6,"cluster_radius":30})",
+     2400, false},
+};
+
+} // namespace
+
+TEST_CASE("vertex_count is the number of vertices the real studiomdl counts")
+{
+    for (const VertexVerdict& v : kVertexVerdicts) {
+        CAPTURE(v.name);
+        const SettingsLoad loaded = settings_from_json(nlohmann::json::parse(v.settings), Settings{});
+        REQUIRE(loaded.warnings.empty());
+        CHECK(ParticleSystem(loaded.settings).vertex_count() == v.vertices);
+    }
+}
+
+TEST_CASE("the vertex blocker agrees with the models studiomdl accepted and refused")
+{
+    for (const VertexVerdict& v : kVertexVerdicts) {
+        CAPTURE(v.name);
+        const SettingsLoad loaded = settings_from_json(nlohmann::json::parse(v.settings), Settings{});
+        const ExportReport report = analyze_export(ParticleSystem(loaded.settings));
+        const bool blocked = std::ranges::any_of(
+            report.blockers, [](const ExportBlocker& b) { return b.kind == ExportBlocker::Kind::TooManyVertices; });
+        CHECK(blocked == !v.accepted);
+        CHECK(report.vertices == v.vertices);
     }
 }

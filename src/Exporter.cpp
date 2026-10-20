@@ -82,7 +82,9 @@ std::string make_qc(const ParticleSystem& sys, const BakedPoses& baked, const st
 std::string make_ref_smd(const ParticleSystem& sys, const std::string& tex_ref)
 {
     // Up to 4 triangles per quad, each a material line and three ~80-byte vertex lines.
-    const std::size_t quads = static_cast<std::size_t>(sys.num_particles()) * sys.quads().size();
+    std::size_t quads = 0;
+    for (int i = 0; i < sys.num_particles(); ++i)
+        quads += sys.quads_of(i).size();
     std::string out;
     out.reserve(quads * 4 * (tex_ref.size() + 1 + 3 * 80) + 4096);
     write_nodes(out, sys);
@@ -112,10 +114,12 @@ std::string make_ref_smd(const ParticleSystem& sys, const std::string& tex_ref)
 
     const bool vertex_bones = sys.corners_per_particle() > 0;
     const bool back_faces = sys.settings().double_sided && sys.settings().geometry != Geometry::VolumetricBox;
-    for (const Particle& p : sys.particles()) {
+    for (int pi = 0; pi < sys.num_particles(); ++pi) {
+        const Particle& p = sys.particles()[static_cast<std::size_t>(pi)];
+        const std::vector<Quad>& quads_of_p = sys.quads_of(pi);
         size = vertex_bones ? 1.0 : p.size;
-        for (int qi = 0; qi < static_cast<int>(sys.quads().size()); ++qi) {
-            const Quad& q = sys.quads()[qi];
+        for (int qi = 0; qi < static_cast<int>(quads_of_p.size()); ++qi) {
+            const Quad& q = quads_of_p[static_cast<std::size_t>(qi)];
             // Each corner hangs on a bone of its own with vertex bones (quads that meet share it),
             // else on the particle's.
             auto bone = [&](int k) {
@@ -389,6 +393,7 @@ ExportReport analyze_export(const ParticleSystem& sys, const AnimationTable& tab
     ExportReport r;
     r.frames = table.frames;
     r.sequence_bytes = sequence_bytes(table);
+    r.vertices = sys.vertex_count();
 
     if (r.frames > kMaxStudioFrames) {
         // Frames are lround(duration * fps) + 1, so this many steps fit.
@@ -408,6 +413,12 @@ ExportReport analyze_export(const ParticleSystem& sys, const AnimationTable& tab
                                    "quads saves the most.",
                                    1 + sys.corners_per_particle());
         r.blockers.push_back({ExportBlocker::Kind::SequenceTooLarge, std::move(message)});
+    }
+    if (r.vertices > kMaxStudioVertices) {
+        std::string message = std::format("{} vertices: studiomdl accepts at most {} in a model. Lower Particle Count",
+                                          r.vertices, kMaxStudioVertices);
+        message += s.cluster_size > 1 ? ", Cluster Size or use geometry with fewer quads." : " or use geometry with fewer quads.";
+        r.blockers.push_back({ExportBlocker::Kind::TooManyVertices, std::move(message)});
     }
 
     if (s.end_behavior == EndBehavior::HideInCore && s.scale_mode == ScaleMode::Static)

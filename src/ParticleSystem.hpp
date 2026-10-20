@@ -88,6 +88,13 @@ public:
     const Settings& settings() const noexcept { return settings_; }
     const std::vector<Particle>& particles() const noexcept { return particles_; }
     const std::vector<Quad>& quads() const noexcept { return quads_; }
+    // The quads of one particle, as seen from its bone at size 1: the geometry, or with a cluster all its copies.
+    const std::vector<Quad>& quads_of(int particle) const noexcept
+    {
+        return cluster_quads_.empty() ? quads_ : cluster_quads_[static_cast<std::size_t>(particle)];
+    }
+    // Vertices studiomdl makes of the model: the distinct corners of every copy of the geometry on every particle.
+    int vertex_count() const noexcept;
     // The distinct corner positions of the quads (rotated like them), in order of first use. With
     // vertex bones each has a bone of its own, and quads that meet at a corner share it.
     const std::vector<Vec3>& corners() const noexcept { return corners_; }
@@ -141,6 +148,7 @@ private:
     double export_fps_ = 30.0;
     int loop_steps_ = 1;
     std::vector<Quad> quads_;
+    std::vector<std::vector<Quad>> cluster_quads_;   // per particle, only with a cluster
     std::vector<Particle> particles_;
     double min_z_raw_ = 0, max_z_raw_ = 0;
     Vec3 volume_scale_{1, 1, 1};

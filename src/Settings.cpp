@@ -104,6 +104,12 @@ bool validate(Settings& s)
     changed |= clamp_value(s.lifespan_variance, 0.0, kMaxVariance);
     changed |= clamp_value(s.size_variance, 0.0, kMaxVariance);
     changed |= clamp_value(s.drag, 0.0, kMaxDrag);
+    changed |= clamp_value(s.cluster_size, 1, kMaxClusterSize);
+    changed |= clamp_value(s.cluster_radius, 0.0, kMaxClusterRadius);
+    if (s.scale_mode == ScaleMode::VertexBone && s.cluster_size != 1) {
+        s.cluster_size = 1;   // the corners of a quad are bones; a cluster's copies would each need their own
+        changed = true;
+    }
     changed |= clamp_value(s.texture.hardness, kMinHardness, kMaxHardness);
     changed |= clamp_value(s.scale_start, 0.0, kMaxScale);
     changed |= clamp_value(s.scale_end, 0.0, kMaxScale);

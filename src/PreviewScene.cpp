@@ -195,7 +195,7 @@ void add_particles(Scene& out, const ParticleSystem& sys, const BakedPoses& bake
         // Vertex bones scale the quad; the texture itself never changes.
         const double scale_factor = pose.scale;
 
-        for (const Quad& q : sys.quads()) {
+        for (const Quad& q : sys.quads_of(i)) {
             SceneFace face{};
             double depth_sum = 0;
             bool visible = true;

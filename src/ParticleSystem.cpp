@@ -56,6 +56,7 @@ private:
 
 constexpr std::uint64_t kParticleSeed = 0x5EED'0F'9A27'1C1Eull;
 constexpr std::uint64_t kVarianceStream = 0xD1B54A32D192ED03ull;
+constexpr std::uint64_t kClusterStream = 0x94D049BB133111EBull;
 
 // Seed 0 is the sequence every effect has always had; other seeds are other sequences.
 std::uint64_t seed_of(int seed)
@@ -204,6 +205,31 @@ ParticleSystem::ParticleSystem(const Settings& settings) : settings_(validated(s
         particles_.push_back(p);
     }
 
+    // Clusters: each particle carries several copies of the quads, each moved and turned at random.
+    if (s.cluster_size > 1 && !vertex_bones) {
+        ParticleRng cluster(seed_of(s.seed) ^ kClusterStream);
+        cluster_quads_.resize(particles_.size());
+        for (std::vector<Quad>& quads : cluster_quads_) {
+            quads.reserve(quads_.size() * static_cast<std::size_t>(s.cluster_size));
+            for (int copy = 0; copy < s.cluster_size; ++copy) {
+                // A point uniform inside the ball, and a turn about every axis.
+                const double ring_around = cluster.unit() * 2.0 * kPi, up = cluster.signed_unit();
+                const double reach = s.cluster_radius * std::cbrt(cluster.unit());
+                const double ring = std::sqrt(1.0 - up * up);
+                const Vec3 offset = Vec3{ring * std::cos(ring_around), ring * std::sin(ring_around), up} * reach;
+                const double turn_x = cluster.unit() * 2.0 * kPi, turn_y = cluster.unit() * 2.0 * kPi,
+                             turn_z = cluster.unit() * 2.0 * kPi;
+                for (Quad quad : quads_) {
+                    for (QuadVertex& v : quad) {
+                        v.pos = apply_static_rotation(v.pos, turn_x, turn_y, turn_z) + offset;
+                        v.normal = apply_static_rotation(v.normal, turn_x, turn_y, turn_z);
+                    }
+                    quads.push_back(quad);
+                }
+            }
+        }
+    }
+
     // Fit the unscaled motion into volume_width x volume_depth x volume_height,
     // sampled at the exported frames: exactly the positions the game will show.
     constexpr double inf = std::numeric_limits<double>::infinity();
@@ -235,8 +261,15 @@ ParticleSystem::ParticleSystem(const Settings& settings) : settings_(validated(s
                      s.volume_height / (max_z_raw_ - min_z_raw_)};
 
     // A static quad (or box) extends at most max(w, h) * 0.87 from its bone.
-    hide_z_ = min_z_raw_ * volume_scale_.z - std::max(s.quad_width, s.quad_height) * (1.0 + s.size_variance);
+    hide_z_ = min_z_raw_ * volume_scale_.z -
+              (std::max(s.quad_width, s.quad_height) * (1.0 + s.size_variance) + (cluster_quads_.empty() ? 0.0 : s.cluster_radius));
     drop_acceleration_ = std::max(std::abs(s.gravity * volume_scale_.z), 600.0);
+}
+
+int ParticleSystem::vertex_count() const noexcept
+{
+    const int copies = cluster_quads_.empty() ? 1 : settings_.cluster_size;
+    return num_particles() * copies * corners_for(settings_.geometry);
 }
 
 Vec3 ParticleSystem::apply_static_rotation(Vec3 p, double rad_x, double rad_y, double rad_z)

@@ -18,6 +18,7 @@ namespace gs {
 
 // studiomdl limits (format/mdl.hpp of the compiler).
 inline constexpr int kMaxStudioFrames = 2048;     // MAXSTUDIOANIMATIONS
+inline constexpr int kMaxStudioVertices = 2048;   // MAXSTUDIOVERTS: "too many vertices in model" above this
 inline constexpr int kMaxTextureNameLength = 63;  // MAXTEXTURENAMELENGTH minus the terminator
 // The texture is "<model name>.bmp", so the name leaves room for the extension.
 inline constexpr int kMaxModelNameLength = kMaxTextureNameLength - 4;
@@ -72,7 +73,7 @@ std::size_t sequence_bytes(const ParticleSystem& sys);
 // A limit that studiomdl enforces. An export that hits one cannot be compiled,
 // so it is refused instead of written.
 struct ExportBlocker {
-    enum class Kind { TooManyFrames, SequenceTooLarge };
+    enum class Kind { TooManyFrames, SequenceTooLarge, TooManyVertices };
     Kind kind;
     std::string message;   // what is over, by how much, and what to lower
 };
@@ -81,6 +82,7 @@ struct ExportBlocker {
 struct ExportReport {
     int frames = 0;
     std::size_t sequence_bytes = 0;        // as studiomdl will measure it
+    int vertices = 0;                      // as studiomdl will count them
     std::vector<ExportBlocker> blockers;   // fatal, frame limit first
     std::vector<std::string> warnings;     // advisory
 };

@@ -23,6 +23,7 @@ add_executable(particlemdl_tests
     test_one_shot.cpp
     test_randomness.cpp
     test_blend_modes.cpp
+    test_clusters.cpp
     test_presets.cpp
     test_utf8_paths.cpp
     test_golden.cpp)

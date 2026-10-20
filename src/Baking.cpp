@@ -163,7 +163,7 @@ ParticleSystem::Bounds animation_bounds(const ParticleSystem& sys, const BakedPo
     for (int f = 0; f < baked.stored_frames(); ++f) {
         for (int i = 0; i < baked.particles(); ++i) {
             const ParticlePose& pose = baked.at(f, i);
-            for (const Quad& q : sys.quads()) {
+            for (const Quad& q : sys.quads_of(i)) {
                 for (const QuadVertex& v : q) {
                     const Vec3 c = pose.pos + ParticleSystem::apply_static_rotation(v.pos * pose.scale, pose.rot.x,
                                                                                     pose.rot.y, pose.rot.z);
