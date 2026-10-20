@@ -146,6 +146,13 @@ if(WIN32)
 endif()
 
 # ---------------------------------------------------------------------------
+# Command-line exporter: particles_core only, no GUI or dialog libraries
+# ---------------------------------------------------------------------------
+add_executable(particlemdl_cli src/cli_main.cpp)
+target_link_libraries(particlemdl_cli PRIVATE particles_core gs_flags)
+target_compile_definitions(particlemdl_cli PRIVATE GS_VERSION="${PROJECT_VERSION}")
+
+# ---------------------------------------------------------------------------
 # Unit tests (ctest; disable with -DBUILD_TESTING=OFF)
 # ---------------------------------------------------------------------------
 include(CTest)
