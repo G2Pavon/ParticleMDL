@@ -388,6 +388,46 @@ ExportBlocked::ExportBlocked(std::vector<ExportBlocker> blockers)
 {
 }
 
+std::vector<std::string> compare_with_export(const MdlInfo& mdl, const ParticleSystem& sys)
+{
+    std::vector<std::string> problems;
+    const int bones = 1 + sys.num_particles() * (1 + sys.corners_per_particle());
+    if (static_cast<int>(mdl.bones.size()) != bones)
+        problems.push_back(std::format("the model has {} bones, the export has {}", mdl.bones.size(), bones));
+
+    if (mdl.sequences.size() != 1) {
+        problems.push_back(std::format("the model has {} sequences, the export has 1", mdl.sequences.size()));
+    } else {
+        const MdlSequence& seq = mdl.sequences.front();
+        if (seq.frames != sys.export_frames())
+            problems.push_back(std::format("the sequence has {} frames, the export has {}", seq.frames, sys.export_frames()));
+        if (static_cast<double>(seq.fps) != sys.export_fps())
+            problems.push_back(std::format("the sequence runs at {:g} fps, the export says {:g}", static_cast<double>(seq.fps),
+                                           sys.export_fps()));
+        if (!(seq.flags & kMdlSequenceLooping))
+            problems.push_back("the sequence does not loop");
+        if (!seq.external) {
+            const std::size_t measured = seq.value_bytes + 12;   // studiomdl's measure: from the last offset entry
+            const std::size_t predicted = sequence_bytes(sys);
+            if (measured != predicted)
+                problems.push_back(std::format("studiomdl wrote {} bytes of animation values where the editor predicted {}",
+                                               measured, predicted));
+        }
+    }
+
+    if (mdl.textures.size() != 1) {
+        problems.push_back(std::format("the model has {} textures, the export has 1", mdl.textures.size()));
+    } else {
+        const MdlTexture& tex = mdl.textures.front();
+        if (!(tex.flags & kMdlTextureAdditive))
+            problems.push_back("the texture is not additive");
+        const int size = sys.settings().texture.size;
+        if (tex.width != size || tex.height != size)
+            problems.push_back(std::format("the texture is {} x {}, the export has {} x {}", tex.width, tex.height, size, size));
+    }
+    return problems;
+}
+
 void export_model(const ParticleSystem& sys, const fs::path& out_dir)
 {
     const std::string& model_name = sys.settings().model_name;

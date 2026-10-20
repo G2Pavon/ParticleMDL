@@ -123,6 +123,7 @@ add_library(particles_core STATIC
     src/TextureGenerator.cpp
     src/ImageImport.cpp
     src/StagedFiles.cpp
+    src/MdlReader.cpp
     src/Exporter.cpp
     src/Compiler.cpp
     src/CompileJob.cpp

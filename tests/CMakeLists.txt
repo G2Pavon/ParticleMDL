@@ -15,11 +15,13 @@ add_executable(particlemdl_tests
     test_staged_files.cpp
     test_image_import.cpp
     test_studiomdl_verdicts.cpp
+    test_mdl_reader.cpp
     test_presets.cpp
     test_utf8_paths.cpp
     test_golden.cpp)
 target_link_libraries(particlemdl_tests PRIVATE particles_editor_support doctest gs_flags)
-target_compile_definitions(particlemdl_tests PRIVATE GS_GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/golden")
+target_compile_definitions(particlemdl_tests PRIVATE GS_GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/golden"
+    GS_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 # The golden snapshots were recorded on Linux/glibc. libm is not bit-exact
 # across platforms (audit M9), so elsewhere the golden tests are left out.
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
