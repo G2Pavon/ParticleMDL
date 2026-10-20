@@ -627,9 +627,13 @@ void EditorApp::draw_left_panel()
     changed |= reset_slider("spin.z", "Z (deg/s)", s.spin.z, -360, 360, 0);
 
     group_label("Emitter");
-    changed |= reset_slider("emission_angle", "Angle (Fan)", s.emission_angle, 1, 360, 360);
-    ImGui::SetItemTooltip("Horizontal sector the particles start in and fly out along (360 = all around)");
-    changed |= reset_slider("spawn_radius", "Radius (Disk)", s.spawn_radius, 0, 500, 0);
+    changed |= enum_combo("Shape", s.emitter_shape);
+    ImGui::SetItemTooltip("Disk: on a disk, leaving in a horizontal fan\nSphere, Hemisphere: in a ball, leaving outward\n"
+                          "Cone: at the origin, leaving inside a cone around +Z\nBox: in a box, leaving outward\n"
+                          "Line: along X, leaving in a fan around +Y");
+    changed |= reset_slider("emission_angle", "Angle (Fan / Cone)", s.emission_angle, 1, 360, 360);
+    ImGui::SetItemTooltip("Disk, Line: the sector the particles fly out along (360 = all around)\nCone: the opening of the cone");
+    changed |= reset_slider("spawn_radius", "Radius / Half Width", s.spawn_radius, 0, 500, 0);
     changed |= reset_slider("spawn_height", "Height (Volume)", s.spawn_height, 0, 400, 0);
     changed |= reset_slider("emitter_tilt.x", "Tilt X (Pitch)", s.emitter_tilt.x, -180, 180, 0);
     changed |= reset_slider("emitter_tilt.y", "Tilt Y (Yaw)", s.emitter_tilt.y, -180, 180, 0);

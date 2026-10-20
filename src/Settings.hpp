@@ -58,8 +58,15 @@ struct Settings {
     Vec3 velocity{}; // added to every particle, units/s
     Vec3 spin{};     // deg/s
 
-    // Emitter
-    double emission_angle = 360;   // horizontal fan
+    // Emitter. The shape says where particles start and which way they leave:
+    //   Disk        on a disk of spawn_radius, leaving in the horizontal fan of emission_angle
+    //   Sphere      in a ball of spawn_radius (on its surface with hollow_ring), leaving outward
+    //   Hemisphere  the upper half of the same
+    //   Cone        at the origin, leaving within a cone around +Z whose opening is emission_angle
+    //   Box         in a box of +-spawn_radius by +-spawn_radius by +-spawn_height, leaving outward
+    //   Line        along X, +-spawn_radius, leaving in a fan around +Y of emission_angle
+    EmitterShape emitter_shape = EmitterShape::Disk;
+    double emission_angle = 360;   // horizontal fan, or the opening of the cone
     double spawn_radius = 0;
     double spawn_height = 0;
     Vec3 emitter_tilt{};
@@ -113,6 +120,7 @@ void for_each_field(S& s, F&& f)
     f("volume_height", s.volume_height);
     f("velocity", s.velocity);
     f("spin", s.spin);
+    f("emitter_shape", s.emitter_shape);
     f("emission_angle", s.emission_angle);
     f("spawn_radius", s.spawn_radius);
     f("spawn_height", s.spawn_height);
