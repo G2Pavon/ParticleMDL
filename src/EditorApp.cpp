@@ -97,18 +97,31 @@ void EditorApp::rebuild()
     // Quantizing the texture is the slow part; physics sliders do not need it.
     if (!texture_settings_ || *texture_settings_ != settings_.texture) {
         texture_problem_.reset();
-        try {
-            renderer_.update_textures(settings_.texture);
-        } catch (const std::exception& e) {
-            // Preview the pattern instead; the export refuses until the image is fixed.
-            texture_problem_ = e.what();
-            TextureSettings pattern = settings_.texture;
-            pattern.file.clear();
-            renderer_.update_textures(pattern);
-        }
         texture_settings_ = settings_.texture;
+        if (settings_.texture.file.empty()) {
+            renderer_.update_textures(settings_.texture);   // a pattern: instant
+        } else {
+            // A picture is decoded and reduced on a worker; the old texture stays until it is ready.
+            texture_job_.request(settings_.texture);
+        }
     }
     dirty_ = false;
+}
+
+void EditorApp::poll_texture()
+{
+    const std::optional<TextureJob::Result> result = texture_job_.poll();
+    if (!result || result->settings != settings_.texture)
+        return;   // nothing yet, or made for a picture that was changed since
+    if (result->image) {
+        renderer_.set_texture(*result->image);
+        return;
+    }
+    // Preview the pattern instead; the export refuses until the image is fixed.
+    texture_problem_ = result->error;
+    TextureSettings pattern = settings_.texture;
+    pattern.file.clear();
+    renderer_.update_textures(pattern);
 }
 
 void EditorApp::apply_preset(int index)
@@ -354,6 +367,7 @@ void EditorApp::finish_dialog(DialogPurpose purpose, const std::optional<std::fi
 void EditorApp::draw_frame(double delta)
 {
     poll_compile();
+    poll_texture();
     if (dirty_)
         rebuild();
     advance_clock(delta);
@@ -747,6 +761,8 @@ void EditorApp::draw_right_panel()
     ImGui::EndDisabled();
     if (texture_problem_)
         wrapped_text(kError, *texture_problem_);
+    else if (texture_job_.busy() && !settings_.texture.file.empty())
+        ImGui::TextDisabled("Loading image...");
 
     group_label("Texture");
     // An imported image replaces the pattern and colours, so those are greyed out.

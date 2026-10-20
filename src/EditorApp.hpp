@@ -15,6 +15,7 @@
 #include "ParticleSystem.hpp"
 #include "PreviewRenderer.hpp"
 #include "PreviewScene.hpp"
+#include "TextureJob.hpp"
 #include "Settings.hpp"
 
 namespace gs {
@@ -46,6 +47,7 @@ private:
     void finish_dialog(DialogPurpose purpose, const std::optional<std::filesystem::path>& path);
     bool can_export() const;
     void poll_compile();
+    void poll_texture();
     void advance_clock(double delta);
     void refresh_preset_label();
     void set_status(std::string text, StatusTone tone);
@@ -102,6 +104,7 @@ private:
     FileDialog texture_dialog_;
     native::DialogJob native_job_;                 // the operating system's dialog, when there is one
     std::optional<DialogPurpose> pending_dialog_;  // what the open native dialog is for
+    TextureJob texture_job_;                       // makes an imported picture's texture off the UI thread
     std::optional<std::string> texture_problem_;   // why the imported image could not be used
     std::string export_dir_;                        // where Export writes; per session, not saved with the effect
     std::optional<std::string> export_dir_problem_;

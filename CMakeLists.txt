@@ -121,6 +121,7 @@ add_library(particles_core STATIC
     src/ParticleSystem.cpp
     src/Baking.cpp
     src/TextureGenerator.cpp
+    src/TextureJob.cpp
     src/ImageImport.cpp
     src/StagedFiles.cpp
     src/MdlReader.cpp

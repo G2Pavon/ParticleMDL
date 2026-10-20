@@ -17,6 +17,7 @@ add_executable(particlemdl_tests
     test_studiomdl_verdicts.cpp
     test_mdl_reader.cpp
     test_studiomdl_numbers.cpp
+    test_texture_job.cpp
     test_presets.cpp
     test_utf8_paths.cpp
     test_golden.cpp)

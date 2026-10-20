@@ -29,7 +29,12 @@ void set_additive_blend(const ImDrawList*, const ImDrawCmd*)
 
 void PreviewRenderer::update_textures(const TextureSettings& s)
 {
-    game_.upload(to_rgba(expand(export_texture(s))));
+    set_texture(export_texture(s));
+}
+
+void PreviewRenderer::set_texture(const IndexedImage& image)
+{
+    game_.upload(to_rgba(expand(image)));
 }
 
 void PreviewRenderer::draw(ImDrawList* dl, ImVec2 origin, ImVec2 size, Rgb background, const Scene& scene) const
