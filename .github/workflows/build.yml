@@ -71,13 +71,13 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install GLFW
-        run: vcpkg install glfw3:x64-windows
+        run: vcpkg install glfw3:x64-windows-static
 
       - name: Configure
         run: >
           cmake -S . -B build -A x64
           -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
-          -DVCPKG_TARGET_TRIPLET=x64-windows
+          -DVCPKG_TARGET_TRIPLET=x64-windows-static
 
       - name: Build
         run: cmake --build build --config Release --parallel
