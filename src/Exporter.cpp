@@ -399,8 +399,8 @@ ExportReport analyze_export(const ParticleSystem& sys, const AnimationTable& tab
         // Frames are lround(duration * fps) + 1, so this many steps fit.
         const double longest = std::floor((kMaxStudioFrames - 1) / static_cast<double>(s.fps) * 10.0) / 10.0;
         r.blockers.push_back({ExportBlocker::Kind::TooManyFrames,
-                              std::format("{} frames: studiomdl accepts at most {} per sequence. At {} fps the longest "
-                                          "Duration is {:.1f} s (or lower the FPS).",
+                              std::format("{} frames: studiomdl keeps only the first {} of a sequence, which would cut the "
+                                          "effect short. At {} fps the longest Duration is {:.1f} s (or lower the FPS).",
                                           r.frames, kMaxStudioFrames, s.fps, longest)});
     }
     if (r.sequence_bytes > kMaxSequenceBytes) {

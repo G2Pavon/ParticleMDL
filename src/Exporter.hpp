@@ -17,7 +17,9 @@
 namespace gs {
 
 // studiomdl limits (format/mdl.hpp of the compiler).
-inline constexpr int kMaxStudioFrames = 2048;     // MAXSTUDIOANIMATIONS
+// studiomdl does not refuse a longer sequence: it keeps the first 2048 frames and says nothing, which
+// cuts the effect short and breaks its loop (seen with Sven Co-op's studiomdl, Nov 30 2018).
+inline constexpr int kMaxStudioFrames = 2048;
 inline constexpr int kMaxStudioVertices = 2048;   // MAXSTUDIOVERTS: "too many vertices in model" above this
 inline constexpr int kMaxTextureNameLength = 63;  // MAXTEXTURENAMELENGTH minus the terminator
 // The texture is "<model name>.bmp", so the name leaves room for the extension.

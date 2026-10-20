@@ -110,6 +110,43 @@ TEST_CASE("the compiler's total is the prediction plus the offset tables and the
 }
 
 // ---------------------------------------------------------------------------
+// Frames. A sequence of more than 2048 frames is not refused: studiomdl keeps the first 2048
+// and says nothing. These are one particle, 40 frames per second, single quads.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+struct FrameVerdict {
+    const char* settings;
+    int frames;            // what this program exports
+    int compiler_frames;   // "(N frames)" in studiomdl's report
+};
+
+constexpr FrameVerdict kFrameVerdicts[] = {
+    {R"({"model_name":"fr2047","count":1,"duration":50.0,"fps":40,"geometry":"single_quad"})", 2001, 2001},
+    {R"({"model_name":"fr2048","count":1,"duration":51.175,"fps":40,"geometry":"single_quad"})", 2048, 2048},
+    {R"({"model_name":"fr2049","count":1,"duration":51.2,"fps":40,"geometry":"single_quad"})", 2049, 2048},
+    {R"({"model_name":"fr2100","count":1,"duration":52.5,"fps":40,"geometry":"single_quad"})", 2101, 2048},
+};
+
+} // namespace
+
+TEST_CASE("the frame blocker is exactly where studiomdl starts to cut the sequence")
+{
+    for (const FrameVerdict& v : kFrameVerdicts) {
+        CAPTURE(v.frames);
+        const SettingsLoad loaded = settings_from_json(nlohmann::json::parse(v.settings), Settings{});
+        const ExportReport report = analyze_export(ParticleSystem(loaded.settings));
+        CHECK(report.frames == v.frames);
+        const bool cut = v.compiler_frames != v.frames;
+        const bool blocked = std::ranges::any_of(
+            report.blockers, [](const ExportBlocker& b) { return b.kind == ExportBlocker::Kind::TooManyFrames; });
+        CHECK(blocked == cut);   // blocked exactly when the compiler would have cut frames off
+        CHECK(v.compiler_frames == std::min(v.frames, kMaxStudioFrames));
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Vertices. studiomdl prints "(N vertices, ...)" for a model it accepts and
 // `too many vertices in model` above 2048.
 // ---------------------------------------------------------------------------
