@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <stop_token>
 #include <string>
+#include <string_view>
 
 namespace gs {
 
@@ -21,8 +22,16 @@ struct CompileResult {
     std::string output;   // compiler stdout + stderr
 };
 
+// One command-line argument as Windows programs read it back (CommandLineToArgvW
+// and the C runtime): quoted when it holds spaces or quotes, with the
+// backslashes before a quote doubled.
+std::wstring quote_windows_argument(std::wstring_view arg);
+
 // Runs `<compiler> <safe_name>.qc` inside options.work_dir. A compiler given as
 // a path ("./studiomdl") is resolved against the caller's current directory.
+// The compiler's output is collected in CompileResult::output on every platform;
+// it runs without a console window, with an empty stdin, and is stopped on
+// timeout or cancel together with anything it started.
 // Success means exit code 0 and <safe_name>.mdl present; the intermediate
 // files are then deleted. Throws std::runtime_error when the process cannot be
 // set up at all.

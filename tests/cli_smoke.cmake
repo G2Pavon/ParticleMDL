@@ -40,10 +40,7 @@ if(EXISTS ${OUT}/over_limit)
     message(FATAL_ERROR "particlemdl_cli created a folder for an export it refused")
 endif()
 
-# A compiler that does not exist is reported, not ignored. (On Windows compiling
-# outside the current folder is refused before the compiler is looked up.)
-if(NOT CMAKE_HOST_WIN32)
-    run_cli(4 --settings ${SETTINGS} --out ${OUT}/nocompiler --compile ${OUT}/no-such-studiomdl)
-endif()
+# A compiler that does not exist is reported, not ignored.
+run_cli(4 --settings ${SETTINGS} --out ${OUT}/nocompiler --compile ${OUT}/no-such-studiomdl)
 
 file(REMOVE_RECURSE ${OUT})

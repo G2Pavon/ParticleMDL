@@ -114,6 +114,7 @@ void EditorApp::new_system()
     preset_index_ = -1;
     camera_.reset();
     status_.clear();
+    set_log({});
     rebuild();
     preview_time_ = 0.0;
 }
@@ -139,13 +140,17 @@ void EditorApp::load_system(const fs::path& path)
         preset_index_ = -1;
         rebuild();
         preview_time_ = 0.0;
-        for (const std::string& w : loaded.warnings)
+        std::string log;
+        for (const std::string& w : loaded.warnings) {
             std::fprintf(stderr, "%s: %s\n", path.filename().string().c_str(), w.c_str());
+            log += path.filename().string() + ": " + w + "\n";
+        }
+        set_log(std::move(log));
         if (loaded.warnings.empty())
             set_status("Loaded: " + path.filename().string(), StatusTone::Success);
         else
             set_status("Loaded: " + path.filename().string() + " with " + std::to_string(loaded.warnings.size()) +
-                           " warning(s), see console", StatusTone::Warning);
+                           " warning(s), see the log", StatusTone::Warning);
     } catch (const std::exception& e) {
         set_status(std::string("Error: ") + e.what(), StatusTone::Error);
     }
@@ -187,19 +192,24 @@ void EditorApp::poll_compile()
             return;
         switch (result->status) {
         case CompileResult::Status::Ok:
+            set_log(result->output);   // the output of a compile that worked: there, but not unfolded
+            open_log_ = false;
             set_status("Success! " + compile_job_.model_name() + ".mdl", StatusTone::Success);
             break;
         case CompileResult::Status::CompilerNotFound:
             std::fprintf(stderr, "Compiler not found: '%s'\n", compiler_path_.c_str());
+            set_log("Compiler not found: '" + compiler_path_ + "'");
             set_status("Compiler not found! Check path.", StatusTone::Error);
             break;
         case CompileResult::Status::Failed:
             std::fprintf(stderr, "--- COMPILER ERROR ---\n%s\n", result->output.c_str());
-            set_status("Compile failed! Check terminal console.", StatusTone::Error);
+            set_log(result->output.empty() ? "The compiler failed without any output." : result->output);
+            set_status("Compile failed! See the log below.", StatusTone::Error);
             break;
         case CompileResult::Status::TimedOut:
             std::fprintf(stderr, "--- COMPILER TIMED OUT ---\n%s\n", result->output.c_str());
-            set_status("Compile timed out! Check terminal console.", StatusTone::Error);
+            set_log(result->output + "\n(timed out)");
+            set_status("Compile timed out! See the log below.", StatusTone::Error);
             break;
         case CompileResult::Status::Cancelled:
             set_status("Compile cancelled.", StatusTone::Warning);
@@ -229,6 +239,12 @@ void EditorApp::advance_clock(double delta)
     preview_time_ += delta;
     if (preview_time_ > loop)
         preview_time_ = floor_mod(preview_time_, loop);
+}
+
+void EditorApp::set_log(std::string text)
+{
+    log_ = std::move(text);
+    open_log_ = !log_.empty();
 }
 
 void EditorApp::set_status(std::string text, StatusTone tone)
@@ -655,6 +671,15 @@ void EditorApp::draw_middle_panel()
     if (ImGui::Button(label, ImVec2(-1, ui::px(40))))
         export_data();
     ImGui::EndDisabled();
+
+    if (!log_.empty()) {
+        if (open_log_) {
+            ImGui::SetNextItemOpen(true);
+            open_log_ = false;
+        }
+        if (ImGui::CollapsingHeader("Log"))
+            ImGui::InputTextMultiline("##log", &log_, ImVec2(-1, ui::px(110)), ImGuiInputTextFlags_ReadOnly);
+    }
 
     bottom_height_ = ImGui::GetCursorPosY() - bottom_start + ImGui::GetStyle().ItemSpacing.y;
 }

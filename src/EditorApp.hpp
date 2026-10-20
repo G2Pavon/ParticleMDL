@@ -49,6 +49,7 @@ private:
     void advance_clock(double delta);
     void refresh_preset_label();
     void set_status(std::string text, StatusTone tone);
+    void set_log(std::string text);
 
     // Menus and dialogs
     void draw_menu_bar();
@@ -86,6 +87,8 @@ private:
     CompileJob compile_job_;
 
     std::string status_;
+    std::string log_;          // compiler output and load warnings, shown under the Export button
+    bool open_log_ = false;    // unfold the log once, when something new was put in it
     StatusTone status_tone_ = StatusTone::Success;
 
     FileDialog save_dialog_;

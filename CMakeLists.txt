@@ -112,7 +112,8 @@ add_library(particles_core STATIC
     src/ImageImport.cpp
     src/Exporter.cpp
     src/Compiler.cpp
-    src/CompileJob.cpp)
+    src/CompileJob.cpp
+    src/WinProcess.cpp)
 target_include_directories(particles_core PUBLIC src)
 find_package(Threads REQUIRED)
 target_link_libraries(particles_core

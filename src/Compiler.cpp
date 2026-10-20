@@ -2,13 +2,15 @@
 
 #include <array>
 #include <optional>
+#include <string_view>
 #include <stdexcept>
 #include <vector>
 
-#ifdef _WIN32
-#include <process.h>
-#else
+#include "WinProcess.hpp"
+
+#ifndef _WIN32
 #include <cerrno>
+#include <fcntl.h>
 #include <csignal>
 #include <poll.h>
 #include <spawn.h>
@@ -18,6 +20,13 @@ extern char** environ;
 #endif
 
 namespace gs {
+
+std::wstring quote_windows_argument(std::wstring_view arg)
+{
+    std::wstring out(arg.size() * 2 + 2, L'\0');   // every character at most doubles, plus two quotes
+    out.resize(quote_command_line_argument(arg.data(), static_cast<unsigned>(arg.size()), out.data()));
+    return out;
+}
 
 namespace {
 
@@ -31,11 +40,13 @@ std::string resolve_compiler(const std::string& compiler)
     return fs::absolute(compiler).string();
 }
 
+#ifndef _WIN32
 bool same_directory(const fs::path& a, const fs::path& b)
 {
     std::error_code ec;
     return fs::equivalent(a, b, ec);
 }
+#endif
 
 void remove_intermediates(const fs::path& dir, const std::string& safe_name)
 {
@@ -46,36 +57,54 @@ void remove_intermediates(const fs::path& dir, const std::string& safe_name)
 
 #ifdef _WIN32
 
-// _spawnvp passes arguments through a command line; quote the ones with spaces.
-std::string quote_argument(const std::string& arg)
-{
-    if (!arg.empty() && arg.find_first_of(" \t\"") == std::string::npos)
-        return arg;
-    std::string out = "\"";
-    for (char c : arg) {
-        if (c == '"')
-            out += '\\';
-        out += c;
-    }
-    return out + "\"";
-}
+// Collects what the compiler writes, and tells the runner when to give up.
+struct WinRun {
+    std::string* output;
+    const std::stop_token* stop;
+};
 
-// No timeout or cancellation on Windows: _spawnvp(_P_WAIT) blocks until exit.
 CompileResult run_compiler(const std::string& compiler, const std::string& qc, const CompileOptions& options,
                            bool& exit_ok)
 {
-    if (!same_directory(options.work_dir, fs::current_path()))
-        throw std::runtime_error("compiling outside the current folder is not supported on Windows");
     CompileResult result;
-    const std::string program = quote_argument(compiler), arg = quote_argument(qc);
-    const char* argv[] = {program.c_str(), arg.c_str(), nullptr};
-    const intptr_t rc = _spawnvp(_P_WAIT, compiler.c_str(), argv);
-    if (rc == -1) {
+    exit_ok = false;
+
+    // Same conversion as every other path in the program, so the .qc is the file that was exported.
+    // CreateProcess may edit the command line, so it gets a writable buffer.
+    std::wstring command = quote_windows_argument(fs::path(compiler).wstring()) + L" " +
+                           quote_windows_argument(fs::path(qc).wstring());
+    const std::wstring work_dir = fs::absolute(options.work_dir).wstring();
+
+    WinRun run{&result.output, &options.stop};
+    ProcessCallbacks callbacks;
+    callbacks.user = &run;
+    callbacks.output = [](void* user, const char* data, unsigned long size) {
+        static_cast<WinRun*>(user)->output->append(data, size);
+    };
+    callbacks.stop_requested = [](void* user) { return static_cast<WinRun*>(user)->stop->stop_requested(); };
+
+    const auto millis = options.timeout.count();
+    const unsigned long timeout = millis < 0 || millis >= static_cast<long long>(kNoTimeout)
+                                      ? kNoTimeout - 1
+                                      : static_cast<unsigned long>(millis);
+    const ProcessResult run_result = run_process(command.data(), work_dir.c_str(), timeout, callbacks);
+    switch (run_result.status) {
+    case ProcessStatus::Exited:
+        exit_ok = run_result.exit_code == 0;
+        break;
+    case ProcessStatus::NotFound:
         result.status = CompileResult::Status::CompilerNotFound;
-        exit_ok = false;
-        return result;
+        break;
+    case ProcessStatus::StartFailed:
+        result.status = CompileResult::Status::Failed;
+        break;
+    case ProcessStatus::TimedOut:
+        result.status = CompileResult::Status::TimedOut;
+        break;
+    case ProcessStatus::Cancelled:
+        result.status = CompileResult::Status::Cancelled;
+        break;
     }
-    exit_ok = rc == 0;
     return result;
 }
 
@@ -133,6 +162,8 @@ CompileResult run_compiler(const std::string& compiler, const std::string& qc, c
     Pipe out;
 
     SpawnActions actions;
+    // An empty stdin: a compiler that waits for a key gets end-of-file instead of a hang.
+    posix_spawn_file_actions_addopen(actions.get(), STDIN_FILENO, "/dev/null", O_RDONLY, 0);
     posix_spawn_file_actions_adddup2(actions.get(), out.write_end(), STDOUT_FILENO);
     posix_spawn_file_actions_adddup2(actions.get(), out.write_end(), STDERR_FILENO);
     posix_spawn_file_actions_addclose(actions.get(), out.read_end());
