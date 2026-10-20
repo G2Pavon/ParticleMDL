@@ -28,6 +28,19 @@ using theme::kSuccess;
 using theme::kWarning;
 
 
+// The ranges of the sliders that have hard limits in Settings.hpp. A slider does not clamp:
+// a value typed past its end (Ctrl+click) or loaded from a file is kept until it leaves the
+// hard limits, which validate() enforces. So the sliders must lie inside them.
+struct SliderRange {
+    double lo, hi;
+};
+constexpr SliderRange kSliderDuration{0.5, 10.0};
+constexpr SliderRange kSliderLifespan{0.1, 1.0};
+constexpr SliderRange kSliderHardness{0.2, 5.0};
+static_assert(kSliderDuration.lo >= kMinDuration && kSliderDuration.hi <= kMaxDuration);
+static_assert(kSliderLifespan.lo >= kMinLifespan && kSliderLifespan.hi <= 1.0);
+static_assert(kSliderHardness.lo >= kMinHardness && kSliderHardness.hi <= kMaxHardness);
+
 constexpr const char* kBudgetHelpTitle = "GoldSrc limits animation data to 64 KB per sequence.\n\nHow to save memory:";
 constexpr const char* kBudgetHelpBody =
     "Lower 'Particle Count'\nLower 'Duration'\nLower 'FPS'\nDisable scaling Vertex Bones\nLess geometry quads";
@@ -549,8 +562,8 @@ void EditorApp::draw_left_panel()
     group_label("Animation");
     changed |= reset_slider("count", "Particle Count", s.count, 1, max_particles(s.geometry, s.scale_mode), 64,
                             ImGuiSliderFlags_AlwaysClamp);
-    changed |= reset_slider("duration", "Duration (s)", s.duration, 0.5, 10.0, 3.0, "%.2f", ImGuiSliderFlags_AlwaysClamp);
-    changed |= reset_slider("lifespan", "Lifespan (%)", s.lifespan, 0.1, 1.0, 0.85, "%.2f", ImGuiSliderFlags_AlwaysClamp);
+    changed |= reset_slider("duration", "Duration (s)", s.duration, kSliderDuration.lo, kSliderDuration.hi, 3.0, "%.2f");
+    changed |= reset_slider("lifespan", "Lifespan (%)", s.lifespan, kSliderLifespan.lo, kSliderLifespan.hi, 0.85, "%.2f");
     changed |= reset_slider("fps", "FPS", s.fps, kMinFps, kMaxFps, 30, ImGuiSliderFlags_AlwaysClamp);
     changed |= enum_combo("End Behavior", s.end_behavior);
     ImGui::SetItemTooltip("What a particle does after its lifespan:\n"
@@ -722,7 +735,7 @@ void EditorApp::draw_right_panel()
     changed |= color_edit("Core Color", s.core_color);
     ImGui::SetNextItemWidth(ui::field_width());
     changed |= color_edit("Edge Color", s.edge_color);
-    changed |= reset_slider("hardness", "Hardness", s.hardness, 0.2, 5.0, 0.8, "%.2f", ImGuiSliderFlags_AlwaysClamp);
+    changed |= reset_slider("hardness", "Hardness", s.hardness, kSliderHardness.lo, kSliderHardness.hi, 0.8, "%.2f");
     ImGui::EndDisabled();
     changed |= int_combo("Resolution", s.texture_size, kTextureSizes);
 
