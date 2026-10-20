@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cctype>
 #include <charconv>
 #include <format>
 #include <fstream>
@@ -21,13 +22,6 @@ namespace gs {
 namespace {
 
 namespace fs = std::filesystem;
-
-std::string replace_all(std::string s, std::string_view from, std::string_view to)
-{
-    for (std::size_t pos = 0; (pos = s.find(from, pos)) != std::string::npos; pos += to.size())
-        s.replace(pos, from.size(), to);
-    return s;
-}
 
 std::span<const char> as_chars(const std::vector<std::uint8_t>& bytes)
 {
@@ -290,7 +284,16 @@ Vec3 studio_angles(Vec3 r)
 
 std::string safe_model_name(const std::string& model_name)
 {
-    return replace_all(replace_all(model_name, " ", "_"), ".mdl", "");
+    std::string safe = model_name;
+    std::ranges::replace(safe, ' ', '_');
+    // Only a trailing ".mdl" (in any case) is the extension; "fx.mdl_v2" keeps what it says.
+    auto is_mdl = [&] {
+        return safe.size() >= 4 && std::ranges::equal(std::string_view(safe).substr(safe.size() - 4), std::string_view(".mdl"),
+                                                       [](char a, char b) { return std::tolower(static_cast<unsigned char>(a)) == b; });
+    };
+    while (is_mdl())
+        safe.resize(safe.size() - 4);
+    return safe;
 }
 
 std::optional<std::string> model_name_problem(std::string_view name)
@@ -301,9 +304,24 @@ std::optional<std::string> model_name_problem(std::string_view name)
         return "Model name must not contain / \\ : or be . or ..";
     if (std::ranges::any_of(name, [](char c) { return c == '"' || static_cast<unsigned char>(c) < 0x20; }))
         return "Model name must not contain quotes or control characters";
+    // Characters Windows does not allow in a file name.
+    if (name.find_first_of("<>|?*") != std::string_view::npos)
+        return "Model name must not contain < > | ? or *";
     // The name becomes the .mdl and texture file names, which studiomdl and GoldSrc read as plain ANSI bytes.
     if (std::ranges::any_of(name, [](char c) { return static_cast<unsigned char>(c) >= 0x80; }))
         return "Model name must use plain ASCII characters (GoldSrc cannot read other model names)";
+    if (safe_model_name(std::string(name)).empty())
+        return "Model name is empty (\".mdl\" is only the extension)";
+    // Windows keeps these names for devices, with or without an extension: "nul.qc" cannot be created.
+    {
+        std::string base = safe_model_name(std::string(name)).substr(0, safe_model_name(std::string(name)).find('.'));
+        std::ranges::transform(base, base.begin(), [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+        static constexpr std::string_view devices[] = {"CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5",
+                                                       "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4",
+                                                       "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"};
+        if (std::ranges::find(devices, base) != std::end(devices))
+            return "Model name \"" + base + "\" is reserved by Windows";
+    }
     if (name.size() > static_cast<std::size_t>(kMaxModelNameLength))
         return "Model name is too long (max " + std::to_string(kMaxModelNameLength) + " characters)";
     return std::nullopt;

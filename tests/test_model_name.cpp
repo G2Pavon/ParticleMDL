@@ -66,10 +66,51 @@ TEST_CASE("model_name_problem explains what is wrong")
     CHECK(model_name_problem("a\"b")->find("quotes") != std::string::npos);
 }
 
-TEST_CASE("safe_model_name turns spaces into underscores and drops .mdl")
+TEST_CASE("safe_model_name turns spaces into underscores and drops a trailing .mdl")
 {
     CHECK(safe_model_name("my fire") == "my_fire");
     CHECK(safe_model_name("fire.mdl") == "fire");
     CHECK(safe_model_name("a b c") == "a_b_c");
     CHECK(safe_model_name("plain") == "plain");
+}
+
+TEST_CASE("safe_model_name takes the extension in any case and only at the end")
+{
+    CHECK(safe_model_name("fire.MDL") == "fire");
+    CHECK(safe_model_name("fire.Mdl") == "fire");
+    CHECK(safe_model_name("fire.mdl.mdl") == "fire");
+    CHECK(safe_model_name("fx.mdl_v2") == "fx.mdl_v2");
+    CHECK(safe_model_name("a.mdl.b") == "a.mdl.b");
+    CHECK(safe_model_name("mdl") == "mdl");
+    CHECK(safe_model_name(".mdl") == "");
+}
+
+TEST_CASE("model_name_problem rejects a name that is only an extension")
+{
+    CHECK(model_name_problem(".mdl"));
+    CHECK(model_name_problem(".MDL"));
+    CHECK_FALSE(model_name_problem("a.mdl"));
+}
+
+TEST_CASE("model_name_problem rejects characters Windows does not allow in file names")
+{
+    for (const char* name : {"a<b", "a>b", "a|b", "a?b", "a*b"}) {
+        CAPTURE(name);
+        CHECK(model_name_problem(name));
+    }
+}
+
+TEST_CASE("model_name_problem rejects the names Windows keeps for devices")
+{
+    for (const char* name : {"nul", "NUL", "Con", "prn", "aux", "COM1", "com9", "LPT1", "lpt9", "nul.mdl", "con.fx",
+                             "aux.txt.mdl"}) {
+        CAPTURE(name);
+        const auto problem = model_name_problem(name);
+        REQUIRE(problem);
+        CHECK(problem->find("reserved") != std::string::npos);
+    }
+    for (const char* name : {"console", "null", "com10", "lpt0", "nulled", "my con", "com"}) {
+        CAPTURE(name);
+        CHECK_FALSE(model_name_problem(name));
+    }
 }

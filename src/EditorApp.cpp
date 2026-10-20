@@ -188,7 +188,7 @@ void EditorApp::export_data()
 
         if (auto_compile_) {
             set_status("Compiling .mdl in " + export_dir_ + "...", StatusTone::Warning);
-            compile_job_.start(compiler_path_, safe, folder);
+            compile_job_.start(compiler_path_, safe, folder, keep_sources_);
         } else {
             set_status("Success! Textures, SMDs, and " + safe + ".qc written to " + export_dir_ + ".", StatusTone::Success);
         }
@@ -666,6 +666,8 @@ void EditorApp::draw_middle_panel()
 
     ImGui::Checkbox("Compile .mdl", &auto_compile_);
     if (auto_compile_) {
+        ImGui::SameLine();
+        ImGui::Checkbox("Keep sources", &keep_sources_);
         ImGui::SameLine();
         ImGui::SetNextItemWidth(ui::px(-80));
         ImGui::InputText("##compiler_path", &compiler_path_);

@@ -11,12 +11,13 @@ CompileJob::~CompileJob()
         future_.wait();
 }
 
-void CompileJob::start(std::string compiler, std::string safe_name, std::filesystem::path work_dir)
+void CompileJob::start(std::string compiler, std::string safe_name, std::filesystem::path work_dir, bool keep_sources)
 {
     stop_ = std::stop_source();   // a fresh one: a stop request is permanent
     safe_name_ = safe_name;
     CompileOptions options;
     options.work_dir = std::move(work_dir);
+    options.keep_sources = keep_sources;
     options.stop = stop_.get_token();
     future_ = std::async(std::launch::async, [compiler = std::move(compiler), safe_name = std::move(safe_name),
                                               options = std::move(options)] {

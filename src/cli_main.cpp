@@ -34,6 +34,7 @@ constexpr const char* kUsageText =
     "  --out <folder>      folder for the .qc, .smd and .bmp files (created if missing)\n"
     "  --compile <path>    run this studiomdl on the .qc afterwards; the .mdl is\n"
     "                      written to --out and the intermediate files are removed\n"
+    "  --keep-sources      with --compile, keep the .qc, .smd and .bmp files\n"
     "  --help, --version\n"
     "\n"
     "Exit status: 0 done, 1 error, 2 bad arguments, 3 over the engine limits,\n"
@@ -41,7 +42,7 @@ constexpr const char* kUsageText =
 
 struct Args {
     std::string settings, out, compiler;
-    bool help = false, version = false;
+    bool help = false, version = false, keep_sources = false;
 };
 
 // The arguments as UTF-8. Windows gives main() the ANSI code page, so there they are
@@ -80,6 +81,10 @@ bool parse_args(const std::vector<std::string>& argv, Args& args, std::string& e
         }
         if (arg == "--version") {
             args.version = true;
+            continue;
+        }
+        if (arg == "--keep-sources") {
+            args.keep_sources = true;
             continue;
         }
 
@@ -147,6 +152,7 @@ int run(const Args& args)
 
     gs::CompileOptions options;
     options.work_dir = out;
+    options.keep_sources = args.keep_sources;
     const gs::CompileResult result = gs::compile_model(args.compiler, safe, options);
     using Status = gs::CompileResult::Status;
     switch (result.status) {

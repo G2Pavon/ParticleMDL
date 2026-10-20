@@ -241,16 +241,29 @@ CompileResult run_compiler(const std::string& compiler, const std::string& qc, c
 
 CompileResult compile_model(const std::string& compiler, const std::string& safe_name, const CompileOptions& options)
 {
+    const fs::path mdl = options.work_dir / from_utf8(safe_name + ".mdl");
+    // A .mdl from an earlier run must not make a failed compile look like a success.
+    std::error_code ec;
+    const bool had_mdl = fs::exists(mdl, ec);
+    const fs::file_time_type before = had_mdl ? fs::last_write_time(mdl, ec) : fs::file_time_type{};
+    const fs::file_time_type started = fs::file_time_type::clock::now();
+
     CompileResult result = run_compiler(resolve_compiler(compiler), safe_name + ".qc", options);
     if (result.status == CompileResult::Status::CompilerNotFound || result.status == CompileResult::Status::TimedOut ||
         result.status == CompileResult::Status::Cancelled)
         return result;
 
-    if (!result.exit_zero || !fs::exists(options.work_dir / from_utf8(safe_name + ".mdl"))) {
+    bool fresh = fs::exists(mdl, ec);
+    if (fresh && had_mdl) {
+        const fs::file_time_type now = fs::last_write_time(mdl, ec);
+        fresh = now != before || now >= started;
+    }
+    if (!result.exit_zero || !fresh) {
         result.status = CompileResult::Status::Failed;
         return result;
     }
-    remove_intermediates(options.work_dir, safe_name);
+    if (!options.keep_sources)
+        remove_intermediates(options.work_dir, safe_name);
     result.status = CompileResult::Status::Ok;
     return result;
 }

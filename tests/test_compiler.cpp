@@ -263,3 +263,47 @@ TEST_CASE("compile_model starts a compiler whose path has non-ASCII characters")
     // The compiler is given as UTF-8 text, the way the editor keeps it.
     CHECK(compile_model(to_utf8(copy), "fx", in(dir)).status == Status::Ok);
 }
+
+TEST_CASE("compile_model does not take an old .mdl for the result of a compile that wrote none")
+{
+    const Folder dir("particlemdl_compile_stale");
+    dir.qc("fx", "nomdl");
+    const fs::path mdl = dir.path / "fx.mdl";
+    std::ofstream(mdl) << "old model";
+    fs::last_write_time(mdl, fs::file_time_type::clock::now() - 1h);
+
+    const CompileResult r = compile_model(self_path, "fx", in(dir));
+    CHECK(r.status == Status::Failed);
+    CHECK(dir.has("fx.mdl"));   // the old model is left alone
+    CHECK(dir.has("fx.qc"));
+}
+
+TEST_CASE("compile_model accepts a .mdl written over an old one")
+{
+    const Folder dir("particlemdl_compile_replace");
+    dir.qc("fx", "ok");
+    const fs::path mdl = dir.path / "fx.mdl";
+    std::ofstream(mdl) << "old model with more text";
+    fs::last_write_time(mdl, fs::file_time_type::clock::now() - 1h);
+
+    CHECK(compile_model(self_path, "fx", in(dir)).status == Status::Ok);
+    std::ifstream in_file(mdl);
+    std::string text;
+    std::getline(in_file, text);
+    CHECK(text == "IDST");
+}
+
+TEST_CASE("compile_model keeps the source files when asked to")
+{
+    const Folder dir("particlemdl_compile_keep");
+    dir.qc("fx", "ok");
+    for (const char* f : {"fx_ref.smd", "fx_anim.smd", "fx.bmp"})
+        std::ofstream(dir.path / f) << "x";
+    CompileOptions options = in(dir);
+    options.keep_sources = true;
+
+    CHECK(compile_model(self_path, "fx", options).status == Status::Ok);
+    CHECK(dir.has("fx.mdl"));
+    for (const char* f : {"fx.qc", "fx_ref.smd", "fx_anim.smd", "fx.bmp"})
+        CHECK(dir.has(f));
+}

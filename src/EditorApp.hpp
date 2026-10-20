@@ -83,6 +83,7 @@ private:
     Rgb canvas_bg_{0, 0, 0};
 
     bool auto_compile_ = false;
+    bool keep_sources_ = false;   // keep the .qc, .smd and .bmp after a successful compile
     std::string compiler_path_;
     CompileJob compile_job_;
 

@@ -26,11 +26,12 @@ inline constexpr int kMaxModelNameLength = kMaxTextureNameLength - 4;
 // including the correction for studiomdl's +90 deg root rotation.
 Vec3 studio_angles(Vec3 r);
 
-// model_name with spaces -> '_' and every ".mdl" removed.
+// model_name with spaces -> '_' and a trailing ".mdl" (any case) removed.
 std::string safe_model_name(const std::string& model_name);
 
 // Why a model name cannot be exported (empty, path separators, quotes,
-// control characters, too long), or nullopt when it is fine.
+// control characters, characters Windows forbids, device names such as "nul",
+// non-ASCII, too long), or nullopt when it is fine.
 std::optional<std::string> model_name_problem(std::string_view name);
 
 // The six values written for every bone in every exported frame - position
