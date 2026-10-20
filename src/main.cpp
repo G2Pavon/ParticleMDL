@@ -1,11 +1,4 @@
 // ParticleMDL - C++20 / Dear ImGui
-//
-//   particlemdl                                  interactive editor
-//   particlemdl [--preset NAME] [--load FILE.json] [--name MODEL] [--texture IMAGE] --export DIR [--compile STUDIOMDL]
-//                                                    headless export (and compile), no window
-//   particlemdl --screenshot FILE.ppm [--frames N] [--load FILE.json]
-//                                                    render N frames (default 30) at a fixed
-//                                                    1/60 s step in a hidden window, save, exit
 
 #include <algorithm>
 #include <cmath>
@@ -15,12 +8,10 @@
 #include <charconv>
 #include <cstdlib>
 #include <filesystem>
-#include <fstream>
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
-#include <span>
 #include <vector>
 
 #include <imgui.h>
@@ -37,77 +28,6 @@
 #include "SettingsJson.hpp"
 
 namespace {
-
-int run_headless(int argc, char** argv)
-{
-    gs::Settings settings;
-    gs::apply_preset(settings, gs::builtin_presets()[0]);   // editor starts on "Fountain"
-    std::optional<std::filesystem::path> out_dir;
-    std::optional<std::string> compiler;
-
-    for (int i = 1; i < argc; ++i) {
-        const std::string arg = argv[i];
-        const bool has_value = i + 1 < argc;
-        if (arg == "--preset" && has_value) {
-            const gs::Preset* preset = gs::find_preset(argv[++i]);
-            if (!preset) {
-                std::fprintf(stderr, "Unknown preset '%s'\n", argv[i]);
-                return 2;
-            }
-            gs::apply_preset(settings, *preset);
-        } else if (arg == "--load" && has_value) {
-            gs::SettingsLoad loaded = gs::read_settings_file(argv[++i], settings);
-            for (const std::string& w : loaded.warnings)
-                std::fprintf(stderr, "%s: %s\n", argv[i], w.c_str());
-            settings = std::move(loaded.settings);
-        } else if (arg == "--name" && has_value) {
-            settings.model_name = argv[++i];
-        } else if (arg == "--texture" && has_value) {
-            settings.texture_file = argv[++i];   // an image to export instead of the pattern
-        } else if (arg == "--export" && has_value) {
-            out_dir = argv[++i];
-        } else if (arg == "--compile" && has_value) {
-            compiler = argv[++i];
-        } else {
-            std::fprintf(stderr, "Unknown or incomplete argument '%s'\n", arg.c_str());
-            return 2;
-        }
-    }
-    if (!out_dir) {
-        std::fprintf(stderr, "Missing --export DIR\n");
-        return 2;
-    }
-
-    if (const auto problem = gs::model_name_problem(settings.model_name)) {
-        std::fprintf(stderr, "%s\n", problem->c_str());
-        return 2;
-    }
-    std::filesystem::create_directories(*out_dir);
-    const gs::ParticleSystem sys(settings);
-    for (const std::string& w : gs::export_warnings(sys))
-        std::fprintf(stderr, "Warning: %s\n", w.c_str());
-    gs::export_model(sys, *out_dir);
-    const std::string safe = gs::safe_model_name(settings.model_name);
-    std::printf("Exported %s (%d particles, %d frames, %.1f KB sequence) to %s\n", safe.c_str(), sys.num_particles(),
-                sys.export_frames(), static_cast<double>(gs::sequence_bytes(sys)) / 1024.0, out_dir->string().c_str());
-    if (!compiler)
-        return 0;
-
-    gs::CompileOptions options;
-    options.work_dir = *out_dir;
-    const gs::CompileResult r = gs::compile_model(*compiler, safe, options);
-    switch (r.status) {
-    case gs::CompileResult::Status::Ok:
-        std::printf("Compiled %s\n", (*out_dir / (safe + ".mdl")).string().c_str());
-        return 0;
-    case gs::CompileResult::Status::CompilerNotFound:
-        std::fprintf(stderr, "Compiler not found: %s\n", compiler->c_str());
-        return 1;
-    default:
-        std::fprintf(stderr, "Compile failed:\n%s\n", r.output.c_str());
-        return 1;
-    }
-}
 
 void glfw_error(int code, const char* desc)
 {
@@ -149,26 +69,6 @@ float ui_scale()
         if (const auto v = parse_number<float>(env); v && *v >= 0.5f && *v <= 4.0f)
             return *v;
     return std::clamp(s, 1.0f, 4.0f);
-}
-
-// Development aid: render a hidden window deterministically and save it.
-struct ScreenshotRequest {
-    std::filesystem::path path;
-    int frames = 30;
-    std::optional<std::filesystem::path> load;
-};
-
-void save_framebuffer_ppm(const std::filesystem::path& path, int w, int h)
-{
-    std::vector<unsigned char> pixels(static_cast<std::size_t>(w) * h * 3);
-    glPixelStorei(GL_PACK_ALIGNMENT, 1);
-    glReadPixels(0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
-    std::ofstream f(path, std::ios::binary);
-    if (!f)
-        throw std::runtime_error("cannot write " + path.string());
-    f << "P6\n" << w << ' ' << h << "\n255\n";
-    for (int y = h - 1; y >= 0; --y)   // GL rows are bottom-up
-        f.write(reinterpret_cast<const char*>(&pixels[static_cast<std::size_t>(y) * w * 3]), std::streamsize{w} * 3);
 }
 
 // Owns the GLFW library for its lifetime.
@@ -228,7 +128,7 @@ public:
     ImGuiSession& operator=(const ImGuiSession&) = delete;
 };
 
-int run_gui(const std::optional<ScreenshotRequest>& shot)
+int run_gui()
 {
     const GlfwLibrary glfw;
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -237,8 +137,6 @@ int run_gui(const std::optional<ScreenshotRequest>& shot)
 #ifdef __APPLE__
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
-    if (shot)
-        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
     const float scale = ui_scale();
     const WindowPtr window(glfwCreateWindow(static_cast<int>(kWindowWidth * scale),
                                             static_cast<int>(kWindowHeight * scale), "ParticleMDL",
@@ -246,7 +144,7 @@ int run_gui(const std::optional<ScreenshotRequest>& shot)
     if (!window)
         throw std::runtime_error("cannot create the window");
     glfwMakeContextCurrent(window.get());
-    glfwSwapInterval(shot ? 0 : 1);
+    glfwSwapInterval(1);
 
     // Pixels per window unit (2 on a HiDPI Wayland/macOS screen).
     int ww = 0, wh = 0, fw = 0, fh = 0;
@@ -260,17 +158,15 @@ int run_gui(const std::optional<ScreenshotRequest>& shot)
 
     // Declared last, destroyed first: its textures need the GL context.
     gs::EditorApp app;
-    if (shot && shot->load)
-        app.load_system(*shot->load);
     double last = glfwGetTime();
-    for (int frame = 1; !glfwWindowShouldClose(window.get()); ++frame) {
+    while (!glfwWindowShouldClose(window.get())) {
         glfwPollEvents();
-        if (!shot && glfwGetWindowAttrib(window.get(), GLFW_ICONIFIED)) {
+        if (glfwGetWindowAttrib(window.get(), GLFW_ICONIFIED)) {
             glfwWaitEventsTimeout(0.1);
             continue;
         }
         const double now = glfwGetTime();
-        const double delta = shot ? 1.0 / 60.0 : now - last;
+        const double delta = now - last;
         last = now;
 
         ImGui_ImplOpenGL3_NewFrame();
@@ -286,10 +182,6 @@ int run_gui(const std::optional<ScreenshotRequest>& shot)
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-        if (shot && frame >= shot->frames) {
-            save_framebuffer_ppm(shot->path, w, h);
-            break;
-        }
         glfwSwapBuffers(window.get());
     }
     return 0;
@@ -299,23 +191,12 @@ int run_gui(const std::optional<ScreenshotRequest>& shot)
 
 int main(int argc, char** argv)
 {
-    const std::span<char*> args(argv + 1, argv + argc);
+    if (argc > 1) {
+        std::fprintf(stderr, "Unknown argument '%s'\n", argv[1]);
+        return 2;
+    }
     try {
-        if (args.size() >= 2 && std::string_view(args[0]) == "--screenshot") {
-            ScreenshotRequest shot;
-            shot.path = args[1];
-            for (std::size_t i = 2; i + 1 < args.size(); i += 2) {
-                const std::string_view option = args[i];
-                if (option == "--frames")
-                    shot.frames = std::max(1, parse_number<int>(args[i + 1]).value_or(shot.frames));
-                else if (option == "--load")
-                    shot.load = args[i + 1];
-            }
-            return run_gui(shot);
-        }
-        if (!args.empty())
-            return run_headless(argc, argv);
-        return run_gui(std::nullopt);
+        return run_gui();
     } catch (const std::exception& e) {
         std::fprintf(stderr, "Error: %s\n", e.what());
         return 1;

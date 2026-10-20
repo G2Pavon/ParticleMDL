@@ -63,8 +63,7 @@ elseif(MSVC)
 endif()
 
 # ---------------------------------------------------------------------------
-# stb_image and stb_image_write: decode imported textures (PNG, JPG, BMP, TGA)
-# and write the preview screenshots. Single-header libraries.
+# stb_image: decode imported textures (PNG, JPG, BMP, TGA). Single-header library.
 # ---------------------------------------------------------------------------
 add_library(stb INTERFACE)
 target_include_directories(stb SYSTEM INTERFACE third_party/stb)
@@ -127,3 +126,11 @@ add_executable(particlemdl
     src/FileDialog.cpp)
 target_link_libraries(particlemdl PRIVATE particles_core imgui gs_flags tinyfiledialogs)
 target_compile_definitions(particlemdl PRIVATE GS_VERSION="${PROJECT_VERSION}")
+if(WIN32)
+    # GUI subsystem: double-clicking the exe opens no console window.
+    set_target_properties(particlemdl PROPERTIES WIN32_EXECUTABLE TRUE)
+    # The GUI subsystem defaults to WinMain; keep the plain main() entry point.
+    if(MSVC)
+        target_link_options(particlemdl PRIVATE /ENTRY:mainCRTStartup)
+    endif()
+endif()
