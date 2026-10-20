@@ -1,0 +1,94 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  linux-ubuntu:
+    name: Ubuntu 24.04 (GCC)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ libglfw3-dev libgl-dev libx11-dev \
+            libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libwayland-dev wayland-protocols libxkbcommon-dev
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Package
+        run: tar -C build -czf particlemdl-ubuntu-24.04-x86_64.tar.gz particlemdl
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: particlemdl-ubuntu-24.04-x86_64
+          path: particlemdl-ubuntu-24.04-x86_64.tar.gz
+
+  linux-fedora:
+    name: Fedora 44 (GCC)
+    runs-on: ubuntu-24.04
+    container: fedora:44
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          dnf install -y gcc-c++ cmake make git glfw-devel mesa-libGL-devel \
+            libX11-devel libXrandr-devel libXinerama-devel libXcursor-devel \
+            libXi-devel wayland-devel wayland-protocols-devel libxkbcommon-devel
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Package
+        run: tar -C build -czf particlemdl-fedora-44-x86_64.tar.gz particlemdl
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: particlemdl-fedora-44-x86_64
+          path: particlemdl-fedora-44-x86_64.tar.gz
+
+  windows:
+    name: Windows (MSVC)
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install GLFW
+        run: vcpkg install glfw3:x64-windows
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -A x64
+          -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+          -DVCPKG_TARGET_TRIPLET=x64-windows
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Package
+        run: |
+          mkdir -p dist
+          cp build/Release/particlemdl.exe dist/
+          cd dist && 7z a ../particlemdl-windows-x64.zip particlemdl.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: particlemdl-windows-x64
+          path: particlemdl-windows-x64.zip
