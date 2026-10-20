@@ -145,6 +145,8 @@ void for_each_field(S& s, F&& f)
 }
 
 int quads_for(Geometry g) noexcept;
+// Distinct corner positions of a geometry. The six quads of a box share eight; the others share none.
+int corners_for(Geometry g) noexcept;
 int bones_per_particle(Geometry g, ScaleMode s) noexcept;
 int max_particles(Geometry g, ScaleMode s) noexcept;
 void enforce_bone_limits(Settings& s) noexcept;

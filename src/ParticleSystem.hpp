@@ -83,8 +83,13 @@ public:
     const Settings& settings() const noexcept { return settings_; }
     const std::vector<Particle>& particles() const noexcept { return particles_; }
     const std::vector<Quad>& quads() const noexcept { return quads_; }
+    // The distinct corner positions of the quads (rotated like them), in order of first use. With
+    // vertex bones each has a bone of its own, and quads that meet at a corner share it.
+    const std::vector<Vec3>& corners() const noexcept { return corners_; }
+    // Which of corners() the given vertex of the given quad is.
+    int corner_of(int quad, int vertex) const noexcept { return corner_of_[static_cast<std::size_t>(quad)][static_cast<std::size_t>(vertex)]; }
     int num_particles() const noexcept { return static_cast<int>(particles_.size()); }
-    // Vertex-bone mode: bones that move each quad corner, numbered right after
+    // Vertex-bone mode: bones that move each distinct quad corner, numbered right after
     // the particle's own bone; 0 without vertex bones.
     int corners_per_particle() const noexcept { return corners_per_particle_; }
     static int corner_bone(const Particle& p, int corner) noexcept { return p.base_bone + 1 + corner; }
@@ -120,6 +125,8 @@ private:
     Vec3 emit_rot_;
     bool has_micro_rotation_ = false;
     int corners_per_particle_ = 0;
+    std::vector<Vec3> corners_;
+    std::vector<std::array<int, 4>> corner_of_;   // per quad and vertex
     double export_fps_ = 30.0;
     int loop_steps_ = 1;
     std::vector<Quad> quads_;

@@ -136,7 +136,7 @@ TEST_CASE("validate limits the particle count to the bone budget")
                          Case{Geometry::SingleQuad, ScaleMode::VertexBone, 25},
                          Case{Geometry::CrossedQuads, ScaleMode::VertexBone, 14},
                          Case{Geometry::TriPlanarQuads, ScaleMode::VertexBone, 9},
-                         Case{Geometry::VolumetricBox, ScaleMode::VertexBone, 5}}) {
+                         Case{Geometry::VolumetricBox, ScaleMode::VertexBone, 14}}) {
         CAPTURE(enum_id(c.geometry));
         CAPTURE(enum_id(c.scale));
         CHECK(max_particles(c.geometry, c.scale) == c.max);

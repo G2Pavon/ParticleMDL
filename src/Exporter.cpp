@@ -99,8 +99,11 @@ std::string make_ref_smd(const ParticleSystem& sys, const std::string& tex_ref)
     for (const Particle& p : sys.particles()) {
         for (int qi = 0; qi < static_cast<int>(sys.quads().size()); ++qi) {
             const Quad& q = sys.quads()[qi];
-            // Each corner hangs on its own bone with vertex bones, else on the particle's.
-            auto bone = [&](int k) { return vertex_bones ? ParticleSystem::corner_bone(p, qi * 4 + k) : p.base_bone; };
+            // Each corner hangs on a bone of its own with vertex bones (quads that meet share it),
+            // else on the particle's.
+            auto bone = [&](int k) {
+                return vertex_bones ? ParticleSystem::corner_bone(p, sys.corner_of(qi, k)) : p.base_bone;
+            };
             const int b0 = bone(0), b1 = bone(1), b2 = bone(2), b3 = bone(3);
 
             write_tri(b0, q[0], b1, q[1], b2, q[2]);
@@ -212,16 +215,10 @@ AnimationTable animation_table(const ParticleSystem& sys, const BakedPoses& bake
             t.values[static_cast<std::size_t>(frame) * t.bones + p.base_bone] = {pose.pos.y, -pose.pos.x, pose.pos.z,
                                                                                 rot.x, rot.y, rot.z};
             // Corner bones shift each corner so the quad appears scaled.
-            int corner = 0;
-            for (const Quad& q : sys.quads()) {
-                if (sys.corners_per_particle() == 0)
-                    break;
-                for (const QuadVertex& v : q) {
-                    const Vec3 offset = v.pos * (pose.scale - 1.0);
-                    const int bone = ParticleSystem::corner_bone(p, corner++);
-                    t.values[static_cast<std::size_t>(frame) * t.bones + bone] = {offset.y, -offset.x, offset.z,
-                                                                                 0.0, 0.0, 0.0};
-                }
+            for (int corner = 0; corner < sys.corners_per_particle(); ++corner) {
+                const Vec3 offset = sys.corners()[static_cast<std::size_t>(corner)] * (pose.scale - 1.0);
+                const int bone = ParticleSystem::corner_bone(p, corner);
+                t.values[static_cast<std::size_t>(frame) * t.bones + bone] = {offset.y, -offset.x, offset.z, 0.0, 0.0, 0.0};
             }
         }
     }

@@ -70,6 +70,22 @@ ParticleSystem::ParticleSystem(const Settings& settings) : settings_(validated(s
     // Quad geometry, pre-rotated by the static mesh rotation.
     const double mrx = radians(s.mesh_rotation.x), mry = radians(s.mesh_rotation.y), mrz = radians(s.mesh_rotation.z);
     quads_ = raw_quads(s.geometry, s.quad_width / 2.0, s.quad_height / 2.0);
+
+    // Corners that are the same point before the rotation are the same corner after it.
+    std::vector<Vec3> unrotated;
+    for (const Quad& q : quads_) {
+        std::array<int, 4> index{};
+        for (std::size_t k = 0; k < 4; ++k) {
+            const auto found = std::ranges::find(unrotated, q[k].pos);
+            index[k] = static_cast<int>(found - unrotated.begin());
+            if (found == unrotated.end())
+                unrotated.push_back(q[k].pos);
+        }
+        corner_of_.push_back(index);
+    }
+    for (const Vec3& corner : unrotated)
+        corners_.push_back(apply_static_rotation(corner, mrx, mry, mrz));
+
     for (Quad& q : quads_) {
         for (QuadVertex& v : q) {
             v.pos = apply_static_rotation(v.pos, mrx, mry, mrz);
@@ -78,7 +94,7 @@ ParticleSystem::ParticleSystem(const Settings& settings) : settings_(validated(s
     }
 
     const bool vertex_bones = s.scale_mode == ScaleMode::VertexBone;
-    corners_per_particle_ = vertex_bones ? static_cast<int>(quads_.size()) * 4 : 0;
+    corners_per_particle_ = vertex_bones ? static_cast<int>(corners_.size()) : 0;
     const int num_particles = std::min(s.count, kMaxBones / bones_per_particle(s.geometry, s.scale_mode));
 
     // Deterministic pseudo-random seeds: the same settings always give the same effect.

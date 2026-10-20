@@ -17,9 +17,14 @@ int quads_for(Geometry g) noexcept
     return 1;
 }
 
+int corners_for(Geometry g) noexcept
+{
+    return g == Geometry::VolumetricBox ? 8 : quads_for(g) * 4;
+}
+
 int bones_per_particle(Geometry g, ScaleMode s) noexcept
 {
-    return s == ScaleMode::VertexBone ? 1 + quads_for(g) * 4 : 1;
+    return s == ScaleMode::VertexBone ? 1 + corners_for(g) : 1;
 }
 
 int max_particles(Geometry g, ScaleMode s) noexcept

@@ -280,3 +280,19 @@ TEST_CASE("a damaged model ends in an error or a result, never a crash or a hang
     CHECK(refused + accepted == 6000);
     CHECK(refused > 0);
 }
+
+TEST_CASE("a box with vertex bones compiles with shared corner bones")
+{
+    // 14 particles of nine bones each: the particle and the eight corners its six quads share.
+    const MdlInfo m = read_mdl(read_bytes(kFixtures / "box_vertex_bones.mdl"));
+    REQUIRE(m.bones.size() == 1 + 14 * 9);
+    CHECK(m.bones[1].name == "p_1");
+    CHECK(m.bones[9].name == "c_9");
+    CHECK(m.bones[9].parent == 1);
+    CHECK(m.bones[10].name == "p_10");
+    CHECK(m.bones[10].parent == 0);
+
+    const ParticleSystem sys(settings_of("box_vertex_bones"));
+    CHECK(compare_with_export(m, sys).empty());
+    CHECK(m.sequences[0].value_bytes + 12 == sequence_bytes(sys));
+}
