@@ -452,6 +452,12 @@ std::vector<std::string> compare_with_export(const MdlInfo& mdl, const ParticleS
 
 void export_model(const ParticleSystem& sys, const fs::path& out_dir)
 {
+    const BakedPoses baked = bake(sys);
+    export_model(sys, baked, animation_table(sys, baked), out_dir);
+}
+
+void export_model(const ParticleSystem& sys, const BakedPoses& baked, const AnimationTable& table, const fs::path& out_dir)
+{
     const std::string& model_name = sys.settings().model_name;
     if (const auto problem = model_name_problem(model_name))
         throw std::invalid_argument(*problem);
@@ -464,10 +470,6 @@ void export_model(const ParticleSystem& sys, const fs::path& out_dir)
     if (!fs::is_directory(out_dir, ec))
         throw std::runtime_error("export folder does not exist: " + to_utf8(out_dir));
 
-    // The animation is built once: the limits are checked against it, and it
-    // becomes the animation SMD.
-    const BakedPoses baked = bake(sys);
-    const AnimationTable table = animation_table(sys, baked);
     if (ExportReport report = analyze_export(sys, table, baked); !report.blockers.empty())
         throw ExportBlocked(std::move(report.blockers));
 

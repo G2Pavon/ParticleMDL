@@ -90,7 +90,8 @@ void EditorApp::rebuild()
     validate(settings_);   // the panels show the values actually used
     system_.emplace(settings_);
     baked_ = bake(*system_);
-    export_report_ = analyze_export(*system_, animation_table(*system_, baked_), baked_);
+    table_ = animation_table(*system_, baked_);
+    export_report_ = analyze_export(*system_, table_, baked_);
     name_problem_ = model_name_problem(settings_.model_name);
     refresh_preset_label();
     // Quantizing the texture is the slow part; physics sliders do not need it.
@@ -181,10 +182,14 @@ void EditorApp::set_export_dir(std::string dir)
 void EditorApp::export_data()
 {
     try {
-        const ParticleSystem sys(settings_);
+        // system_, baked_ and table_ are those of the current settings: a change rebuilds them
+        // at the start of the next frame, and a change made in this frame is taken in here.
+        if (dirty_)
+            rebuild();
+        const ParticleSystem& sys = *system_;
         const std::filesystem::path folder = from_utf8(export_dir_);
-        export_model(sys, folder);
-        const std::string safe = safe_model_name(settings_.model_name);
+        export_model(sys, baked_, table_, folder);
+        const std::string safe = safe_model_name(sys.settings().model_name);
 
         if (auto_compile_) {
             set_status("Compiling .mdl in " + export_dir_ + "...", StatusTone::Warning);
@@ -663,7 +668,7 @@ void EditorApp::draw_middle_panel()
 
     ImGui::SetNextItemWidth(ui::px(150));
     if (ImGui::InputText("Model Name", &settings_.model_name))
-        name_problem_ = model_name_problem(settings_.model_name);
+        dirty_ = true;   // the system holds a copy of the name, and the problem is worked out when it is rebuilt
     if (name_problem_)
         wrapped_text(kError, *name_problem_);
     for (const ExportBlocker& b : export_report_.blockers)

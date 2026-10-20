@@ -200,3 +200,31 @@ TEST_CASE("export_model still writes an export that is inside the limits")
     export_model(ParticleSystem{Settings{}}, dir.path);
     CHECK(dir.file_count() == 4);
 }
+
+TEST_CASE("exporting with the baked frames and animation already at hand writes the same files")
+{
+    const ParticleSystem sys{Settings{}};
+    const TempDir plain("particlemdl_export_plain"), reused("particlemdl_export_reused");
+    export_model(sys, plain.path);
+
+    const BakedPoses baked = bake(sys);
+    export_model(sys, baked, animation_table(sys, baked), reused.path);
+
+    for (const auto& entry : fs::directory_iterator(plain.path)) {
+        const fs::path other = reused.path / entry.path().filename();
+        REQUIRE(fs::exists(other));
+        std::ifstream a(entry.path(), std::ios::binary), b(other, std::ios::binary);
+        CHECK(std::string(std::istreambuf_iterator<char>(a), {}) == std::string(std::istreambuf_iterator<char>(b), {}));
+    }
+    CHECK(plain.file_count() == reused.file_count());
+
+    // The limits are checked on this path too.
+    Settings over;
+    over.count = 126;
+    over.duration = 60;
+    over.fps = 60;
+    over.geometry = Geometry::SingleQuad;
+    const ParticleSystem big(over);
+    const BakedPoses big_baked = bake(big);
+    CHECK_THROWS_AS(export_model(big, big_baked, animation_table(big, big_baked), reused.path), ExportBlocked);
+}

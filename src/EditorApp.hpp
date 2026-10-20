@@ -71,6 +71,7 @@ private:
 
     // Derived from the settings when they change, not every frame.
     std::string preset_label_;                    // name, plus " (modified)" after edits
+    AnimationTable table_;                        // the animation of system_, as exported
     BakedPoses baked_;                            // the frames as exported, for the game-accurate preview
     ExportReport export_report_;                  // limits, sequence size and warnings of the current settings
     std::optional<std::string> name_problem_;
