@@ -119,8 +119,8 @@ std::vector<std::array<std::uint8_t, 3>> median_cut(std::vector<HistEntry> entri
 
 void put_u16(std::vector<std::uint8_t>& out, std::uint16_t v)
 {
-    out.push_back(v & 0xFF);
-    out.push_back(v >> 8);
+    out.push_back(static_cast<std::uint8_t>(v & 0xFF));
+    out.push_back(static_cast<std::uint8_t>(v >> 8));
 }
 
 void put_u32(std::vector<std::uint8_t>& out, std::uint32_t v)

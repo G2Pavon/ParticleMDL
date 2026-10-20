@@ -776,7 +776,7 @@ void EditorApp::draw_canvas(ImVec2 size)
         camera_.orbit(md.x, md.y);
     }
 
-    camera_.set_focal_length(OrbitCamera::kFocalLength * ui::scale());
+    camera_.set_focal_length(OrbitCamera::kFocalLength * static_cast<double>(ui::scale()));
     const Point2 center{origin.x + size.x / 2, origin.y + size.y / 2};
     build_scene(*system_, baked_, camera_, preview_time_, center, scene_options_, scene_);
     renderer_.draw(ImGui::GetWindowDrawList(), origin, size, canvas_bg_, scene_);

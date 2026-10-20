@@ -1,0 +1,59 @@
+{
+  "version": 5,
+  "cmakeMinimumRequired": { "major": 3, "minor": 24, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "release",
+      "displayName": "Release",
+      "binaryDir": "${sourceDir}/build/release",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "debug",
+      "displayName": "Debug",
+      "binaryDir": "${sourceDir}/build/debug",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "strict",
+      "displayName": "Release with warnings as errors (what CI builds)",
+      "inherits": "release",
+      "binaryDir": "${sourceDir}/build/strict",
+      "cacheVariables": { "GS_WERROR": "ON" }
+    },
+    {
+      "name": "sanitize",
+      "displayName": "AddressSanitizer and UndefinedBehaviorSanitizer (GCC or Clang)",
+      "binaryDir": "${sourceDir}/build/sanitize",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "GS_SANITIZE": "ON",
+        "GS_WERROR": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "release", "configurePreset": "release" },
+    { "name": "debug", "configurePreset": "debug" },
+    { "name": "strict", "configurePreset": "strict" },
+    {
+      "name": "sanitize",
+      "configurePreset": "sanitize",
+      "targets": ["particlemdl_tests", "particlemdl_cli"]
+    }
+  ],
+  "testPresets": [
+    { "name": "release", "configurePreset": "release", "output": { "outputOnFailure": true } },
+    { "name": "debug", "configurePreset": "debug", "output": { "outputOnFailure": true } },
+    { "name": "strict", "configurePreset": "strict", "output": { "outputOnFailure": true } },
+    {
+      "name": "sanitize",
+      "configurePreset": "sanitize",
+      "output": { "outputOnFailure": true },
+      "environment": {
+        "ASAN_OPTIONS": "detect_leaks=1:strict_string_checks=1",
+        "UBSAN_OPTIONS": "print_stacktrace=1:halt_on_error=1"
+      }
+    }
+  ]
+}

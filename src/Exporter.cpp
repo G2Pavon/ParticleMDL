@@ -231,10 +231,11 @@ std::size_t sequence_bytes(const AnimationTable& table)
                 if (bone == 0 && k == 5)
                     x += kRootRotate;   // $rotate turns the root bone
                 if (k >= 3) {           // rotations wrapped to [-pi, pi)
-                    if (x >= kPiD)
-                        x = static_cast<float>(x - kPiD * 2);
-                    if (x < -kPiD)
-                        x = static_cast<float>(x + kPiD * 2);
+                    // studiomdl compares the float with a double pi, so this does too.
+                    if (static_cast<double>(x) >= kPiD)
+                        x = static_cast<float>(static_cast<double>(x) - kPiD * 2);
+                    if (static_cast<double>(x) < -kPiD)
+                        x = static_cast<float>(static_cast<double>(x) + kPiD * 2);
                 }
                 v[static_cast<std::size_t>(f)] = x;
             }

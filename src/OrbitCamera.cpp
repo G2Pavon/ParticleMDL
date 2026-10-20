@@ -42,8 +42,8 @@ std::optional<Point2> OrbitCamera::project_camera_space(const CamPoint& c, Point
 {
     if (c.depth < kNear)
         return std::nullopt;
-    return Point2{static_cast<float>(center.x - (c.right / c.depth) * focal_length_),
-                  static_cast<float>(center.y - (c.up / c.depth) * focal_length_)};
+    return Point2{static_cast<float>(static_cast<double>(center.x) - (c.right / c.depth) * focal_length_),
+                  static_cast<float>(static_cast<double>(center.y) - (c.up / c.depth) * focal_length_)};
 }
 
 std::optional<Projection> OrbitCamera::project(Vec3 p, Point2 center) const noexcept

@@ -149,8 +149,9 @@ void add_particles(Scene& out, const ParticleSystem& sys, const BakedPoses& bake
                 continue;
 
             // Back-face culling from the screen-space winding.
-            const double cross = static_cast<double>(face.pts[1].x - face.pts[0].x) * (face.pts[2].y - face.pts[0].y) -
-                                 static_cast<double>(face.pts[1].y - face.pts[0].y) * (face.pts[2].x - face.pts[0].x);
+            const double cross =
+                static_cast<double>(face.pts[1].x - face.pts[0].x) * static_cast<double>(face.pts[2].y - face.pts[0].y) -
+                static_cast<double>(face.pts[1].y - face.pts[0].y) * static_cast<double>(face.pts[2].x - face.pts[0].x);
             if (!sys.settings().double_sided && cross > 0)
                 continue;
 

@@ -9,6 +9,11 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
+# vcpkg's static triplets link the C runtime statically; our own targets must match them.
+if(MSVC AND NOT DEFINED CMAKE_MSVC_RUNTIME_LIBRARY AND VCPKG_TARGET_TRIPLET MATCHES "static")
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
 option(GS_WERROR "Treat warnings in our own code as errors (CI turns this on)" OFF)
 option(GS_SANITIZE "Build everything with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 
@@ -54,7 +59,7 @@ add_library(imgui STATIC
     ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
     ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
     ${IMGUI_DIR}/misc/cpp/imgui_stdlib.cpp)
-target_include_directories(imgui PUBLIC
+target_include_directories(imgui SYSTEM PUBLIC
     ${IMGUI_DIR}
     ${IMGUI_DIR}/backends
     ${IMGUI_DIR}/misc/cpp)
@@ -69,12 +74,19 @@ add_library(gs_flags INTERFACE)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     # -ffp-contract=off: no fused multiply-add, so the simulation produces the
     # same doubles (and byte-identical exports) on every architecture.
-    target_compile_options(gs_flags INTERFACE -Wall -Wextra -Wpedantic -ffp-contract=off)
+    target_compile_options(gs_flags INTERFACE -Wall -Wextra -Wpedantic -ffp-contract=off
+        -Wshadow -Wconversion -Wold-style-cast -Wnon-virtual-dtor -Woverloaded-virtual -Wdouble-promotion -Wformat=2)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        # Clang's -Wconversion includes sign conversions, which GCC's does not; keep both the same.
+        # Its libstdc++ notice about <ciso646> (included by doctest) is not ours to fix.
+        target_compile_options(gs_flags INTERFACE -Wno-sign-conversion "-Wno-error=#warnings"
+            -Wno-unknown-warning-option -Wno-c2y-extensions)   # the latter: __COUNTER__ in the test macros
+    endif()
     if(GS_WERROR)
         target_compile_options(gs_flags INTERFACE -Werror)
     endif()
 elseif(MSVC)
-    target_compile_options(gs_flags INTERFACE /W4 /fp:precise /utf-8)
+    target_compile_options(gs_flags INTERFACE /W4 /fp:precise /utf-8 /permissive- /Zc:__cplusplus)
     if(GS_WERROR)
         target_compile_options(gs_flags INTERFACE /WX)
     endif()
@@ -185,4 +197,27 @@ if(BUILD_TESTING)
     add_library(doctest INTERFACE)
     target_include_directories(doctest SYSTEM INTERFACE third_party/doctest)
     add_subdirectory(tests)
+endif()
+
+# ---------------------------------------------------------------------------
+# Installing and packaging (cmake --install, cpack): the editor, the command-line
+# exporter, the licence and the readme.
+# ---------------------------------------------------------------------------
+include(GNUInstallDirs)
+install(TARGETS particlemdl particlemdl_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(FILES LICENSE README.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
+
+if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+    set(CPACK_PACKAGE_NAME "particlemdl")
+    set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Simulate particles using animated GoldSrc models")
+    set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+    string(TOLOWER "${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}" gs_package_system)
+    set(CPACK_PACKAGE_FILE_NAME "particlemdl-${PROJECT_VERSION}-${gs_package_system}")
+    if(WIN32)
+        set(CPACK_GENERATOR ZIP)
+    else()
+        set(CPACK_GENERATOR TGZ)
+    endif()
+    include(CPack)
 endif()

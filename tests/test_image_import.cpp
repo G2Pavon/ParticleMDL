@@ -160,7 +160,8 @@ TEST_CASE("fit_to_square averages a reduced picture instead of picking pixels")
         sum += v;
         sum_sq += v * v;
     }
-    const double mean = sum / n, deviation = std::sqrt(sum_sq / n - mean * mean);
+    const double count = static_cast<double>(n);
+    const double mean = sum / count, deviation = std::sqrt(sum_sq / count - mean * mean);
     CHECK(mean == doctest::Approx(127.5).epsilon(0.05));
     CHECK(deviation < 25.0);   // a single pixel per output would give about 127
 }
