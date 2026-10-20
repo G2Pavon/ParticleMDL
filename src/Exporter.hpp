@@ -59,6 +59,11 @@ inline constexpr std::size_t kMaxSequenceBytes = 65535;
 // because every value is zero. Exposed for inspection and tests.
 std::size_t encoded_entries(std::span<const short> value);
 
+// The float studiomdl reads back from a value written to the SMD as "%.6f". Exact: the
+// same result as printing and reading the text, without the text when the value is not
+// close to a rounding tie.
+float as_read_by_studiomdl(double v);
+
 // That distance, largest over all bones: studiomdl's own measure, computed with
 // its quantization and run-length coding of the values as written to the SMD.
 std::size_t sequence_bytes(const AnimationTable& table);

@@ -136,18 +136,6 @@ std::string make_anim_smd(const ParticleSystem& sys, const AnimationTable& table
 
 // --- studiomdl's animation encoding (studiomdl.cpp, writemdl.cpp) -----------
 
-// The float studiomdl reads back from a value written as "%.6f".
-float as_read_by_studiomdl(double v)
-{
-    if (std::abs(v) < 5e-7)   // prints as (-)0.000000; the sign does not matter here
-        return 0.0f;
-    std::array<char, 64> buf;
-    const auto written = std::to_chars(buf.data(), buf.data() + buf.size(), v, std::chars_format::fixed, 6);
-    float f = 0;
-    std::from_chars(buf.data(), written.ptr, f);
-    return f;
-}
-
 } // namespace
 
 // Number of 2-byte entries the run-length coder emits for one channel, or 0
@@ -176,6 +164,31 @@ std::size_t encoded_entries(std::span<const short> value)
         ++total;
     }
     return (entries == 2 && value[0] == 0) ? 0 : entries;
+}
+
+float as_read_by_studiomdl(double v)
+{
+    if (std::abs(v) < 5e-7)   // prints as (-)0.000000; the sign does not matter here
+        return 0.0f;
+
+    // Printing "%.6f" rounds v to a multiple of 1e-6, and reading that back gives the float
+    // nearest to it. Unless v * 1e6 is almost exactly half way between two integers, that
+    // multiple is nearbyint(v * 1e6): the product is off by far less than the distance to the
+    // tie (|v| < 1e5 keeps it below 1.2e-5), and r / 1e6 is then the double nearest the
+    // decimal value, whose rounding to float is the same as the decimal's (no 6-digit decimal
+    // is near enough to a float's midpoint for the two roundings to differ).
+    if (std::abs(v) < 1e5) {
+        const double scaled = v * 1e6;
+        const double r = std::nearbyint(scaled);
+        if (0.5 - std::abs(scaled - r) > 1e-3)
+            return static_cast<float>(r / 1e6);
+    }
+
+    std::array<char, 64> buf;
+    const auto written = std::to_chars(buf.data(), buf.data() + buf.size(), v, std::chars_format::fixed, 6);
+    float f = 0;
+    std::from_chars(buf.data(), written.ptr, f);
+    return f;
 }
 
 AnimationTable animation_table(const ParticleSystem& sys)
@@ -221,13 +234,20 @@ std::size_t sequence_bytes(const AnimationTable& table)
     constexpr float kRootRotate = static_cast<float>(90.0 * kPiD / 180.0);   // default $rotate
     constexpr std::size_t kOffsetEntry = 6 * sizeof(std::uint16_t);          // per bone
 
-    std::vector<float> v(static_cast<std::size_t>(table.frames));
-    std::vector<short> quantized(v.size());
+    const std::size_t frames = static_cast<std::size_t>(table.frames);
+    std::array<std::vector<float>, 6> channel;   // one bone's six channels over all frames
+    for (auto& c : channel)
+        c.resize(frames);
+    std::vector<short> quantized(frames);
+
     std::size_t data_bytes = 0, worst = 0;
     for (int bone = 0; bone < table.bones; ++bone) {
-        for (int k = 0; k < 6; ++k) {
-            for (int f = 0; f < table.frames; ++f) {
-                float x = as_read_by_studiomdl(table.at(f, bone)[k]);
+        // One pass over the frames for all six channels: the table is frame-major, so reading a
+        // channel at a time would stride through it six times.
+        for (std::size_t f = 0; f < frames; ++f) {
+            const std::array<double, 6>& row = table.at(static_cast<int>(f), bone);
+            for (std::size_t k = 0; k < 6; ++k) {
+                float x = as_read_by_studiomdl(row[k]);
                 if (bone == 0 && k == 5)
                     x += kRootRotate;   // $rotate turns the root bone
                 if (k >= 3) {           // rotations wrapped to [-pi, pi)
@@ -237,18 +257,20 @@ std::size_t sequence_bytes(const AnimationTable& table)
                     if (static_cast<double>(x) < -kPiD)
                         x = static_cast<float>(static_cast<double>(x) + kPiD * 2);
                 }
-                v[static_cast<std::size_t>(f)] = x;
+                channel[k][f] = x;
             }
+        }
+        for (std::size_t k = 0; k < 6; ++k) {
             // Per-channel 16-bit scale from the range, which starts at +-128
             // units or +-pi/8 radians.
             float minv = k < 3 ? -128.0f : static_cast<float>(-kPiD / 8.0);
             float maxv = k < 3 ? 128.0f : static_cast<float>(kPiD / 8.0);
-            for (const float x : v) {
+            for (const float x : channel[k]) {
                 minv = std::min(minv, x);
                 maxv = std::max(maxv, x);
             }
             const float scale = (-minv > maxv) ? minv / -32768.0f : maxv / 32767.0f;
-            std::ranges::transform(v, quantized.begin(), [scale](float x) { return static_cast<short>(x / scale); });
+            std::ranges::transform(channel[k], quantized.begin(), [scale](float x) { return static_cast<short>(x / scale); });
             data_bytes += encoded_entries(quantized) * sizeof(short);
         }
         // The limit is checked after each bone, from that bone's offset entry.
