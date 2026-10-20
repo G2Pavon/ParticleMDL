@@ -162,9 +162,8 @@ std::string make_ref_smd(const ParticleSystem& sys, const std::string& tex_ref)
     return out;
 }
 
-std::string make_anim_smd(const ParticleSystem& sys)
+std::string make_anim_smd(const ParticleSystem& sys, const AnimationTable& table)
 {
-    const AnimationTable table = animation_table(sys);
     // One ~64-byte line per bone per frame.
     std::string out;
     out.reserve(static_cast<std::size_t>(table.frames) * (static_cast<std::size_t>(table.bones) * 64 + 16) +
@@ -343,15 +342,55 @@ std::optional<std::string> model_name_problem(std::string_view name)
     return std::nullopt;
 }
 
-std::vector<std::string> export_warnings(const ParticleSystem& sys)
+namespace {
+
+std::string kilobytes(std::size_t bytes)
 {
-    std::vector<std::string> w;
-    if (sys.settings().end_behavior == EndBehavior::HideInCore && sys.settings().scale_mode == ScaleMode::Static)
-        w.push_back("Hide in Core needs Vertex Bone scaling: static particles stay visible at the center");
-    if (sys.export_frames() > kMaxStudioFrames)
-        w.push_back(std::to_string(sys.export_frames()) + " frames: studiomdl accepts at most " +
-                    std::to_string(kMaxStudioFrames) + " per sequence (lower Duration or FPS)");
-    return w;
+    return std::format("{:.1f} KB", static_cast<double>(bytes) / 1024.0);
+}
+
+} // namespace
+
+ExportReport analyze_export(const ParticleSystem& sys)
+{
+    return analyze_export(sys, animation_table(sys));
+}
+
+ExportReport analyze_export(const ParticleSystem& sys, const AnimationTable& table)
+{
+    const Settings& s = sys.settings();
+    ExportReport r;
+    r.frames = table.frames;
+    r.sequence_bytes = sequence_bytes(table);
+
+    if (r.frames > kMaxStudioFrames) {
+        // Frames are lround(duration * fps) + 1, so this many steps fit.
+        const double longest = std::floor((kMaxStudioFrames - 1) / static_cast<double>(s.fps) * 10.0) / 10.0;
+        r.blockers.push_back({ExportBlocker::Kind::TooManyFrames,
+                              std::format("{} frames: studiomdl accepts at most {} per sequence. At {} fps the longest "
+                                          "Duration is {:.1f} s (or lower the FPS).",
+                                          r.frames, kMaxStudioFrames, s.fps, longest)});
+    }
+    if (r.sequence_bytes > kMaxSequenceBytes) {
+        std::string message = std::format(
+            "Animation data is {}: studiomdl accepts at most {} per sequence ({} frames x {} bones). "
+            "Lower Particle Count, Duration or FPS.",
+            kilobytes(r.sequence_bytes), kilobytes(kMaxSequenceBytes), r.frames, table.bones);
+        if (sys.corners_per_particle() > 0)
+            message += std::format(" Vertex-bone scaling uses {} bones per particle: turning it off or using fewer "
+                                   "quads saves the most.",
+                                   1 + sys.corners_per_particle());
+        r.blockers.push_back({ExportBlocker::Kind::SequenceTooLarge, std::move(message)});
+    }
+
+    if (s.end_behavior == EndBehavior::HideInCore && s.scale_mode == ScaleMode::Static)
+        r.warnings.push_back("Hide in Core needs Vertex Bone scaling: static particles stay visible at the center");
+    return r;
+}
+
+ExportBlocked::ExportBlocked(std::vector<ExportBlocker> blockers)
+    : std::runtime_error(blockers.empty() ? "export blocked" : blockers.front().message), blockers_(std::move(blockers))
+{
 }
 
 void export_model(const ParticleSystem& sys, const fs::path& out_dir)
@@ -368,11 +407,17 @@ void export_model(const ParticleSystem& sys, const fs::path& out_dir)
     if (!fs::is_directory(out_dir, ec))
         throw std::runtime_error("export folder does not exist: " + out_dir.string());
 
+    // The animation is built once: the limits are checked against it, and it
+    // becomes the animation SMD.
+    const AnimationTable table = animation_table(sys);
+    if (ExportReport report = analyze_export(sys, table); !report.blockers.empty())
+        throw ExportBlocked(std::move(report.blockers));
+
     StagedFiles files(out_dir);
     files.add(tex_ref, as_chars(encode_indexed_bmp(export_texture(sys.settings()))));
     files.add(safe + ".qc", make_qc(sys, safe, tex_ref));
     files.add(safe + "_ref.smd", make_ref_smd(sys, tex_ref));
-    files.add(safe + "_anim.smd", make_anim_smd(sys));
+    files.add(safe + "_anim.smd", make_anim_smd(sys, table));
     files.commit();
 }
 

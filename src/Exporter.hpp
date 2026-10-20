@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <optional>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -59,13 +60,39 @@ std::size_t encoded_entries(std::span<const short> value);
 std::size_t sequence_bytes(const AnimationTable& table);
 std::size_t sequence_bytes(const ParticleSystem& sys);
 
-// Non-fatal problems with an export, such as more frames than studiomdl accepts.
-std::vector<std::string> export_warnings(const ParticleSystem& sys);
+// A limit that studiomdl enforces. An export that hits one cannot be compiled,
+// so it is refused instead of written.
+struct ExportBlocker {
+    enum class Kind { TooManyFrames, SequenceTooLarge };
+    Kind kind;
+    std::string message;   // what is over, by how much, and what to lower
+};
+
+// What the editor and the CLI need to know about an export, from one pass.
+struct ExportReport {
+    int frames = 0;
+    std::size_t sequence_bytes = 0;        // as studiomdl will measure it
+    std::vector<ExportBlocker> blockers;   // fatal, frame limit first
+    std::vector<std::string> warnings;     // advisory
+};
+ExportReport analyze_export(const ParticleSystem& sys);
+ExportReport analyze_export(const ParticleSystem& sys, const AnimationTable& table);   // reuses a table
+
+// Thrown by export_model() when the export has blockers. Nothing is written.
+class ExportBlocked : public std::runtime_error {
+public:
+    explicit ExportBlocked(std::vector<ExportBlocker> blockers);
+    const std::vector<ExportBlocker>& blockers() const noexcept { return blockers_; }
+
+private:
+    std::vector<ExportBlocker> blockers_;
+};
 
 // Writes <safe>.bmp, <safe>.qc, <safe>_ref.smd and <safe>_anim.smd into
 // out_dir. Geometry and animation are pre-rotated by -90 deg around Z to cancel
 // the +90 deg studiomdl applies on import. Throws std::invalid_argument for an
-// unusable model name and std::runtime_error on I/O errors. Files are staged
+// unusable model name, ExportBlocked for an export over studiomdl's limits and
+// std::runtime_error on I/O errors. Files are staged
 // and renamed into place together: a failed export leaves no partial files.
 void export_model(const ParticleSystem& sys, const std::filesystem::path& out_dir = ".");
 

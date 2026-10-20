@@ -74,8 +74,7 @@ void EditorApp::rebuild()
 {
     validate(settings_);   // the panels show the values actually used
     system_.emplace(settings_);
-    export_warnings_ = export_warnings(*system_);
-    sequence_bytes_ = sequence_bytes(*system_);
+    export_report_ = analyze_export(*system_);
     name_problem_ = model_name_problem(settings_.model_name);
     refresh_preset_label();
     // Quantizing the texture is the slow part; physics sliders do not need it.
@@ -368,7 +367,7 @@ void EditorApp::draw_frame(double delta)
 
 bool EditorApp::can_export() const
 {
-    return !compile_job_.busy() && !name_problem_ && !export_dir_problem_;
+    return !compile_job_.busy() && !name_problem_ && !export_dir_problem_ && export_report_.blockers.empty();
 }
 
 void EditorApp::draw_menu_bar()
@@ -442,7 +441,7 @@ void EditorApp::draw_status_bar(float height)
     ImGui::Begin("##statusbar", nullptr, kBarFlags);
 
     // Right: sequence memory against the limit. The bar is fixed, the text is not.
-    const double used_kb = static_cast<double>(sequence_bytes_) / 1024.0;
+    const double used_kb = static_cast<double>(export_report_.sequence_bytes) / 1024.0;
     const double limit_kb = static_cast<double>(kMaxSequenceBytes) / 1024.0;
     char memory[64];
     std::snprintf(memory, sizeof memory, "Sequence memory: %.1f / %.1f KB", used_kb, limit_kb);
@@ -613,7 +612,9 @@ void EditorApp::draw_middle_panel()
         name_problem_ = model_name_problem(settings_.model_name);
     if (name_problem_)
         wrapped_text(kError, *name_problem_);
-    for (const std::string& w : export_warnings_)
+    for (const ExportBlocker& b : export_report_.blockers)
+        wrapped_text(kError, b.message);
+    for (const std::string& w : export_report_.warnings)
         wrapped_text(kWarning, w);
 
     ImGui::TextUnformatted("Export folder");
@@ -638,9 +639,11 @@ void EditorApp::draw_middle_panel()
     }
     ImGui::Dummy(ImVec2(0, ui::px(5)));
 
-    const char* label = sequence_bytes_ > kMaxSequenceBytes ? "ERROR: Exceeds 64K Limit!###export"
-                        : auto_compile_          ? "Export .mdl###export"
-                                                 : "Export SMD/QC###export";
+    const char* label = auto_compile_ ? "Export .mdl###export" : "Export SMD/QC###export";
+    if (!export_report_.blockers.empty())
+        label = export_report_.blockers.front().kind == ExportBlocker::Kind::TooManyFrames
+                    ? "Blocked: too many frames###export"
+                    : "Blocked: animation over 64 KB###export";
     ImGui::BeginDisabled(!can_export());
     if (ImGui::Button(label, ImVec2(-1, ui::px(40))))
         export_data();

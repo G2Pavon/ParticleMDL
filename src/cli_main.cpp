@@ -91,20 +91,15 @@ int run(const Args& args)
     }
 
     const gs::ParticleSystem sys(loaded.settings);
-    for (const std::string& w : gs::export_warnings(sys))
+    const gs::ExportReport report = gs::analyze_export(sys);
+    for (const std::string& w : report.warnings)
         std::fprintf(stderr, "warning: %s\n", w.c_str());
 
     // studiomdl would refuse these, so do not write files that cannot compile.
-    if (sys.export_frames() > gs::kMaxStudioFrames) {
-        std::fprintf(stderr, "error: %d frames; studiomdl accepts at most %d per sequence\n", sys.export_frames(),
-                     gs::kMaxStudioFrames);
+    for (const gs::ExportBlocker& b : report.blockers)
+        std::fprintf(stderr, "error: %s\n", b.message.c_str());
+    if (!report.blockers.empty())
         return kLimits;
-    }
-    if (const std::size_t bytes = gs::sequence_bytes(sys); bytes > gs::kMaxSequenceBytes) {
-        std::fprintf(stderr, "error: the animation needs %zu bytes; the limit is %zu per sequence\n", bytes,
-                     gs::kMaxSequenceBytes);
-        return kLimits;
-    }
 
     const fs::path out = args.out;
     fs::create_directories(out);

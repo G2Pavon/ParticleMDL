@@ -33,6 +33,13 @@ if(NOT qc MATCHES "\\$modelname \"smoke\\.mdl\"")
     message(FATAL_ERROR "smoke.qc has no $modelname line:\n${qc}")
 endif()
 
+# An effect over studiomdl's limits is refused before anything is written.
+get_filename_component(FIXTURES ${SETTINGS} DIRECTORY)
+run_cli(3 --settings ${FIXTURES}/over_limit.json --out ${OUT}/over_limit)
+if(EXISTS ${OUT}/over_limit)
+    message(FATAL_ERROR "particlemdl_cli created a folder for an export it refused")
+endif()
+
 # A compiler that does not exist is reported, not ignored. (On Windows compiling
 # outside the current folder is refused before the compiler is looked up.)
 if(NOT CMAKE_HOST_WIN32)

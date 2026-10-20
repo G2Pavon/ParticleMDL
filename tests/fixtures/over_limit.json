@@ -1,0 +1,7 @@
+{
+  "model_name": "over_limit",
+  "count": 126,
+  "duration": 60.0,
+  "fps": 60,
+  "geometry": "single_quad"
+}

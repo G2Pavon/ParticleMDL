@@ -8,6 +8,7 @@
 #include <imgui.h>
 
 #include "CompileJob.hpp"
+#include "Exporter.hpp"
 #include "FileDialog.hpp"
 #include "NativeDialog.hpp"
 #include "OrbitCamera.hpp"
@@ -69,8 +70,7 @@ private:
 
     // Derived from the settings when they change, not every frame.
     std::string preset_label_;                    // name, plus " (modified)" after edits
-    std::vector<std::string> export_warnings_;
-    std::size_t sequence_bytes_ = 0;              // as studiomdl will measure it
+    ExportReport export_report_;                  // limits, sequence size and warnings of the current settings
     std::optional<std::string> name_problem_;
 
     double preview_time_ = 0.0;
