@@ -665,6 +665,11 @@ void EditorApp::draw_left_panel()
     changed |= reset_slider("spread", "Spread", s.spread, 0, 150, 30);
     changed |= reset_slider("gravity", "Gravity", s.gravity, -600, 200, -150);
     changed |= reset_slider("drag", "Drag", s.drag, 0.0, 5.0, 0.0, "%.2f");
+    changed |= reset_slider("bounce", "Bounce", s.bounce, 0.0, 0.95, 0.0, "%.2f");
+    ImGui::SetItemTooltip("0: no floor. Above 0 particles bounce off a floor at the height below and keep this share of\n"
+                          "their speed at each hit; a particle that starts under the floor does not bounce.");
+    if (s.bounce > 0.0)
+        changed |= reset_slider("floor_height", "Floor Height", s.floor_height, -300, 300, 0);
     ImGui::SetItemTooltip("How fast the velocity dies away, per second (0 = none).\nWith gravity it gives a terminal speed.");
     changed |= reset_slider("turbulence", "Turbulence", s.turbulence, 0, 200, 0);
     changed |= reset_slider("vortex_spin", "Vortex Spin", s.vortex_spin, -720, 720, 0);

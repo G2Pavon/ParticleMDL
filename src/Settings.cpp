@@ -104,6 +104,8 @@ bool validate(Settings& s)
     changed |= clamp_value(s.lifespan_variance, 0.0, kMaxVariance);
     changed |= clamp_value(s.size_variance, 0.0, kMaxVariance);
     changed |= clamp_value(s.drag, 0.0, kMaxDrag);
+    changed |= clamp_value(s.bounce, 0.0, kMaxBounce);
+    changed |= clamp_value(s.floor_height, -kMaxFloorHeight, kMaxFloorHeight);
     changed |= clamp_value(s.cluster_size, 1, kMaxClusterSize);
     changed |= clamp_value(s.cluster_radius, 0.0, kMaxClusterRadius);
     if (s.scale_mode == ScaleMode::VertexBone && s.cluster_size != 1) {

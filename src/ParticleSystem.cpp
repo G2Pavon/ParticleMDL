@@ -376,6 +376,59 @@ ParticlePose ParticleSystem::pose_at(const Particle& p, double loop_time) const
     }
 }
 
+namespace {
+
+// Height and vertical velocity after flying freely for `tau`: gravity, and a drag that works on the velocity.
+struct Flight {
+    double z, v;
+};
+
+Flight fly(double z0, double v0, double gravity, double drag, double tau)
+{
+    if (drag > 0.0) {
+        // The closed form of dv/dt = g - k v, as in ParticleSystem::motion().
+        const double k = drag, x_kt = k * tau;
+        const double reach = -std::expm1(-x_kt) / k;
+        const double deficit = x_kt < 0.05 ? tau * (x_kt / 2.0 - x_kt * x_kt / 6.0 + x_kt * x_kt * x_kt / 24.0 -
+                                                    x_kt * x_kt * x_kt * x_kt / 120.0 +
+                                                    x_kt * x_kt * x_kt * x_kt * x_kt / 720.0)
+                                             : tau - reach;
+        return {z0 + (v0 * reach) + (gravity / k) * deficit, gravity / k + (v0 - gravity / k) * std::exp(-x_kt)};
+    }
+    return {z0 + (v0 * tau) + (0.5 * gravity * (tau * tau)), v0 + gravity * tau};
+}
+
+// The height at time t of a particle that bounces off a floor: after each hit it keeps `bounce` of its
+// speed, upward. It lies still on the floor once a bounce is too small to see.
+double bounced_height(double z0, double v0, double gravity, double drag, double t, double floor, double bounce)
+{
+    if (z0 < floor)
+        return fly(z0, v0, gravity, drag, t).z;   // it starts under the floor: there is nothing to hit
+    constexpr int kMaxBounces = 64;
+    constexpr double kRestSpeed = 0.5;
+    double z = z0, v = v0, remaining = t;
+    for (int hit = 0; hit < kMaxBounces; ++hit) {
+        if (fly(z, v, gravity, drag, remaining).z >= floor)
+            return fly(z, v, gravity, drag, remaining).z;
+        // It reaches the floor within `remaining`: find when (the height crosses the floor once, downward).
+        double lo = 0.0, hi = remaining;
+        for (int i = 0; i < 80; ++i) {
+            const double mid = (lo + hi) / 2.0;
+            (fly(z, v, gravity, drag, mid).z >= floor ? lo : hi) = mid;
+        }
+        const double arrival = hi;
+        const double speed = -fly(z, v, gravity, drag, arrival).v * bounce;   // upward after the hit
+        remaining -= arrival;
+        z = floor;
+        v = speed;
+        if (speed < kRestSpeed)
+            return floor;
+    }
+    return floor;
+}
+
+} // namespace
+
 Vec3 ParticleSystem::motion(const Particle& p, double t, Vec3 scale) const
 {
     const Settings& s = settings_;
@@ -403,6 +456,9 @@ Vec3 ParticleSystem::motion(const Particle& p, double t, Vec3 scale) const
         y = p.spawn.y + (p.velocity.y * t) + turb_y;
         z = p.spawn.z + (p.velocity.z * t) + (0.5 * s.gravity * (t * t));
     }
+
+    if (s.bounce > 0.0)
+        z = bounced_height(p.spawn.z, p.velocity.z, s.gravity, s.drag, t, s.floor_height, s.bounce);
 
     // In the same (unscaled) units as every other motion parameter, so the
     // volume fit sees exactly the motion that is exported.

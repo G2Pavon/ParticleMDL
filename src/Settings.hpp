@@ -90,6 +90,8 @@ struct Settings {
     double spread = 30;   // random +- on speed and burst
     double gravity = -150;
     double drag = 0;          // 1/s: how fast the velocity dies away
+    double bounce = 0;        // 0: no floor. Otherwise the share of its speed a particle keeps when it hits the floor
+    double floor_height = 0;  // where that floor is, in the units of the motion
     double turbulence = 0;
     double vortex_spin = 0;   // deg/s
     double vortex_pull = 0;   // units/s toward the axis
@@ -157,6 +159,8 @@ void for_each_field(S& s, F&& f)
     f("spread", s.spread);
     f("gravity", s.gravity);
     f("drag", s.drag);
+    f("bounce", s.bounce);
+    f("floor_height", s.floor_height);
     f("turbulence", s.turbulence);
     f("vortex_spin", s.vortex_spin);
     f("vortex_pull", s.vortex_pull);
@@ -202,6 +206,8 @@ inline constexpr double kMaxVariance = 0.9;
 inline constexpr int kMaxClusterSize = 64;
 inline constexpr double kMaxClusterRadius = 2000.0;
 inline constexpr double kMaxDrag = 10.0;
+inline constexpr double kMaxBounce = 0.95;
+inline constexpr double kMaxFloorHeight = 2000.0;
 inline constexpr double kMinHardness = 0.05, kMaxHardness = 20.0;
 inline constexpr double kMaxScale = 100.0;
 inline constexpr double kMaxVolume = 65536;
