@@ -30,6 +30,10 @@ smoke/.bmp 5174 afc82faa8a61259a
 smoke/.qc 212 e20ab552eb848611
 smoke/_anim.smd 382813 2435f0ee00bf6426
 smoke/_ref.smd 30808 10178570d6345b0f
+sparks/.bmp 5174 a1c7d5d2fc7c97a2
+sparks/.qc 220 a42e5adf71e3d1b1
+sparks/_anim.smd 185674 af40aee0db3bc7fd
+sparks/_ref.smd 53935 7b69b5dce4b1e73d
 sun/.bmp 66614 a15b2d2bc52f4346
 sun/.qc 203 bae68786c9ae63a5
 sun/_anim.smd 247197 213a93a091bfcad8

@@ -108,6 +108,15 @@ std::span<const Preset> builtin_presets()
             .scale_mode = ScaleMode::VertexBone, .scale_start = 1.6, .scale_end = 0.2,
             .geometry = Geometry::SingleQuad, .quad_width = 24, .quad_height = 24, .double_sided = true, .mesh_rotation = {0, 0, 0},
             .particle_spin = {0, 0, 120}, .spin_spread = 90}},
+        Preset{"Sparks", {
+            .count = 60, .duration = 1.5, .lifespan = 0.75, .fps = 30, .end_behavior = EndBehavior::HideUnderground, .lifespan_variance = 0.4,
+            .volume_width = 256, .volume_depth = 256, .volume_height = 160, .velocity = {0, 0, 0}, .spin = {0, 0, 0},
+            .emitter_shape = EmitterShape::Cone, .emission_angle = 50, .spawn_radius = 4, .spawn_height = 0, .emitter_tilt = {0, 0, 0}, .hollow_ring = false,
+            .speed = 230, .burst = 0, .spread = 90, .gravity = -420, .drag = 0.3, .turbulence = 0, .vortex_spin = 0, .vortex_pull = 0,
+            .texture = {.pattern = TexPattern::RainDrop, .color_mode = ColorMode::SolidColor, .core_color = {255, 190, 90}, .edge_color = {0, 0, 0}, .size = 64, .hardness = 0.7, .file = {}},
+            .scale_mode = ScaleMode::Static, .scale_start = 1.0, .scale_end = 1.0,
+            .geometry = Geometry::SingleQuad, .quad_width = 3, .quad_height = 16, .double_sided = true, .mesh_rotation = {0, 0, 0},
+            .align_to_velocity = true, .particle_spin = {0, 0, 0}, .spin_spread = 0}},
         Preset{"Torch Flame", {
             .count = 19, .duration = 3.0, .lifespan = 1.0, .fps = 30, .end_behavior = EndBehavior::HideUnderground,
             .volume_width = 1, .volume_depth = 1, .volume_height = 7, .velocity = {0, 0, 0}, .spin = {0, 0, 34},

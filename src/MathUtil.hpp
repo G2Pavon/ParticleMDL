@@ -68,6 +68,41 @@ inline Quat quat_from_euler(double rad_x, double rad_y, double rad_z) noexcept
     return axis_rotation(rad_x, 0) * axis_rotation(rad_y, 1) * axis_rotation(rad_z, 2);
 }
 
+// The shortest rotation that turns the direction `from` into the direction `to` (both unit vectors).
+inline Quat quat_from_to(Vec3 from, Vec3 to) noexcept
+{
+    const double c = from.x * to.x + from.y * to.y + from.z * to.z;
+    Vec3 axis{from.y * to.z - from.z * to.y, from.z * to.x - from.x * to.z, from.x * to.y - from.y * to.x};
+    const double s = std::sqrt(axis.x * axis.x + axis.y * axis.y + axis.z * axis.z);
+    if (s < 1e-12) {
+        if (c > 0.0)
+            return {};   // the same direction
+        // Opposite directions: half a turn about any axis at right angles to `from`.
+        const Vec3 side = std::abs(from.x) < 0.9 ? Vec3{1, 0, 0} : Vec3{0, 1, 0};
+        Vec3 perp{from.y * side.z - from.z * side.y, from.z * side.x - from.x * side.z, from.x * side.y - from.y * side.x};
+        const double n = std::sqrt(perp.x * perp.x + perp.y * perp.y + perp.z * perp.z);
+        return {0.0, perp.x / n, perp.y / n, perp.z / n};
+    }
+    const double angle = std::atan2(s, c);
+    axis = axis * (std::sin(angle / 2.0) / s);
+    return {std::cos(angle / 2.0), axis.x, axis.y, axis.z};
+}
+
+// The Euler angles (x, y, z) with apply_static_rotation(v, x, y, z) == rotate(q, v): the same rotation
+// as a turn about Z, then Y, then X. At the singularity (y = +-90 degrees) the turn is all put in x.
+inline Vec3 euler_from_quat(const Quat& q) noexcept
+{
+    // The matrix of the rotation; only the entries the angles come from.
+    const double m01 = 2.0 * (q.x * q.y - q.w * q.z), m00 = 1.0 - 2.0 * (q.y * q.y + q.z * q.z);
+    const double m02 = 2.0 * (q.x * q.z + q.w * q.y);
+    const double m12 = 2.0 * (q.y * q.z - q.w * q.x), m22 = 1.0 - 2.0 * (q.x * q.x + q.y * q.y);
+    const double y = std::asin(m02 > 1.0 ? 1.0 : m02 < -1.0 ? -1.0 : m02);
+    if (std::abs(m02) < 1.0 - 1e-12)
+        return {std::atan2(-m12, m22), y, std::atan2(-m01, m00)};
+    const double m11 = 1.0 - 2.0 * (q.x * q.x + q.z * q.z), m21 = 2.0 * (q.y * q.z + q.w * q.x);
+    return {std::atan2(m21, m11), y, 0.0};
+}
+
 inline Vec3 rotate(const Quat& q, Vec3 v) noexcept
 {
     // v' = v + 2w (u x v) + 2 u x (u x v), with u the vector part.

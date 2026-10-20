@@ -840,6 +840,9 @@ void EditorApp::draw_right_panel()
     changed |= reset_slider("mesh_rotation.z", "Rot Z (Roll)", s.mesh_rotation.z, -180, 180, 0);
 
     group_label("Rotation");
+    changed |= ImGui::Checkbox("Face Direction of Travel", &s.align_to_velocity);
+    ImGui::SetItemTooltip("The quad's Z axis points the way the particle moves (sparks, rain, tracers).\n"
+                          "Spin Z then rolls it around that direction; Spin X and Y have no effect.");
     changed |= reset_slider("particle_spin.x", "X (deg/s)", s.particle_spin.x, -360, 360, 0);
     changed |= reset_slider("particle_spin.y", "Y (deg/s)", s.particle_spin.y, -360, 360, 0);
     changed |= reset_slider("particle_spin.z", "Z (deg/s)", s.particle_spin.z, -360, 360, 0);

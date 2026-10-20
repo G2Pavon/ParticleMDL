@@ -70,7 +70,7 @@ ParticleSystem::ParticleSystem(const Settings& settings) : settings_(validated(s
 {
     const Settings& s = settings_;
     emit_rot_ = {radians(s.emitter_tilt.x), radians(s.emitter_tilt.y), radians(s.emitter_tilt.z)};
-    has_micro_rotation_ = s.particle_spin != Vec3{} || s.spin_spread != 0.0;
+    has_micro_rotation_ = s.particle_spin != Vec3{} || s.spin_spread != 0.0 || s.align_to_velocity;
 
     export_fps_ = s.fps;
     loop_steps_ = std::max(1, static_cast<int>(std::lround(s.duration * export_fps_)));
@@ -426,6 +426,17 @@ Vec3 ParticleSystem::rotation_at(const Particle& p, double t) const
 {
     if (!has_micro_rotation_)
         return {0.0, 0.0, 0.0};
+    if (settings_.align_to_velocity) {
+        // Z along the direction of travel, taken from the motion that is shown (the system's spin included).
+        const double h = loop_duration() / (static_cast<double>(loop_steps_) * 16.0);
+        const double before = std::max(0.0, t - h);
+        const Vec3 d = position_at(p, t + h) - position_at(p, before);
+        const double speed = std::sqrt(d.x * d.x + d.y * d.y + d.z * d.z);
+        const Quat roll = axis_rotation(t * p.spin.z, 2);
+        const Quat aligned = speed < 1e-12 ? roll : quat_from_to({0, 0, 1}, d * (1.0 / speed)) * roll;
+        const Vec3 angles = euler_from_quat(aligned);
+        return {floor_mod(angles.x, kPi * 2), floor_mod(angles.y, kPi * 2), floor_mod(angles.z, kPi * 2)};
+    }
     return {floor_mod(t * p.spin.x, kPi * 2), floor_mod(t * p.spin.y, kPi * 2), floor_mod(t * p.spin.z, kPi * 2)};
 }
 

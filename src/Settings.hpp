@@ -115,6 +115,9 @@ struct Settings {
     Vec3 mesh_rotation{};
 
     // Per-particle spin
+    // The quad's Z axis points the way the particle travels (sparks, rain, tracers). Spin Z then
+    // rolls it around that direction; Spin X and Y have no effect.
+    bool align_to_velocity = false;
     Vec3 particle_spin{};     // deg/s
     double spin_spread = 0;   // random +-, deg/s
 
@@ -176,6 +179,7 @@ void for_each_field(S& s, F&& f)
     f("cluster_size", s.cluster_size);
     f("cluster_radius", s.cluster_radius);
     f("mesh_rotation", s.mesh_rotation);
+    f("align_to_velocity", s.align_to_velocity);
     f("particle_spin", s.particle_spin);
     f("spin_spread", s.spin_spread);
 }
