@@ -6,14 +6,14 @@ namespace gs {
 
 // The two seeds also set the values of their panel: each one is drawn at random anywhere in its
 // slider's range, whatever it was. A value whose 0 turns a feature off (drag, bounce, turbulence,
-// vortex, system velocity, spin and tilt, the variances, mesh rotation, particle spin, cluster) is
+// vortex, system velocity, emitter tilt, the variances, mesh rotation, particle spin, cluster) is
 // first turned on or off at random. The particle count and the cluster size are drawn among the
 // values the export accepts, so a seed never makes an effect studiomdl would refuse; a particle seed
 // that would still exceed a limit lowers the particle count, the only value of the other side it
 // can change. Choices (shape, geometry, end behavior, loop, checkboxes), the frame rate and the
 // texture are never changed.
 //   System: the animation (count, duration, lifespan and its variance, burst window), the
-//     volume, the system velocity and rotation, the emitter and the physics.
+//     volume, the system velocity, the emitter and the physics. Not the system rotation.
 //   Particle: the vertex-bone scaling, the geometry (size, size variance, cluster, mesh
 //     rotation) and the per-particle spin.
 enum class SeedSide { System, Particle };

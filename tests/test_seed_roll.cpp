@@ -62,7 +62,7 @@ struct Range {
 std::vector<Range> system_ranges(const Settings& s)
 {
     return {{1, double(max_particles(s.geometry, s.scale_mode))}, {0.5, 10}, {0.1, 1}, {0, 0.9}, {0, 1}, {1, 1024}, {1, 1024},
-            {1, 1024}, {-500, 500}, {-500, 500}, {-500, 500}, {-360, 360}, {-360, 360}, {-360, 360}, {1, 360},
+            {1, 1024}, {-500, 500}, {-500, 500}, {-500, 500}, {1, 360},
             {0, 500}, {0, 400}, {-180, 180}, {-180, 180}, {-180, 180}, {-200, 400}, {-300, 300}, {0, 150},
             {-600, 200}, {0, 5}, {0, 0.95}, {-300, 300}, {0, 200}, {-720, 720}, {-300, 300}};
 }
@@ -76,7 +76,7 @@ std::vector<Range> particle_ranges(const Settings&)
 std::vector<double> system_values(const Settings& s)
 {
     return {double(s.count), s.duration, s.lifespan, s.lifespan_variance, s.burst_window, s.volume_width, s.volume_depth,
-            s.volume_height, s.velocity.x, s.velocity.y, s.velocity.z, s.spin.x, s.spin.y, s.spin.z, s.emission_angle,
+            s.volume_height, s.velocity.x, s.velocity.y, s.velocity.z, s.emission_angle,
             s.spawn_radius, s.spawn_height, s.emitter_tilt.x, s.emitter_tilt.y, s.emitter_tilt.z, s.speed, s.burst,
             s.spread, s.gravity, s.drag, s.bounce, s.floor_height, s.turbulence, s.vortex_spin, s.vortex_pull};
 }
@@ -201,10 +201,11 @@ TEST_CASE("a seed changes nothing but its own side's values")
 {
     Settings base = all_in_use();
     base.texture.hardness = 2.0;
-    base.fps = 24;
+    base.fps = 24;   // and all_in_use() spins the system: neither is the seed's
     for (const SeedSide side : {SeedSide::System, SeedSide::Particle}) {
         Settings s = base;
         roll_settings(s, base, side, 11);
+        CHECK(s.spin == base.spin);   // the system rotation is never drawn
         const SeedSide other = side == SeedSide::System ? SeedSide::Particle : SeedSide::System;
         CHECK(same_rolled_values(s, base, other));
         CHECK_FALSE(same_rolled_values(s, base, side));

@@ -616,8 +616,8 @@ void EditorApp::draw_left_panel()
         seed_input("system_seed", seed,
                    "System seed (Seed picks a new one).\n"
                    "Draws every value of this panel at random anywhere in its slider's range, turning drag,\n"
-                   "bounce, turbulence, vortex, velocity, rotation and tilt on or off at random (not the FPS,\n"
-                   "nor the choices). The particle count is drawn among those the export accepts. It also\n"
+                   "bounce, turbulence, vortex, velocity and tilt on or off at random (not the rotation, the\n"
+                   "FPS, nor the choices). The particle count is drawn among those the export accepts. It also\n"
                    "picks where each particle starts, the direction and speed it leaves with, its turbulence\n"
                    "and its lifespan variance. 0 brings back the values from before any seed."))
         set_seed(SeedSide::System, seed);

@@ -34,8 +34,6 @@ void for_each_rolled(S& s, SeedSide side, F&& f)
         f(s.volume_height, 1.0, 1024.0, always);
         for (auto* v : {&s.velocity.x, &s.velocity.y, &s.velocity.z})
             f(*v, -500.0, 500.0, optional);
-        for (auto* v : {&s.spin.x, &s.spin.y, &s.spin.z})
-            f(*v, -360.0, 360.0, optional);
         f(s.emission_angle, 1.0, 360.0, always);
         f(s.spawn_radius, 0.0, 500.0, always);
         f(s.spawn_height, 0.0, 400.0, always);
