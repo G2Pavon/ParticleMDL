@@ -58,6 +58,10 @@ unsigned quote_command_line_argument(const wchar_t* arg, unsigned length, wchar_
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0600
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600   // Vista: PROC_THREAD_ATTRIBUTE_HANDLE_LIST
+#endif
 #include <windows.h>
 
 namespace gs {
@@ -84,6 +88,46 @@ public:
 
 private:
     HANDLE h_ = nullptr;
+};
+
+// The attribute that limits what a child inherits to the handles named in it. Without it, the
+// child gets every inheritable handle of this process: files the C runtime opened on another
+// thread (inheritable by default) would stay open in the compiler, and could not be renamed.
+class InheritOnly {
+public:
+    InheritOnly(HANDLE* handles, int count)
+    {
+        SIZE_T size = 0;
+        InitializeProcThreadAttributeList(nullptr, 1, 0, &size);
+        list_ = static_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(HeapAlloc(GetProcessHeap(), 0, size));
+        if (!list_)
+            return;
+        if (!InitializeProcThreadAttributeList(list_, 1, 0, &size)) {
+            HeapFree(GetProcessHeap(), 0, list_);
+            list_ = nullptr;
+            return;
+        }
+        if (!UpdateProcThreadAttribute(list_, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST, handles,
+                                       static_cast<SIZE_T>(count) * sizeof(HANDLE), nullptr, nullptr)) {
+            DeleteProcThreadAttributeList(list_);
+            HeapFree(GetProcessHeap(), 0, list_);
+            list_ = nullptr;
+        }
+    }
+    ~InheritOnly()
+    {
+        if (list_) {
+            DeleteProcThreadAttributeList(list_);
+            HeapFree(GetProcessHeap(), 0, list_);
+        }
+    }
+    InheritOnly(const InheritOnly&) = delete;
+    InheritOnly& operator=(const InheritOnly&) = delete;
+
+    LPPROC_THREAD_ATTRIBUTE_LIST get() const noexcept { return list_; }   // null if it could not be made
+
+private:
+    LPPROC_THREAD_ATTRIBUTE_LIST list_ = nullptr;
 };
 
 // Hands over whatever is waiting in the pipe, without ever blocking: a program
@@ -123,12 +167,23 @@ ProcessResult run_process(wchar_t* command_line, const wchar_t* work_dir, unsign
     Handle empty_stdin(CreateFileW(L"NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, &inheritable,
                                    OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
 
-    STARTUPINFOW startup{};
-    startup.cb = sizeof startup;
-    startup.dwFlags = STARTF_USESTDHANDLES;
-    startup.hStdInput = empty_stdin.valid() ? empty_stdin.get() : INVALID_HANDLE_VALUE;
-    startup.hStdOutput = pipe_write.get();
-    startup.hStdError = pipe_write.get();
+    STARTUPINFOEXW startup{};
+    startup.StartupInfo.cb = sizeof startup;
+    startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+    startup.StartupInfo.hStdInput = empty_stdin.valid() ? empty_stdin.get() : INVALID_HANDLE_VALUE;
+    startup.StartupInfo.hStdOutput = pipe_write.get();
+    startup.StartupInfo.hStdError = pipe_write.get();
+
+    // The child inherits its standard handles and nothing else (each handle once in the list).
+    HANDLE inherited[2] = {pipe_write.get(), empty_stdin.get()};
+    const InheritOnly inherit_only(inherited, empty_stdin.valid() ? 2 : 1);
+    DWORD flags = CREATE_NO_WINDOW | CREATE_SUSPENDED;
+    if (inherit_only.get()) {
+        startup.lpAttributeList = inherit_only.get();
+        flags |= EXTENDED_STARTUPINFO_PRESENT;
+    } else {
+        startup.StartupInfo.cb = sizeof startup.StartupInfo;   // as before: everything inheritable is inherited
+    }
 
     // The job ends everything the compiler started when we stop it, or when we exit.
     Handle job(CreateJobObjectW(nullptr, nullptr));
@@ -139,8 +194,8 @@ ProcessResult run_process(wchar_t* command_line, const wchar_t* work_dir, unsign
     }
 
     PROCESS_INFORMATION info{};
-    if (!CreateProcessW(nullptr, command_line, nullptr, nullptr, TRUE, CREATE_NO_WINDOW | CREATE_SUSPENDED, nullptr,
-                        work_dir, &startup, &info)) {
+    if (!CreateProcessW(nullptr, command_line, nullptr, nullptr, TRUE, flags, nullptr, work_dir, &startup.StartupInfo,
+                        &info)) {
         const DWORD error = GetLastError();
         const bool missing = error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND || error == ERROR_ACCESS_DENIED;
         return {missing ? ProcessStatus::NotFound : ProcessStatus::StartFailed, error};
