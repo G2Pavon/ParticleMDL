@@ -57,6 +57,7 @@ struct Settings {
     // Which random numbers the effect uses: the system seed for where and how the particles leave,
     // their wobble and their lifespans; the particle seed for their spin, size and cluster copies.
     // 0 and 0 are the original effect; any other number gives other values for that side alone.
+    // In the editor a seed also varies the values of its panel (see SeedRoll.hpp).
     int system_seed = 0;
     int particle_seed = 0;
     double lifespan_variance = 0;     // each particle lives up to this fraction shorter, at random

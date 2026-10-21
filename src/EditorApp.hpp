@@ -15,6 +15,7 @@
 #include "ParticleSystem.hpp"
 #include "PreviewRenderer.hpp"
 #include "PreviewScene.hpp"
+#include "SeedRoll.hpp"
 #include "TextureJob.hpp"
 #include "Settings.hpp"
 
@@ -66,6 +67,11 @@ private:
     void draw_canvas(ImVec2 size);
 
     Settings settings_;
+    // What each panel's values were before its seed varied them, so another seed varies the same
+    // values and seed 0 brings them back. Forgotten when a value of the panel is set by hand, or
+    // the whole effect is replaced (preset, new, load): those values are then the ones to vary.
+    std::optional<Settings> system_base_, particle_base_;
+    void set_seed(SeedSide side, int seed);
     std::optional<ParticleSystem> system_;
     std::optional<TextureSettings> texture_settings_;   // what the preview textures were made from
     bool dirty_ = true;

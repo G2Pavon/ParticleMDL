@@ -120,6 +120,7 @@ add_library(particles_core STATIC
     src/Presets.cpp
     src/BoneLayout.cpp
     src/ParticleSystem.cpp
+    src/SeedRoll.cpp
     src/Baking.cpp
     src/TextureGenerator.cpp
     src/TextureJob.cpp

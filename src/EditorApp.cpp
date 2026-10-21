@@ -131,6 +131,8 @@ void EditorApp::apply_preset(int index)
         return;
     preset_index_ = index;
     gs::apply_preset(settings_, presets[index]);
+    system_base_.reset();
+    particle_base_.reset();
     rebuild();
     preview_time_ = 0.0;
 }
@@ -140,12 +142,23 @@ void EditorApp::new_system()
     const std::string name = settings_.model_name;
     settings_ = blank_settings();
     settings_.model_name = name;
+    system_base_.reset();
+    particle_base_.reset();
     preset_index_ = -1;
     camera_.reset();
     status_.clear();
     set_log({});
     rebuild();
     preview_time_ = 0.0;
+}
+
+void EditorApp::set_seed(SeedSide side, int seed)
+{
+    std::optional<Settings>& base = side == SeedSide::System ? system_base_ : particle_base_;
+    if (!base)
+        base = settings_;   // the values before this side's first roll
+    roll_settings(settings_, *base, side, seed);
+    dirty_ = true;
 }
 
 void EditorApp::save_system(const fs::path& path)
@@ -164,6 +177,8 @@ void EditorApp::load_system(const fs::path& path)
     try {
         SettingsLoad loaded = read_settings_file(path, settings_);
         settings_ = std::move(loaded.settings);
+        system_base_.reset();
+        particle_base_.reset();
         preset_index_ = -1;
         rebuild();
         preview_time_ = 0.0;
@@ -597,10 +612,14 @@ void EditorApp::draw_left_panel()
 
     Settings& s = settings_;
     bool changed = false;
-    changed |= seed_input("system_seed", "System Seed", s.system_seed,
-                          "Random numbers of the system: where each particle starts, the direction and speed it\n"
-                          "leaves with, its turbulence and its lifespan variance. 0 is the original effect; another\n"
-                          "number gives other values with the same settings.");
+    if (int seed = s.system_seed;
+        seed_input("system_seed", "System Seed", seed,
+                   "Varies the values of this panel that are in use by up to 25% each (not the FPS, nor the\n"
+                   "choices), and picks where each particle starts, the direction and speed it leaves with, its\n"
+                   "turbulence and its lifespan variance. 0 keeps the values as they were before any seed;\n"
+                   "a value set by hand is kept and varied from then on."))
+        set_seed(SeedSide::System, seed);
+    const Settings before = s;
     group_label("Animation");
     changed |= reset_slider("count", "Particle Count", s.count, 1, max_particles(s.geometry, s.scale_mode), 64,
                             ImGuiSliderFlags_AlwaysClamp);
@@ -669,6 +688,8 @@ void EditorApp::draw_left_panel()
     changed |= reset_slider("turbulence", "Turbulence", s.turbulence, 0, 200, 0);
     changed |= reset_slider("vortex_spin", "Vortex Spin", s.vortex_spin, -720, 720, 0);
     changed |= reset_slider("vortex_pull", "Vortex Pull", s.vortex_pull, -300, 300, 0);
+    if (!same_rolled_values(before, s, SeedSide::System))
+        system_base_.reset();   // set by hand: these are the values the seed varies now
     dirty_ |= changed;
 }
 
@@ -764,10 +785,14 @@ void EditorApp::draw_right_panel()
 
     Settings& s = settings_;
     bool changed = false;
-    changed |= seed_input("particle_seed", "Particle Seed", s.particle_seed,
-                          "Random numbers of the particles: their spin spread, their size variance and where the\n"
-                          "copies of a cluster sit and how they are turned. 0 is the original effect; another\n"
-                          "number gives other values with the same settings.");
+    if (int seed = s.particle_seed;
+        seed_input("particle_seed", "Particle Seed", seed,
+                   "Varies the scaling, geometry and spin values of this panel that are in use by up to 25%\n"
+                   "each (not the texture, nor the choices), and picks each particle's spin spread, its size\n"
+                   "variance and where the copies of a cluster sit and how they are turned. 0 keeps the\n"
+                   "values as they were before any seed; a value set by hand is kept and varied from then on."))
+        set_seed(SeedSide::Particle, seed);
+    const Settings before = s;
     ImGui::Dummy(ImVec2(0, ui::px(5)));
     ImGui::Image(renderer_.swatch(), ImVec2(ui::px(PreviewRenderer::kSwatchSize), ui::px(PreviewRenderer::kSwatchSize)));
     ImGui::Dummy(ImVec2(0, ui::px(10)));
@@ -841,6 +866,8 @@ void EditorApp::draw_right_panel()
     changed |= reset_slider("particle_spin.y", "Y (deg/s)", s.particle_spin.y, -360, 360, 0);
     changed |= reset_slider("particle_spin.z", "Z (deg/s)", s.particle_spin.z, -360, 360, 0);
     changed |= reset_slider("spin_spread", "Random Spread", s.spin_spread, 0, 360, 0);
+    if (!same_rolled_values(before, s, SeedSide::Particle))
+        particle_base_.reset();   // set by hand: these are the values the seed varies now
     dirty_ |= changed;
 }
 
