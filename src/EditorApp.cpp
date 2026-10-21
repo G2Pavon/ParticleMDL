@@ -257,7 +257,8 @@ void EditorApp::poll_compile()
             break;
         case CompileResult::Status::TimedOut:
             std::fprintf(stderr, "--- COMPILER TIMED OUT ---\n%s\n", result->output.c_str());
-            set_log(result->output + "\n(timed out)");
+            set_log(result->output + (result->output.empty() ? "" : "\n") +
+                    timeout_message(CompileOptions{}.timeout, settings_.loop));
             set_status("Compile timed out! See the log below.", StatusTone::Error);
             break;
         case CompileResult::Status::Cancelled:

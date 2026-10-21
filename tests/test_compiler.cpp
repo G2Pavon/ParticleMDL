@@ -307,3 +307,15 @@ TEST_CASE("compile_model keeps the source files when asked to")
     for (const char* f : {"fx.qc", "fx_ref.smd", "fx_anim.smd", "fx.bmp"})
         CHECK(dir.has(f));
 }
+
+TEST_CASE("a timeout names the hang of studiomdl++ for looping sequences only")
+{
+    const std::string looping = timeout_message(std::chrono::minutes(2), true);
+    CHECK(looping.find("within 120 s") != std::string::npos);
+    CHECK(looping.find("studiomdl++") != std::string::npos);
+    CHECK(looping.find("Loop") != std::string::npos);
+
+    const std::string once = timeout_message(std::chrono::seconds(30), false);
+    CHECK(once.find("within 30 s") != std::string::npos);
+    CHECK(once.find("studiomdl++") == std::string::npos);
+}

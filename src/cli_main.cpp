@@ -174,7 +174,7 @@ int run(const Args& args)
         std::fprintf(stderr, "error: compiler not found: '%s'\n", args.compiler.c_str());
         break;
     case Status::TimedOut:
-        std::fprintf(stderr, "error: the compiler timed out\n");
+        std::fprintf(stderr, "error: %s\n", gs::timeout_message(options.timeout, sys.looping()).c_str());
         break;
     case Status::Cancelled:
         std::fprintf(stderr, "error: the compile was cancelled\n");

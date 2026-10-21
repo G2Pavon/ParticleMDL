@@ -42,4 +42,9 @@ std::wstring quote_windows_argument(std::wstring_view arg);
 CompileResult compile_model(const std::string& compiler, const std::string& safe_name,
                             const CompileOptions& options = {});
 
+// What to tell the user when the compiler was stopped for running past `timeout`. A hung
+// compiler usually prints nothing (its output is buffered until it exits), so the message
+// names the one known cause: studiomdl++ hangs on some looping sequences.
+std::string timeout_message(std::chrono::milliseconds timeout, bool looping);
+
 } // namespace gs

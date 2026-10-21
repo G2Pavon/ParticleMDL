@@ -1,6 +1,7 @@
 #include "Compiler.hpp"
 
 #include <array>
+#include <format>
 #include <optional>
 #include <string_view>
 #include <stdexcept>
@@ -266,6 +267,17 @@ CompileResult compile_model(const std::string& compiler, const std::string& safe
         remove_intermediates(options.work_dir, safe_name);
     result.status = CompileResult::Status::Ok;
     return result;
+}
+
+std::string timeout_message(std::chrono::milliseconds timeout, bool looping)
+{
+    std::string message = std::format("The compiler did not finish within {} s and was stopped.",
+                                      std::chrono::duration_cast<std::chrono::seconds>(timeout).count());
+    if (looping)
+        message += " studiomdl++ hangs on some looping sequences, depending on their length (seen under Wine); "
+                   "Sven Co-op's studiomdl compiles them. A slightly different Duration or FPS, or Loop turned "
+                   "off, also avoids it.";
+    return message;
 }
 
 } // namespace gs
