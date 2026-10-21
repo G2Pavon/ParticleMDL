@@ -353,15 +353,16 @@ ParticlePose ParticleSystem::pose_at(const Particle& p, double loop_time) const
                 vertex_bones ? scale_factor_at(p, st.eval_time, st.past_lifespan()) * p.size : p.size, true};
 
     // Parked out of sight. Bones have no scale, so only vertex-bone quads can
-    // collapse; static quads rely on where they are parked.
-    ParticlePose hidden{{0.0, 0.0, hide_z_}, {}, vertex_bones ? 0.0 : p.size, false};
+    // collapse; static quads rely on where they are parked. The quad keeps the turn it
+    // died with, so it does not turn on its way down (and a constant costs little to store).
+    const double death = p.lifespan * loop_duration();
+    ParticlePose hidden{{0.0, 0.0, hide_z_}, rotation_at(p, death), vertex_bones ? 0.0 : p.size, false};
     switch (settings_.end_behavior) {
     case EndBehavior::HideInCore:
         hidden.pos = {};
         hidden.visible = !vertex_bones;   // a static quad stays visible at the center
         return hidden;
     case EndBehavior::DropThroughFloor: {
-        const double death = p.lifespan * loop_duration();
         const Vec3 at_death = position_at(p, death);
         const double fall = st.eval_time - death;
         const double z = at_death.z - 0.5 * drop_acceleration_ * fall * fall;
@@ -369,7 +370,7 @@ ParticlePose ParticleSystem::pose_at(const Particle& p, double loop_time) const
             hidden.pos = {at_death.x, at_death.y, hide_z_};
             return hidden;
         }
-        return {{at_death.x, at_death.y, z}, rotation_at(p, death), vertex_bones ? settings_.scale_end * p.size : p.size, true};
+        return {{at_death.x, at_death.y, z}, hidden.rot, vertex_bones ? settings_.scale_end * p.size : p.size, true};
     }
     default:   // Hide Underground
         return hidden;

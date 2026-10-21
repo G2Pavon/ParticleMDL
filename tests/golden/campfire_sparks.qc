@@ -3,7 +3,7 @@ $cd "."
 $cdtexture "."
 $scale 1.0
 
-$bbox -35.00 -31.00 -6.00 35.00 34.00 132.00
+$bbox -35.00 -31.00 -7.00 35.00 34.00 132.00
 
 $texrendermode "campfire_sparks.bmp" additive
 

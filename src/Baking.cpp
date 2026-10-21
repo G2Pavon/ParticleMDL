@@ -129,6 +129,26 @@ BakedPoses bake(const ParticleSystem& sys)
                 place_underground(b.at_mut(seam.to, i), c.pos.x, c.pos.y, hide_z);
             }
         }
+        // Turning: a diving quad keeps the turn it died with (see ParticleSystem::pose_at), and every
+        // later hidden frame takes the turn of the frame after it, so the quad rises already turned
+        // the way it is reborn. Neither turns while it can be seen, and the hidden stretch holds a
+        // single value, which costs studiomdl's coding next to nothing. This goes backwards, in a loop
+        // from a visible frame so that each hidden stretch is met whole.
+        int start = stored;
+        if (b.looping_) {
+            start = 0;
+            while (start < stored && !b.at(start, i).visible)
+                ++start;
+            if (start == stored)
+                continue;   // never visible
+        }
+        for (int k = 1; k <= stored; ++k) {
+            const int f = (start - k + stored) % stored;
+            const int next = b.looping_ ? (f + 1) % stored : f + 1, prev = b.looping_ ? (f - 1 + stored) % stored : f - 1;
+            const bool dive = prev >= 0 && b.at(prev, i).visible;
+            if (!b.at(f, i).visible && !dive && next < stored)
+                b.at_mut(f, i).rot = b.at(next, i).rot;
+        }
     }
     return b;
 }

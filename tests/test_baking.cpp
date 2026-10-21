@@ -197,9 +197,21 @@ TEST_CASE("static quads that hide underground dive and rise vertically")
         }
 }
 
-TEST_CASE("a dying static quad is parked right below where it died")
+namespace {
+
+// Spinning, so a quad that turned while it dives or rises would show it.
+Settings spinning(EndBehavior end, double lifespan)
 {
-    const ParticleSystem sys(moving(EndBehavior::HideUnderground, ScaleMode::Static, 0.4, 30));
+    Settings s = moving(end, ScaleMode::Static, lifespan, 30);
+    s.particle_spin = {40, 0, 90};
+    return s;
+}
+
+} // namespace
+
+TEST_CASE("a dying static quad is parked right below where it died, turned as it died")
+{
+    const ParticleSystem sys(spinning(EndBehavior::HideUnderground, 0.4));
     const BakedPoses baked = bake(sys);
     int dives = 0;
     for (int i = 0; i < baked.particles(); ++i)
@@ -210,15 +222,21 @@ TEST_CASE("a dying static quad is parked right below where it died")
                 CHECK(b.pos.x == a.pos.x);
                 CHECK(b.pos.y == a.pos.y);
                 CHECK(b.pos.z == doctest::Approx(sys.hide_z()));
+                // It turns on only as far as it spins until it dies, never back to no turn.
+                const Quat qa = quat_from_euler(a.rot.x, a.rot.y, a.rot.z), qb = quat_from_euler(b.rot.x, b.rot.y, b.rot.z);
+                const double dot = std::abs(qa.w * qb.w + qa.x * qb.x + qa.y * qb.y + qa.z * qb.z);
+                const double turned = 2.0 * std::acos(std::min(1.0, dot));
+                CHECK(turned <= radians(std::hypot(40.0, 90.0)) / 30.0 + 1e-9);
+                CHECK(a.rot != Vec3{});
                 ++dives;
             }
         }
     CHECK(dives == baked.particles());   // each particle dies once per loop
 }
 
-TEST_CASE("a reborn static quad waits right below where it reappears")
+TEST_CASE("a reborn static quad waits right below where it reappears, turned the same way")
 {
-    const ParticleSystem sys(moving(EndBehavior::HideUnderground, ScaleMode::Static, 0.4, 30));
+    const ParticleSystem sys(spinning(EndBehavior::HideUnderground, 0.4));
     const BakedPoses baked = bake(sys);
     int rises = 0;
     for (int i = 0; i < baked.particles(); ++i)
@@ -229,6 +247,7 @@ TEST_CASE("a reborn static quad waits right below where it reappears")
                 CHECK(a.pos.x == b.pos.x);
                 CHECK(a.pos.y == b.pos.y);
                 CHECK(a.pos.z == doctest::Approx(sys.hide_z()));
+                CHECK(a.rot == b.rot);
                 ++rises;
             }
         }
