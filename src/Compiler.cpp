@@ -128,7 +128,14 @@ CompileResult run_compiler(const std::string& compiler, const std::string& qc, c
                                       ? kNoTimeout - 1
                                       : static_cast<unsigned long>(millis);
     const ProcessResult run_result = run_process(command.data(), work_dir.c_str(), timeout, callbacks);
-    result.output = output.take();
+    // The compiler prints in the ANSI code page (its paths too); the log is UTF-8.
+    const std::string ansi = output.take();
+    result.output.resize(ansi_to_utf8(ansi.data(), static_cast<unsigned long>(ansi.size()), nullptr, 0));
+    if (result.output.empty() && !ansi.empty())
+        result.output = ansi;
+    else
+        ansi_to_utf8(ansi.data(), static_cast<unsigned long>(ansi.size()), result.output.data(),
+                     static_cast<unsigned long>(result.output.size()));
     switch (run_result.status) {
     case ProcessStatus::Exited:
         result.exit_zero = run_result.exit_code == 0;
@@ -136,9 +143,19 @@ CompileResult run_compiler(const std::string& compiler, const std::string& qc, c
     case ProcessStatus::NotFound:
         result.status = CompileResult::Status::CompilerNotFound;
         break;
-    case ProcessStatus::StartFailed:
+    case ProcessStatus::StartFailed: {
+        // Not started (a 64-bit program on 32-bit Windows, one that needs elevation, a folder
+        // path that is too long): say what Windows said, there is no compiler output.
         result.status = CompileResult::Status::Failed;
+        char text[512];
+        describe_error(run_result.exit_code, text, sizeof text);
+        std::string reason = text;
+        if (const std::size_t at = reason.find("%1"); at != std::string::npos)
+            reason.replace(at, 2, "the compiler");
+        result.output += std::format("The compiler could not be started (Windows error {}{}{}).", run_result.exit_code,
+                                     reason.empty() ? "" : ": ", reason);
         break;
+    }
     case ProcessStatus::TimedOut:
         result.status = CompileResult::Status::TimedOut;
         break;

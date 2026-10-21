@@ -41,6 +41,15 @@ inline constexpr unsigned long kNoTimeout = 0xFFFFFFFFul;
 // stdin, and waits for it. Anything it started is stopped with it.
 ProcessResult run_process(wchar_t* command_line, const wchar_t* work_dir, unsigned long timeout_ms,
                           const ProcessCallbacks& callbacks);
+
+// Text in the ANSI code page (what a program that prints char strings writes) as UTF-8, written
+// into `out` when it is not null; returns the bytes written (or needed), 0 if it cannot be converted.
+unsigned long ansi_to_utf8(const char* text, unsigned long size, char* out, unsigned long capacity) noexcept;
+
+// Windows' own description of an error code, as UTF-8 without the trailing line break and full
+// stop, and zero-terminated; returns its length, 0 (an empty text) when there is none or it does
+// not fit in `capacity` - 1 bytes. It may hold "%1" where Windows would name the program.
+unsigned long describe_error(unsigned long code, char* out, unsigned long capacity) noexcept;
 #endif
 
 } // namespace gs

@@ -158,7 +158,8 @@ ProcessResult run_process(wchar_t* command_line, const wchar_t* work_dir, unsign
     SECURITY_ATTRIBUTES inheritable{sizeof inheritable, nullptr, TRUE};
 
     HANDLE read = nullptr, write = nullptr;
-    if (!CreatePipe(&read, &write, &inheritable, 0))
+    // 64 KB rather than the default page: a compiler that prints a lot waits less for us to read it.
+    if (!CreatePipe(&read, &write, &inheritable, 64 * 1024))
         return {ProcessStatus::StartFailed, GetLastError()};
     Handle pipe_read(read), pipe_write(write);
     SetHandleInformation(pipe_read.get(), HANDLE_FLAG_INHERIT, 0);   // only the child's end is inherited
@@ -204,7 +205,11 @@ ProcessResult run_process(wchar_t* command_line, const wchar_t* work_dir, unsign
     pipe_write.reset();   // ours is closed, so the pipe ends with the program
 
     bool in_job = job.valid() && AssignProcessToJobObject(job.get(), process.get());
-    ResumeThread(thread.get());
+    if (ResumeThread(thread.get()) == static_cast<DWORD>(-1)) {
+        const DWORD error = GetLastError();
+        TerminateProcess(process.get(), 1);
+        return {ProcessStatus::StartFailed, error};
+    }
 
     auto stop = [&] {
         if (in_job)
@@ -233,8 +238,44 @@ ProcessResult run_process(wchar_t* command_line, const wchar_t* work_dir, unsign
     }
 
     DWORD code = 0;
-    GetExitCodeProcess(process.get(), &code);
+    if (!GetExitCodeProcess(process.get(), &code))
+        return {ProcessStatus::StartFailed, GetLastError()};
     return {ProcessStatus::Exited, code};
+}
+
+unsigned long ansi_to_utf8(const char* text, unsigned long size, char* out, unsigned long capacity) noexcept
+{
+    if (size == 0)
+        return 0;
+    const int wide = MultiByteToWideChar(CP_ACP, 0, text, static_cast<int>(size), nullptr, 0);
+    if (wide <= 0)
+        return 0;
+    wchar_t* buffer = static_cast<wchar_t*>(HeapAlloc(GetProcessHeap(), 0, static_cast<SIZE_T>(wide) * sizeof(wchar_t)));
+    if (!buffer)
+        return 0;
+    MultiByteToWideChar(CP_ACP, 0, text, static_cast<int>(size), buffer, wide);
+    const int bytes = WideCharToMultiByte(CP_UTF8, 0, buffer, wide, out, out ? static_cast<int>(capacity) : 0, nullptr, nullptr);
+    HeapFree(GetProcessHeap(), 0, buffer);
+    return bytes > 0 ? static_cast<unsigned long>(bytes) : 0;
+}
+
+unsigned long describe_error(unsigned long code, char* out, unsigned long capacity) noexcept
+{
+    if (capacity == 0)
+        return 0;
+    wchar_t text[512];
+    DWORD length = FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, code, 0, text,
+                                  sizeof text / sizeof text[0], nullptr);
+    while (length > 0 && (text[length - 1] == L'\n' || text[length - 1] == L'\r' || text[length - 1] == L' ' ||
+                          text[length - 1] == L'.'))
+        --length;
+    int bytes = length > 0 ? WideCharToMultiByte(CP_UTF8, 0, text, static_cast<int>(length), out,
+                                                 static_cast<int>(capacity - 1), nullptr, nullptr)
+                           : 0;
+    if (bytes < 0)
+        bytes = 0;
+    out[bytes] = '\0';
+    return static_cast<unsigned long>(bytes);
 }
 
 } // namespace gs
