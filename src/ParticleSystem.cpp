@@ -67,6 +67,37 @@ std::uint64_t seed_of(int seed)
     return kParticleSeed ^ (static_cast<std::uint64_t>(static_cast<std::uint32_t>(seed)) * 0x9E3779B97F4A7C15ull);
 }
 
+// The random numbers of one particle, in the order they have always been drawn. Effects made with
+// one seed drew them all from one sequence; now the values of the system come from the sequence of
+// the system seed and those of the particle from that of the particle seed, so equal seeds give the
+// effect one seed gave, and each seed changes only its own side.
+struct ParticleDraws {
+    double direction, speed_jitter, burst_jitter, radius_draw, height;   // system: how it leaves
+    Vec3 spin_jitter;                                                     // particle
+    Vec2 turb_freq, turb_phase;                                           // system: its wobble
+
+    explicit ParticleDraws(ParticleRng& rng)
+        : direction(rng.unit()), speed_jitter(rng.signed_unit()), burst_jitter(rng.signed_unit()), radius_draw(rng.unit()),
+          height(rng.signed_unit())
+    {
+        spin_jitter.x = rng.signed_unit();
+        spin_jitter.y = rng.signed_unit();
+        spin_jitter.z = rng.signed_unit();
+        turb_freq.x = 3.0 + rng.signed_unit() * 2.0;
+        turb_freq.y = 2.0 + rng.signed_unit() * 2.0;
+        turb_phase.x = rng.unit() * 2.0 * kPi;
+        turb_phase.y = rng.unit() * 2.0 * kPi;
+    }
+};
+
+// The draws added later, from a sequence of their own so the ones above stayed the same.
+struct VarianceDraws {
+    double lifespan;   // system
+    double size;       // particle
+
+    explicit VarianceDraws(ParticleRng& rng) : lifespan(rng.unit()), size(rng.signed_unit()) {}
+};
+
 } // namespace
 
 ParticleSystem::ParticleSystem(const Settings& settings) : settings_(validated(settings))
@@ -112,27 +143,22 @@ ParticleSystem::ParticleSystem(const Settings& settings) : settings_(validated(s
 
     // Deterministic pseudo-random seeds: the same settings always give the same effect.
     particles_.reserve(num_particles);
-    ParticleRng rng(seed_of(s.seed));
-    // The draws that were added later come from a stream of their own, so the original ones are the
-    // same as before and every effect made without them still looks the same.
-    ParticleRng extra(seed_of(s.seed) ^ kVarianceStream);
+    ParticleRng system_rng(seed_of(s.system_seed)), particle_rng(seed_of(s.particle_seed));
+    ParticleRng system_extra(seed_of(s.system_seed) ^ kVarianceStream), particle_extra(seed_of(s.particle_seed) ^ kVarianceStream);
     const double angle_rad = radians(s.emission_angle);
     for (int i = 0; i < num_particles; ++i) {
         Particle p;
 
         // The same draws in the same order for every particle, so a particle's
         // values do not depend on how many particles there are.
-        const double direction = rng.unit();
-        const double speed_jitter = rng.signed_unit();
-        const double burst_jitter = rng.signed_unit();
-        const double radius_draw = rng.unit();
+        const ParticleDraws system(system_rng), own(particle_rng);
+        const VarianceDraws system_variance(system_extra), own_variance(particle_extra);
+        const double direction = system.direction;
+        const double speed_jitter = system.speed_jitter;
+        const double burst_jitter = system.burst_jitter;
+        const double radius_draw = system.radius_draw;
         const double radius = std::sqrt(radius_draw);   // uniform over the disk's area
-        const double height = rng.signed_unit();
-        const double rot_jitter_x = rng.signed_unit();
-        const double rot_jitter_y = rng.signed_unit();
-        const double rot_jitter_z = rng.signed_unit();
-        const Vec2 turb_freq{3.0 + rng.signed_unit() * 2.0, 2.0 + rng.signed_unit() * 2.0};
-        const Vec2 turb_phase{rng.unit() * 2.0 * kPi, rng.unit() * 2.0 * kPi};
+        const double height = system.height;
 
         // Births are evenly spaced over the loop for a steady flow; a one-shot effect is born in a burst.
         const double phase = s.loop ? static_cast<double>(i + 1) / num_particles : 0.0;
@@ -197,19 +223,19 @@ ParticleSystem::ParticleSystem(const Settings& settings) : settings_(validated(s
         p.spawn = spawn;
         p.velocity = vel;
         p.phase_offset = phase;
-        p.spin = {radians(s.particle_spin.x) + radians(s.spin_spread) * rot_jitter_x,
-                  radians(s.particle_spin.y) + radians(s.spin_spread) * rot_jitter_y,
-                  radians(s.particle_spin.z) + radians(s.spin_spread) * rot_jitter_z};
-        p.turb_freq = turb_freq;
-        p.turb_phase = turb_phase;
-        p.lifespan = std::max(s.lifespan * (1.0 - s.lifespan_variance * extra.unit()), kMinLifespan);
-        p.size = 1.0 + s.size_variance * extra.signed_unit();
+        p.spin = {radians(s.particle_spin.x) + radians(s.spin_spread) * own.spin_jitter.x,
+                  radians(s.particle_spin.y) + radians(s.spin_spread) * own.spin_jitter.y,
+                  radians(s.particle_spin.z) + radians(s.spin_spread) * own.spin_jitter.z};
+        p.turb_freq = system.turb_freq;
+        p.turb_phase = system.turb_phase;
+        p.lifespan = std::max(s.lifespan * (1.0 - s.lifespan_variance * system_variance.lifespan), kMinLifespan);
+        p.size = 1.0 + s.size_variance * own_variance.size;
         particles_.push_back(p);
     }
 
     // Clusters: each particle carries several copies of the quads, each moved and turned at random.
     if (s.cluster_size > 1 && !vertex_bones) {
-        ParticleRng cluster(seed_of(s.seed) ^ kClusterStream);
+        ParticleRng cluster(seed_of(s.particle_seed) ^ kClusterStream);
         cluster_quads_.resize(particles_.size());
         for (std::vector<Quad>& quads : cluster_quads_) {
             quads.reserve(quads_.size() * static_cast<std::size_t>(s.cluster_size));

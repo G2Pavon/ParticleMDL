@@ -108,7 +108,7 @@ TEST_CASE("a cluster of radius 0 puts every copy at the particle, still turned")
     CHECK(normals.size() > 6);
 }
 
-TEST_CASE("a cluster is the same every time and another with another seed")
+TEST_CASE("a cluster is the same every time and another with another particle seed")
 {
     Settings s = clustered(5, 4, 30);
     const ParticleSystem a(s), b(s);
@@ -116,9 +116,15 @@ TEST_CASE("a cluster is the same every time and another with another seed")
         for (std::size_t q = 0; q < a.quads_of(i).size(); ++q)
             CHECK(centroid(a.quads_of(i)[q]) == centroid(b.quads_of(i)[q]));
 
-    s.seed = 5;
+    s.particle_seed = 5;
     const ParticleSystem other(s);
     CHECK_FALSE(centroid(a.quads_of(0)[0]) == centroid(other.quads_of(0)[0]));
+
+    // The system seed moves the particles, not the copies on them.
+    s.particle_seed = 0;
+    s.system_seed = 5;
+    const ParticleSystem moved(s);
+    CHECK(centroid(a.quads_of(0)[0]) == centroid(moved.quads_of(0)[0]));
 }
 
 TEST_CASE("a cluster does not change how the particles move")

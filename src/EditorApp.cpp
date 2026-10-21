@@ -597,6 +597,10 @@ void EditorApp::draw_left_panel()
 
     Settings& s = settings_;
     bool changed = false;
+    changed |= seed_input("system_seed", "System Seed", s.system_seed,
+                          "Random numbers of the system: where each particle starts, the direction and speed it\n"
+                          "leaves with, its turbulence and its lifespan variance. 0 is the original effect; another\n"
+                          "number gives other values with the same settings.");
     group_label("Animation");
     changed |= reset_slider("count", "Particle Count", s.count, 1, max_particles(s.geometry, s.scale_mode), 64,
                             ImGuiSliderFlags_AlwaysClamp);
@@ -605,16 +609,6 @@ void EditorApp::draw_left_panel()
     changed |= reset_slider("lifespan_variance", "Lifespan Variance", s.lifespan_variance, 0.0, 0.9, 0.0, "%.2f");
     ImGui::SetItemTooltip("Each particle lives up to this fraction shorter than the lifespan, at random");
     changed |= reset_slider("fps", "FPS", s.fps, kMinFps, kMaxFps, 30, ImGuiSliderFlags_AlwaysClamp);
-    {
-        ImGui::SetNextItemWidth(ui::px(-150));
-        changed |= ImGui::InputInt("Random Seed", &s.seed, 0, 0);
-        ImGui::SetItemTooltip("Which random numbers the particles use. 0 is the original effect; another number gives\na different one with the same settings.");
-        ImGui::SameLine();
-        if (ImGui::Button("New##seed", ImVec2(ui::px(60), 0))) {
-            s.seed = static_cast<int>(static_cast<unsigned>(ImGui::GetTime() * 1000.0) & 0x7FFFFFFFu);
-            changed = true;
-        }
-    }
     changed |= enum_combo("End Behavior", s.end_behavior);
     ImGui::SetItemTooltip("What a particle does after its lifespan:\n"
                           "Drop Through Floor: falls, then hides below the effect\n"
@@ -770,6 +764,11 @@ void EditorApp::draw_right_panel()
 
     Settings& s = settings_;
     bool changed = false;
+    changed |= seed_input("particle_seed", "Particle Seed", s.particle_seed,
+                          "Random numbers of the particles: their spin spread, their size variance and where the\n"
+                          "copies of a cluster sit and how they are turned. 0 is the original effect; another\n"
+                          "number gives other values with the same settings.");
+    ImGui::Dummy(ImVec2(0, ui::px(5)));
     ImGui::Image(renderer_.swatch(), ImVec2(ui::px(PreviewRenderer::kSwatchSize), ui::px(PreviewRenderer::kSwatchSize)));
     ImGui::Dummy(ImVec2(0, ui::px(10)));
 

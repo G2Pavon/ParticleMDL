@@ -239,7 +239,7 @@ std::vector<std::string> apply_json(Settings& s, const json& j)
 
     Warnings w;
     for (const auto& item : j.items()) {
-        if (is_known_key(item.key()))
+        if (is_known_key(item.key()) || item.key() == "seed")   // "seed": the one seed of earlier files, below
             continue;
         const auto retired = std::ranges::find(retired_keys(), item.key(), &RetiredKey::key);
         if (retired == retired_keys().end())
@@ -263,6 +263,17 @@ std::vector<std::string> apply_json(Settings& s, const json& j)
         else
             warn_bad_value(w, key, describe<T>(), *it);
     });
+    // Files saved before there were two seeds had one for both: keep that look.
+    if (const auto it = j.find("seed"); it != j.end()) {
+        if (const std::optional<int> seed = parse<int>(*it)) {
+            if (!j.contains("system_seed"))
+                s.system_seed = *seed;
+            if (!j.contains("particle_seed"))
+                s.particle_seed = *seed;
+        } else {
+            warn_bad_value(w, "seed", describe<int>(), *it);
+        }
+    }
     // Files saved before depth existed had one width for X and Y: keep that look.
     if (!j.contains("volume_depth") && j.contains("volume_width"))
         s.volume_depth = s.volume_width;

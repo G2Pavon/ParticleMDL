@@ -38,25 +38,135 @@ bool same_particles(const ParticleSystem& a, const ParticleSystem& b)
 
 } // namespace
 
-TEST_CASE("the seed 0 is the original sequence and another seed gives another effect")
+TEST_CASE("the seeds 0 are the original sequence and another system seed gives another effect")
 {
     const ParticleSystem zero(base());
     Settings s = base();
-    s.seed = 0;
+    s.system_seed = 0;
     CHECK(same_particles(zero, ParticleSystem(s)));
 
-    s.seed = 1;
+    s.system_seed = 1;
     const ParticleSystem one(s);
-    s.seed = 2;
+    s.system_seed = 2;
     const ParticleSystem two(s);
     CHECK_FALSE(same_particles(zero, one));
     CHECK_FALSE(same_particles(one, two));
 
-    s.seed = 1;
+    s.system_seed = 1;
     CHECK(same_particles(one, ParticleSystem(s)));   // and the same seed is the same effect
-    s.seed = -5;
+    s.system_seed = -5;
     CHECK(same_particles(ParticleSystem(s), ParticleSystem(s)));
     CHECK_FALSE(same_particles(zero, ParticleSystem(s)));
+}
+
+namespace {
+
+// Everything random in an effect with every random setting in use.
+Settings everything_random()
+{
+    Settings s = base();
+    s.count = 10;
+    s.spawn_radius = 40;
+    s.spawn_height = 20;
+    s.turbulence = 30;
+    s.lifespan_variance = 0.5;
+    s.size_variance = 0.5;
+    s.spin_spread = 90;
+    s.cluster_size = 3;
+    return s;
+}
+
+bool same_system_values(const Particle& a, const Particle& b)
+{
+    return a.spawn == b.spawn && a.velocity == b.velocity && a.turb_freq == b.turb_freq && a.turb_phase == b.turb_phase &&
+           a.lifespan == b.lifespan;
+}
+
+bool same_particle_values(const ParticleSystem& a, const ParticleSystem& b, int i)
+{
+    const Particle& pa = a.particles()[static_cast<std::size_t>(i)];
+    const Particle& pb = b.particles()[static_cast<std::size_t>(i)];
+    return pa.spin == pb.spin && pa.size == pb.size && a.quads_of(i)[1][0].pos == b.quads_of(i)[1][0].pos;
+}
+
+} // namespace
+
+TEST_CASE("each seed changes all of its own values and none of the other's")
+{
+    const Settings s = everything_random();
+    Settings system = s, particle = s;
+    system.system_seed = 12;
+    particle.particle_seed = 12;
+    const ParticleSystem original(s), new_system(system), new_particle(particle);
+    for (int i = 0; i < original.num_particles(); ++i) {
+        CAPTURE(i);
+        const Particle& o = original.particles()[static_cast<std::size_t>(i)];
+        const Particle& by_system = new_system.particles()[static_cast<std::size_t>(i)];
+        const Particle& by_particle = new_particle.particles()[static_cast<std::size_t>(i)];
+
+        // The system seed: where it starts, how it leaves, its wobble and its lifespan.
+        CHECK(o.spawn != by_system.spawn);
+        CHECK(o.velocity != by_system.velocity);
+        CHECK(o.turb_freq != by_system.turb_freq);
+        CHECK(o.turb_phase != by_system.turb_phase);
+        CHECK(o.lifespan != by_system.lifespan);
+        CHECK(same_particle_values(original, new_system, i));
+
+        // The particle seed: its spin, its size and its cluster copies.
+        CHECK(o.spin != by_particle.spin);
+        CHECK(o.size != by_particle.size);
+        CHECK(original.quads_of(i)[1][0].pos != new_particle.quads_of(i)[1][0].pos);
+        CHECK(same_system_values(o, by_particle));
+    }
+}
+
+TEST_CASE("a file with the one seed of earlier versions loads as both seeds and looks as it did")
+{
+    nlohmann::json j = to_json(everything_random());
+    j.erase("system_seed");
+    j.erase("particle_seed");
+    j["seed"] = 7;
+    const SettingsLoad loaded = settings_from_json(j, Settings{});
+    CHECK(loaded.warnings.empty());
+    CHECK(loaded.settings.system_seed == 7);
+    CHECK(loaded.settings.particle_seed == 7);
+
+    // What the version with one seed made of particle 3 with seed 7.
+    const ParticleSystem sys(loaded.settings);
+    const Particle& p = sys.particles()[3];
+    auto near = [](double a, double b) { return std::abs(a - b) <= 1e-12 * std::max(1.0, std::abs(b)); };
+    CHECK(near(p.spawn.x, 33.680566633424377));
+    CHECK(near(p.spawn.y, -8.4689434978300202));
+    CHECK(near(p.spawn.z, -17.175807339266544));
+    CHECK(near(p.velocity.x, 29.866982699382984));
+    CHECK(near(p.velocity.y, -7.5100217785743366));
+    CHECK(near(p.velocity.z, 110.76699480938495));
+    CHECK(near(p.spin.x, 0.46143450912463652));
+    CHECK(near(p.spin.y, -0.768192327912534));
+    CHECK(near(p.spin.z, 0.1975449806232836));
+    CHECK(near(p.lifespan, 0.74065900702745646));
+    CHECK(near(p.size, 1.4465141716372238));
+    CHECK(near(p.turb_freq.x, 4.1475610091328878));
+    CHECK(near(p.turb_freq.y, 0.97806624634938188));
+    CHECK(near(p.turb_phase.x, 5.0670325506005653));
+    CHECK(near(p.turb_phase.y, 3.6666806471443754));
+    const Vec3 corner = sys.quads_of(3)[1][0].pos;
+    CHECK(near(corner.x, 17.285011666652732));
+    CHECK(near(corner.y, 1.2270060721715923));
+    CHECK(near(corner.z, 3.8529686511616319));
+
+    // A file that has the two seeds keeps them, whatever an old key says.
+    j["system_seed"] = 3;
+    j["particle_seed"] = 4;
+    const Settings both = settings_from_json(j, Settings{}).settings;
+    CHECK(both.system_seed == 3);
+    CHECK(both.particle_seed == 4);
+
+    j["seed"] = "seven";
+    j.erase("system_seed");
+    const SettingsLoad bad = settings_from_json(j, Settings{});
+    REQUIRE(bad.warnings.size() == 1);
+    CHECK(bad.warnings[0].starts_with("seed: expected"));
 }
 
 TEST_CASE("a particle does not depend on how many there are when the seed is the same")
@@ -64,7 +174,8 @@ TEST_CASE("a particle does not depend on how many there are when the seed is the
     Settings few = base(), many = base();
     few.count = 5;
     many.count = 30;
-    few.seed = many.seed = 9;
+    few.system_seed = many.system_seed = 9;
+    few.particle_seed = many.particle_seed = 4;
     const ParticleSystem a(few), b(many);
     for (std::size_t i = 0; i < a.particles().size(); ++i)
         CHECK(a.particles()[i].velocity == b.particles()[i].velocity);
@@ -265,21 +376,24 @@ TEST_CASE("drag with gravity reaches a terminal speed of gravity over drag")
 TEST_CASE("the new settings are saved, validated and absent from old files")
 {
     Settings s;
-    s.seed = 77;
+    s.system_seed = 77;
+    s.particle_seed = 78;
     s.lifespan_variance = 0.3;
     s.size_variance = 0.2;
     s.drag = 1.5;
     const SettingsLoad back = settings_from_json(nlohmann::json::parse(settings_file_text(s)), Settings{});
-    CHECK(back.settings.seed == 77);
+    CHECK(back.settings.system_seed == 77);
+    CHECK(back.settings.particle_seed == 78);
     CHECK(back.settings.lifespan_variance == 0.3);
     CHECK(back.settings.size_variance == 0.2);
     CHECK(back.settings.drag == 1.5);
 
     nlohmann::json old = to_json(Settings{});
-    for (const char* key : {"seed", "lifespan_variance", "size_variance", "drag"})
+    for (const char* key : {"system_seed", "particle_seed", "lifespan_variance", "size_variance", "drag"})
         old.erase(key);
     const Settings loaded = settings_from_json(old, Settings{}).settings;
-    CHECK(loaded.seed == 0);
+    CHECK(loaded.system_seed == 0);
+    CHECK(loaded.particle_seed == 0);
     CHECK(loaded.drag == 0.0);
 
     Settings wild;
@@ -300,7 +414,8 @@ TEST_CASE("variance keeps the effect inside the limits and free of drawn jumps")
     s.lifespan_variance = 0.6;
     s.size_variance = 0.5;
     s.drag = 1.0;
-    s.seed = 31;
+    s.system_seed = 31;
+    s.particle_seed = 32;
     const ParticleSystem sys(s);
     CHECK(analyze_export(sys).blockers.empty());
 

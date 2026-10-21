@@ -64,6 +64,21 @@ bool reset_slider(const char* id, const char* label, double& v, double vmin, dou
     return changed;
 }
 
+bool seed_input(const char* id, const char* label, int& seed, const char* tooltip)
+{
+    ImGui::PushID(id);
+    ImGui::SetNextItemWidth(px(-150));
+    bool changed = ImGui::InputInt(label, &seed, 0, 0);
+    ImGui::SetItemTooltip("%s", tooltip);
+    ImGui::SameLine();
+    if (ImGui::Button("New", ImVec2(px(60), 0))) {
+        seed = static_cast<int>(static_cast<unsigned>(ImGui::GetTime() * 1000.0) & 0x7FFFFFFFu);
+        changed = true;
+    }
+    ImGui::PopID();
+    return changed;
+}
+
 bool color_edit(const char* label, Rgb& c, ImGuiColorEditFlags flags)
 {
     float f[3] = {c.r / 255.f, c.g / 255.f, c.b / 255.f};

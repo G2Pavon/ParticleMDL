@@ -35,6 +35,9 @@ bool reset_slider(const char* id, const char* label, int& v, int vmin, int vmax,
 bool reset_slider(const char* id, const char* label, double& v, double vmin, double vmax, double def,
                   const char* format = "%.6g", ImGuiSliderFlags flags = 0);
 
+// A random seed: typed in, or a new one from the "New" button beside it. `id` keeps two of them apart.
+bool seed_input(const char* id, const char* label, int& seed, const char* tooltip);
+
 // Edits a 0..255 color. Does not set the item width.
 bool color_edit(const char* label, Rgb& c, ImGuiColorEditFlags flags = 0);
 

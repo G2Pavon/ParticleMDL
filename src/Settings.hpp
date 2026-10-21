@@ -54,7 +54,11 @@ struct Settings {
     // the duration (0: all at the start) and the sequence ends on its last frame.
     bool loop = true;
     double burst_window = 0;   // fraction of the duration, one-shot only
-    int seed = 0;                     // 0 is the original sequence; any other number gives another effect
+    // Which random numbers the effect uses: the system seed for where and how the particles leave,
+    // their wobble and their lifespans; the particle seed for their spin, size and cluster copies.
+    // 0 and 0 are the original effect; any other number gives other values for that side alone.
+    int system_seed = 0;
+    int particle_seed = 0;
     double lifespan_variance = 0;     // each particle lives up to this fraction shorter, at random
     double size_variance = 0;         // each particle is up to this fraction larger or smaller, at random
 
@@ -137,7 +141,8 @@ void for_each_field(S& s, F&& f)
     f("end_behavior", s.end_behavior);
     f("loop", s.loop);
     f("burst_window", s.burst_window);
-    f("seed", s.seed);
+    f("system_seed", s.system_seed);
+    f("particle_seed", s.particle_seed);
     f("lifespan_variance", s.lifespan_variance);
     f("size_variance", s.size_variance);
     f("volume_width", s.volume_width);
