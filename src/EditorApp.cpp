@@ -613,7 +613,8 @@ void EditorApp::draw_left_panel()
     Settings& s = settings_;
     bool changed = false;
     if (int seed = s.system_seed;
-        seed_input("system_seed", "System Seed", seed,
+        seed_input("system_seed", seed,
+                   "System seed (Seed picks a new one).\n"
                    "Varies the values of this panel that are in use by up to 25% each (not the FPS, nor the\n"
                    "choices), and picks where each particle starts, the direction and speed it leaves with, its\n"
                    "turbulence and its lifespan variance. 0 keeps the values as they were before any seed;\n"
@@ -786,7 +787,8 @@ void EditorApp::draw_right_panel()
     Settings& s = settings_;
     bool changed = false;
     if (int seed = s.particle_seed;
-        seed_input("particle_seed", "Particle Seed", seed,
+        seed_input("particle_seed", seed,
+                   "Particle seed (Seed picks a new one).\n"
                    "Varies the scaling, geometry and spin values of this panel that are in use by up to 25%\n"
                    "each (not the texture, nor the choices), and picks each particle's spin spread, its size\n"
                    "variance and where the copies of a cluster sit and how they are turned. 0 keeps the\n"

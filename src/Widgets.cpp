@@ -64,17 +64,19 @@ bool reset_slider(const char* id, const char* label, double& v, double vmin, dou
     return changed;
 }
 
-bool seed_input(const char* id, const char* label, int& seed, const char* tooltip)
+bool seed_input(const char* id, int& seed, const char* tooltip)
 {
     ImGui::PushID(id);
-    ImGui::SetNextItemWidth(px(-150));
-    bool changed = ImGui::InputInt(label, &seed, 0, 0);
+    const float button = px(60);
+    ImGui::SetNextItemWidth(-(button + ImGui::GetStyle().ItemSpacing.x));
+    bool changed = ImGui::InputInt("##seed", &seed, 0, 0);
     ImGui::SetItemTooltip("%s", tooltip);
     ImGui::SameLine();
-    if (ImGui::Button("New", ImVec2(px(60), 0))) {
+    if (ImGui::Button("Seed", ImVec2(button, 0))) {
         seed = static_cast<int>(static_cast<unsigned>(ImGui::GetTime() * 1000.0) & 0x7FFFFFFFu);
         changed = true;
     }
+    ImGui::SetItemTooltip("%s", tooltip);
     ImGui::PopID();
     return changed;
 }
