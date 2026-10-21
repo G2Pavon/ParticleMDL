@@ -38,6 +38,9 @@ constexpr int kMaxSequences = 8192;
 constexpr int kMaxTextures = 1024;
 constexpr int kMaxFrames = 65536;
 constexpr int kMaxBlends = 16;
+constexpr int kMaxBodyParts = 1024;
+constexpr int kMaxSkinFamilies = 1024;
+constexpr std::uintmax_t kMaxFileBytes = 256u << 20;
 constexpr std::size_t kMaxSteps = 100'000'000;   // run-length segments walked in one file
 
 class Bytes {
@@ -147,11 +150,21 @@ MdlSequence read_sequence(const Bytes& in, std::size_t at, int bones, std::size_
                 const std::uint8_t total = in.u8(p + 1, "animation values");
                 if (total == 0)
                     throw MdlError(std::format("an animation channel has a run of no frames (at byte {})", p));
+                // The engine reads the last stored value for the frames after it, and a run's header in place of
+                // a value that is not there.
+                if (valid == 0 || valid > total)
+                    throw MdlError(std::format("an animation channel has a run of {} frames with {} values (at byte {})",
+                                               total, valid, p));
                 const std::size_t values = static_cast<std::size_t>(valid) * 2;
                 in.require(p + 2, values, "animation values");
                 p += 2 + values;
                 covered += total;
             }
+            // studiomdl's runs cover the frames exactly. More is what a channel offset that did not fit in
+            // 16 bits and wrapped around looks like: the offset points at the wrong values.
+            if (covered != seq.frames)
+                throw MdlError(std::format("an animation channel covers {} frames, the sequence has {} (bone {}, channel {})",
+                                           covered, seq.frames, table % static_cast<std::size_t>(bones), channel));
             end = std::max(end, p);
         }
     }
@@ -209,13 +222,16 @@ MdlInfo read_mdl(std::span<const std::uint8_t> bytes)
         info.textures.push_back(std::move(tex));
     }
 
-    info.body_parts = checked_count(in, kOffNumBodyParts, kMaxSequences, "body parts");
-    info.skin_families = checked_count(in, kOffNumSkinFamilies, kMaxSequences, "skin families");
+    info.body_parts = checked_count(in, kOffNumBodyParts, kMaxBodyParts, "body parts");
+    info.skin_families = checked_count(in, kOffNumSkinFamilies, kMaxSkinFamilies, "skin families");
     return info;
 }
 
 MdlInfo read_mdl_file(const std::filesystem::path& path)
 {
+    std::error_code ec;
+    if (const std::uintmax_t size = std::filesystem::file_size(path, ec); !ec && size > kMaxFileBytes)
+        throw MdlError(std::format("{} is {} MB, too large for a model", to_utf8(path), size >> 20));
     std::ifstream file(path, std::ios::binary);
     if (!file)
         throw std::runtime_error("cannot read " + to_utf8(path));

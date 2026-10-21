@@ -225,6 +225,56 @@ TEST_CASE("inconsistent counts and offsets are refused")
           }).find("run of no frames") != std::string::npos);
 }
 
+namespace {
+
+// Where the first run of bone 1's first animated channel is in crossed_static.mdl.
+std::size_t first_run(const std::vector<std::uint8_t>& b)
+{
+    const std::size_t table = 3236 + 12;   // the animation starts at 3236; bone 1's offsets follow bone 0's
+    for (std::size_t c = 0; c < 6; ++c) {
+        const std::size_t at = table + c * 2;
+        if (const std::uint16_t off = static_cast<std::uint16_t>(b[at] | b[at + 1] << 8); off != 0)
+            return table + off;
+    }
+    FAIL("bone 1 has no animated channel");
+    return 0;
+}
+
+std::string error_of(const std::vector<std::uint8_t>& bytes)
+{
+    try {
+        read_mdl(bytes);
+    } catch (const MdlError& e) {
+        return e.what();
+    }
+    return {};
+}
+
+} // namespace
+
+TEST_CASE("runs that do not cover the frames exactly are refused")
+{
+    const std::vector<std::uint8_t> good = read_bytes(kFixtures / "crossed_static.mdl");
+    const std::size_t run = first_run(good);
+
+    // One frame too many: what a channel offset that wrapped around 16 bits leads to.
+    std::vector<std::uint8_t> longer = good;
+    ++longer[run + 1];
+    CHECK(error_of(longer).find("covers 32 frames, the sequence has 31") != std::string::npos);
+
+    // A run with no stored value would make the engine read the next run's header as a value.
+    std::vector<std::uint8_t> empty = good;
+    empty[run] = 0;
+    CHECK(error_of(empty).find("with 0 values") != std::string::npos);
+
+    // More values than frames.
+    std::vector<std::uint8_t> extra = good;
+    extra[run] = static_cast<std::uint8_t>(extra[run + 1] + 1);
+    CHECK(error_of(extra).find("values (at byte") != std::string::npos);
+
+    CHECK(error_of(good).empty());
+}
+
 TEST_CASE("a model cut anywhere inside what the reader reads is refused without reading outside the data")
 {
     const std::vector<std::uint8_t> good = read_bytes(kFixtures / "crossed_static.mdl");
