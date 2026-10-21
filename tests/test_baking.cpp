@@ -314,6 +314,26 @@ TEST_CASE("static endless loops warn about the jump that cannot be hidden")
     CHECK(analyze_export(ParticleSystem(hide)).warnings.empty());
 }
 
+TEST_CASE("a single hidden frame between lives makes the rise slant, and is warned about")
+{
+    auto slant_warnings = [](const ExportReport& r) {
+        return std::ranges::count_if(r.warnings, [](const std::string& w) { return w.find("at a slant") != std::string::npos; });
+    };
+    // 2 s at 15 fps: dead for 0.09 s, under 1.5 frames, so some particles have one hidden frame.
+    const ParticleSystem tight(moving(EndBehavior::HideUnderground, ScaleMode::Static, 0.955, 15));
+    CHECK(bake(tight).slanted_rise() > 6.0);
+    CHECK(slant_warnings(analyze_export(tight)) == 1);
+
+    // Dead for six frames: every rise is straight up.
+    const ParticleSystem roomy(moving(EndBehavior::HideUnderground, ScaleMode::Static, 0.8, 15));
+    CHECK(bake(roomy).slanted_rise() == doctest::Approx(0.0));
+    CHECK(slant_warnings(analyze_export(roomy)) == 0);
+
+    // Twice the frame rate gives the same particles a second hidden frame.
+    const ParticleSystem faster(moving(EndBehavior::HideUnderground, ScaleMode::Static, 0.955, 30));
+    CHECK(bake(faster).slanted_rise() == doctest::Approx(0.0));
+}
+
 TEST_CASE("particles whose lives are too short to be drawn are warned about")
 {
     // 1.6 frames of life: the collapse around birth and death leaves nothing to draw.

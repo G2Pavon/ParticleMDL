@@ -456,6 +456,10 @@ ExportReport analyze_export(const ParticleSystem& sys, const AnimationTable& tab
              (s.end_behavior == EndBehavior::EndlessLoop || s.end_behavior == EndBehavior::StopAndStay))
         r.warnings.push_back("Static quads cannot hide a respawn: each particle visibly jumps back to its start for one "
                              "frame. Vertex Bone scaling removes the jump.");
+    if (baked.slanted_rise() > std::max(s.quad_width, s.quad_height))
+        r.warnings.push_back("Some particles are hidden for only one frame between lives, so the quad comes up at a slant "
+                             "and slides along the floor as it reappears. Lower Lifespan or raise FPS to give it a "
+                             "second hidden frame.");
     return r;
 }
 

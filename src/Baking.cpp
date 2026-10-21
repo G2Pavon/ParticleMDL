@@ -149,6 +149,14 @@ BakedPoses bake(const ParticleSystem& sys)
             if (!b.at(f, i).visible && !dive && next < stored)
                 b.at_mut(f, i).rot = b.at(next, i).rot;
         }
+
+        for (int f = 0; f < stored; ++f) {
+            const int next = b.looping_ ? (f + 1) % stored : f + 1;
+            if (next < stored && !b.at(f, i).visible && b.at(next, i).visible) {
+                const Vec3 d = b.at(next, i).pos - b.at(f, i).pos;
+                b.slanted_rise_ = std::max(b.slanted_rise_, std::hypot(d.x, d.y));
+            }
+        }
     }
     return b;
 }

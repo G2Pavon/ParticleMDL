@@ -53,6 +53,11 @@ public:
     // jump that could not be hidden; 0 when there is none.
     double unhidden_jump() const noexcept { return unhidden_jump_; }
 
+    // Static quads that dive: largest sideways distance a quad travels in one frame as it rises
+    // into view. A rise is straight up unless the particle had a single hidden frame, which then
+    // sits below where it died, so the quad comes up at a slant and slides as it crosses the floor.
+    double slanted_rise() const noexcept { return slanted_rise_; }
+
 private:
     friend BakedPoses bake(const ParticleSystem& sys);
 
@@ -66,6 +71,7 @@ private:
     int particles_ = 0;
     double loop_ = 1.0;
     double unhidden_jump_ = 0.0;
+    double slanted_rise_ = 0.0;
     std::vector<ParticlePose> poses_;   // frame-major, stored_frames() frames
 };
 
