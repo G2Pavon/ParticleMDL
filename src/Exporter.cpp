@@ -462,6 +462,12 @@ std::vector<std::string> compare_with_export(const MdlInfo& mdl, const ParticleS
         }
     }
 
+    int vertices = 0;
+    for (const MdlModel& model : mdl.models)
+        vertices += model.vertices;
+    if (vertices != sys.vertex_count())
+        problems.push_back(std::format("the model has {} vertices, the export has {}", vertices, sys.vertex_count()));
+
     if (mdl.textures.size() != 1) {
         problems.push_back(std::format("the model has {} textures, the export has 1", mdl.textures.size()));
     } else {

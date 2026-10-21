@@ -79,6 +79,10 @@ TEST_CASE("a model compiled by studiomdl is read back")
     CHECK(m.textures[0].width == 64);
     CHECK(m.textures[0].height == 64);
     CHECK(m.body_parts == 1);
+    REQUIRE(m.models.size() == 1);
+    CHECK(m.models[0].name == "a1_ref");
+    CHECK(m.models[0].vertices == 160);   // 20 particles of two crossed quads: 8 corners each
+    CHECK(m.models[0].normals == 40);
 }
 
 TEST_CASE("corner bones of a vertex-bone model hang on their particle's bone")
@@ -135,6 +139,8 @@ TEST_CASE("compare_with_export names what differs")
     CHECK(mentions(problems_with([](Settings& s) { s.count = 21; }), "21 bones, the export has 22"));
     CHECK(mentions(problems_with([](Settings& s) { s.fps = 30; }), "frames"));
     CHECK(mentions(problems_with([](Settings& s) { s.duration = 3.0; }), "31 frames, the export has 46"));
+    CHECK(mentions(problems_with([](Settings& s) { s.geometry = Geometry::SingleQuad; }),
+                   "160 vertices, the export has 80"));
     CHECK(mentions(problems_with([](Settings& s) { s.texture.size = 128; }), "64 x 64, the export has 128 x 128"));
     // Spinning adds three rotation channels to every bone, so the animation is bigger than the model's.
     CHECK(mentions(problems_with([](Settings& s) { s.particle_spin = {10, 20, 30}; }), "bytes of animation values"));
@@ -341,6 +347,11 @@ TEST_CASE("a box with vertex bones compiles with shared corner bones")
     CHECK(m.bones[9].parent == 1);
     CHECK(m.bones[10].name == "p_10");
     CHECK(m.bones[10].parent == 0);
+
+    // studiomdl keeps a normal for each bone a face touches: three faces meet at each of the 8 corners.
+    REQUIRE(m.models.size() == 1);
+    CHECK(m.models[0].vertices == 14 * 8);
+    CHECK(m.models[0].normals == 14 * 24);
 
     const ParticleSystem sys(settings_of("box_vertex_bones"));
     CHECK(compare_with_export(m, sys).empty());

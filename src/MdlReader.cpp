@@ -19,6 +19,8 @@ constexpr std::size_t kBoneSize = 112;
 constexpr std::size_t kSeqDescSize = 176;
 constexpr std::size_t kTextureSize = 80;
 constexpr std::size_t kAnimOffsetsSize = 12;   // six 16-bit offsets per bone
+constexpr std::size_t kBodyPartSize = 76;
+constexpr std::size_t kModelSize = 112;
 
 // Header field offsets.
 constexpr std::size_t kOffId = 0, kOffVersion = 4, kOffName = 8, kOffLength = 72;
@@ -26,7 +28,10 @@ constexpr std::size_t kOffNumBones = 140, kOffBoneIndex = 144;
 constexpr std::size_t kOffNumSeq = 164, kOffSeqIndex = 168;
 constexpr std::size_t kOffNumTextures = 180, kOffTextureIndex = 184;
 constexpr std::size_t kOffNumSkinFamilies = 196;
-constexpr std::size_t kOffNumBodyParts = 204;
+constexpr std::size_t kOffNumBodyParts = 204, kOffBodyPartIndex = 208;
+// Body part and model field offsets.
+constexpr std::size_t kPartNumModels = 64, kPartModelIndex = 72;
+constexpr std::size_t kModelNumVerts = 80, kModelNumNorms = 92;
 // Sequence description field offsets.
 constexpr std::size_t kSeqFps = 32, kSeqFlags = 36, kSeqNumFrames = 56, kSeqNumBlends = 120, kSeqAnimIndex = 124,
                       kSeqGroup = 156;
@@ -39,6 +44,8 @@ constexpr int kMaxTextures = 1024;
 constexpr int kMaxFrames = 65536;
 constexpr int kMaxBlends = 16;
 constexpr int kMaxBodyParts = 1024;
+constexpr int kMaxModels = 1024;   // in one body part
+constexpr int kMaxVertices = 1 << 20;
 constexpr int kMaxSkinFamilies = 1024;
 constexpr std::uintmax_t kMaxFileBytes = 256u << 20;
 constexpr std::size_t kMaxSteps = 100'000'000;   // run-length segments walked in one file
@@ -223,6 +230,22 @@ MdlInfo read_mdl(std::span<const std::uint8_t> bytes)
     }
 
     info.body_parts = checked_count(in, kOffNumBodyParts, kMaxBodyParts, "body parts");
+    const std::size_t part_at = checked_index(in, kOffBodyPartIndex, "body parts");
+    in.require(part_at, static_cast<std::size_t>(info.body_parts) * kBodyPartSize, "body parts");
+    for (int i = 0; i < info.body_parts; ++i) {
+        const std::size_t at = part_at + static_cast<std::size_t>(i) * kBodyPartSize;
+        const int models = checked_count(in, at + kPartNumModels, kMaxModels, "models");
+        const std::size_t model_at = checked_index(in, at + kPartModelIndex, "models");
+        in.require(model_at, static_cast<std::size_t>(models) * kModelSize, "models");
+        for (int k = 0; k < models; ++k) {
+            const std::size_t m = model_at + static_cast<std::size_t>(k) * kModelSize;
+            MdlModel model;
+            model.name = in.name(m, 64, "model name");
+            model.vertices = checked_count(in, m + kModelNumVerts, kMaxVertices, "vertices");
+            model.normals = checked_count(in, m + kModelNumNorms, kMaxVertices, "normals");
+            info.models.push_back(std::move(model));
+        }
+    }
     info.skin_families = checked_count(in, kOffNumSkinFamilies, kMaxSkinFamilies, "skin families");
     return info;
 }

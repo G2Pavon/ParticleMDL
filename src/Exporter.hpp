@@ -103,7 +103,7 @@ private:
 };
 
 // What differs between a model studiomdl compiled and the export it was made from: bones,
-// frames, frame rate, loop flag, texture and the size of the animation. Empty when they agree.
+// frames, frame rate, loop flag, vertices, texture and the size of the animation. Empty when they agree.
 // A difference means the compiler read the files differently than expected; the one about
 // the animation size also says the 64 KB check may be off for this compiler.
 std::vector<std::string> compare_with_export(const MdlInfo& mdl, const ParticleSystem& sys);

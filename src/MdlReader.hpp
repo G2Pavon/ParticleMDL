@@ -42,6 +42,12 @@ struct MdlSequence {
     std::size_t value_bytes = 0;      // the run-length coded values after it
 };
 
+struct MdlModel {                     // one model of a body part: what studiomdl counted for it
+    std::string name;
+    int vertices = 0;
+    int normals = 0;
+};
+
 struct MdlInfo {
     int version = 0;
     std::string name;
@@ -50,6 +56,7 @@ struct MdlInfo {
     std::vector<MdlSequence> sequences;
     std::vector<MdlTexture> textures;
     int body_parts = 0;
+    std::vector<MdlModel> models;     // of every body part, in order
     int skin_families = 0;
 };
 
