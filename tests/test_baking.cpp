@@ -392,9 +392,8 @@ TEST_CASE("the exported animation is built from the baked frames")
     bool found = false;
     for (int f = 0; f < baked.steps() && !found; ++f)
         if (baked.at(f, 0).scale == 0.0) {
-            const Particle& p = sys.particles()[0];
             const Vec3 corner = sys.quads()[0][0].pos;
-            const auto& row = via_baked.at(f, ParticleSystem::corner_bone(p, 0));
+            const auto& row = via_baked.at(f, sys.bones().corner_bone(0, 0));
             CHECK(row[0] == doctest::Approx(-corner.y));
             CHECK(row[1] == doctest::Approx(corner.x));
             CHECK(row[2] == doctest::Approx(-corner.z));

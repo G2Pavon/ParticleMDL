@@ -1,0 +1,92 @@
+#include <doctest/doctest.h>
+
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <string>
+
+#include "BoneLayout.hpp"
+#include "Exporter.hpp"
+#include "MdlReader.hpp"
+#include "SettingsJson.hpp"
+
+using namespace gs;
+
+TEST_CASE("a static layout is the root and one bone per particle")
+{
+    const BoneLayout b(3, 0);
+    CHECK(b.count() == 4);
+    CHECK_FALSE(b.vertex_bones());
+    CHECK(b.particle_bone(0) == 1);
+    CHECK(b.particle_bone(2) == 3);
+    CHECK(b.parent(0) == -1);
+    for (int bone = 1; bone < 4; ++bone) {
+        CHECK(b.parent(bone) == 0);
+        CHECK(b.name(bone) == "p_" + std::to_string(bone));
+    }
+    CHECK(b.name(0) == "root");
+}
+
+TEST_CASE("with corner bones each particle's corners follow its own bone and hang on it")
+{
+    const BoneLayout b(2, 4);   // two single quads with vertex bones
+    CHECK(b.count() == 1 + 2 * 5);
+    CHECK(b.vertex_bones());
+    CHECK(b.particle_bone(0) == 1);
+    CHECK(b.corner_bone(0, 0) == 2);
+    CHECK(b.corner_bone(0, 3) == 5);
+    CHECK(b.particle_bone(1) == 6);
+    CHECK(b.corner_bone(1, 0) == 7);
+    CHECK(b.corner_bone(1, 3) == 10);
+
+    CHECK(b.parent(1) == 0);
+    CHECK(b.parent(6) == 0);
+    for (int c = 0; c < 4; ++c) {
+        CHECK(b.parent(b.corner_bone(0, c)) == 1);
+        CHECK(b.parent(b.corner_bone(1, c)) == 6);
+    }
+    CHECK(b.name(1) == "p_1");
+    CHECK(b.name(2) == "c_2");
+    CHECK(b.name(6) == "p_6");
+    CHECK(b.name(10) == "c_10");
+}
+
+TEST_CASE("the layout of a system agrees with bones_per_particle and the bone limit")
+{
+    for (const Geometry g : {Geometry::SingleQuad, Geometry::CrossedQuads, Geometry::TriPlanarQuads, Geometry::VolumetricBox})
+        for (const ScaleMode mode : {ScaleMode::Static, ScaleMode::VertexBone}) {
+            CAPTURE(enum_id(g));
+            CAPTURE(enum_id(mode));
+            Settings s;
+            s.geometry = g;
+            s.scale_mode = mode;
+            s.count = 126;   // as many as the bones allow
+            const ParticleSystem sys(s);
+            const BoneLayout& b = sys.bones();
+            CHECK(b.particles() == sys.num_particles());
+            CHECK(1 + b.corners_per_particle() == bones_per_particle(g, mode));
+            CHECK(b.count() == 1 + sys.num_particles() * bones_per_particle(g, mode));
+            CHECK(b.count() <= 1 + kMaxBones);   // studiomdl refuses 128
+            // The last particle's last bone is the last bone.
+            const int last = sys.num_particles() - 1;
+            CHECK((b.vertex_bones() ? b.corner_bone(last, b.corners_per_particle() - 1) : b.particle_bone(last)) ==
+                  b.count() - 1);
+        }
+}
+
+TEST_CASE("the bones of a compiled model are the layout's, in order")
+{
+    namespace fs = std::filesystem;
+    const fs::path fixtures = fs::path(GS_FIXTURE_DIR) / "real_mdl";
+    for (const char* name : {"crossed_static", "vertex_bones", "box_vertex_bones"}) {
+        CAPTURE(name);
+        const MdlInfo m = read_mdl_file(fixtures / (std::string(name) + ".mdl"));
+        const ParticleSystem sys(read_settings_file(fixtures / (std::string(name) + ".json"), Settings{}).settings);
+        const BoneLayout& b = sys.bones();
+        REQUIRE(static_cast<int>(m.bones.size()) == b.count());
+        for (int bone = 0; bone < b.count(); ++bone) {
+            CHECK(m.bones[static_cast<std::size_t>(bone)].name == b.name(bone));
+            CHECK(m.bones[static_cast<std::size_t>(bone)].parent == b.parent(bone));
+        }
+    }
+}

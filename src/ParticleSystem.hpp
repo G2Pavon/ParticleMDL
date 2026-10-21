@@ -3,6 +3,7 @@
 #include <array>
 #include <vector>
 
+#include "BoneLayout.hpp"
 #include "MathUtil.hpp"
 #include "Settings.hpp"
 
@@ -17,7 +18,6 @@ using Quad = std::array<QuadVertex, 4>;
 
 // One particle's seed values; trivially copyable.
 struct Particle {
-    int base_bone = 0;          // its corner bones (vertex bones) follow directly
     double phase_offset = 0;    // looping: birth time as a fraction of the loop
     double birth = 0;           // one-shot: when it starts, in seconds
     double lifespan = 1.0;      // fraction of the duration it lives
@@ -103,12 +103,15 @@ public:
     // Which of corners() the given vertex of the given quad is.
     int corner_of(int quad, int vertex) const noexcept { return corner_of_[static_cast<std::size_t>(quad)][static_cast<std::size_t>(vertex)]; }
     int num_particles() const noexcept { return static_cast<int>(particles_.size()); }
-    // Vertex-bone mode: bones that move each distinct quad corner, numbered right after
-    // the particle's own bone; 0 without vertex bones.
-    int corners_per_particle() const noexcept { return corners_per_particle_; }
-    static int corner_bone(const Particle& p, int corner) noexcept { return p.base_bone + 1 + corner; }
-    // Bones of the exported skeleton: the root (bone 0), then each particle's bone followed by its corner bones.
-    int bone_count() const noexcept { return 1 + num_particles() * (1 + corners_per_particle_); }
+    // The exported skeleton: the root, each particle's bone and, with vertex bones, one bone for
+    // each of corners() after it.
+    const BoneLayout& bones() const noexcept { return bones_; }
+    // The bone vertex `vertex` of quad `quad` of a particle hangs on: its corner's bone with vertex
+    // bones, else the particle's.
+    int vertex_bone(int particle, int quad, int vertex) const noexcept
+    {
+        return bones_.vertex_bones() ? bones_.corner_bone(particle, corner_of(quad, vertex)) : bones_.particle_bone(particle);
+    }
 
     double loop_duration() const noexcept { return settings_.duration; }
     double export_fps() const noexcept { return export_fps_; }
@@ -146,7 +149,7 @@ private:
     Settings settings_;
     Vec3 emit_rot_;
     bool has_micro_rotation_ = false;
-    int corners_per_particle_ = 0;
+    BoneLayout bones_;
     std::vector<Vec3> corners_;
     std::vector<std::array<int, 4>> corner_of_;   // per quad and vertex
     double export_fps_ = 30.0;

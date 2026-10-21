@@ -1,6 +1,7 @@
 #include "ParticleSystem.hpp"
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -104,8 +105,10 @@ ParticleSystem::ParticleSystem(const Settings& settings) : settings_(validated(s
     }
 
     const bool vertex_bones = s.scale_mode == ScaleMode::VertexBone;
-    corners_per_particle_ = vertex_bones ? static_cast<int>(corners_.size()) : 0;
     const int num_particles = std::min(s.count, kMaxBones / bones_per_particle(s.geometry, s.scale_mode));
+    bones_ = BoneLayout(num_particles, vertex_bones ? static_cast<int>(corners_.size()) : 0);
+    // bones_per_particle() is what the settings are checked with before there is a system.
+    assert(1 + bones_.corners_per_particle() == bones_per_particle(s.geometry, s.scale_mode));
 
     // Deterministic pseudo-random seeds: the same settings always give the same effect.
     particles_.reserve(num_particles);
@@ -113,12 +116,9 @@ ParticleSystem::ParticleSystem(const Settings& settings) : settings_(validated(s
     // The draws that were added later come from a stream of their own, so the original ones are the
     // same as before and every effect made without them still looks the same.
     ParticleRng extra(seed_of(s.seed) ^ kVarianceStream);
-    int current_bone_id = 1;
     const double angle_rad = radians(s.emission_angle);
     for (int i = 0; i < num_particles; ++i) {
         Particle p;
-        p.base_bone = current_bone_id;
-        current_bone_id += 1 + corners_per_particle_;
 
         // The same draws in the same order for every particle, so a particle's
         // values do not depend on how many particles there are.
@@ -285,7 +285,7 @@ int ParticleSystem::normal_count() const
         kept.clear();
         for (int qi = 0; qi < static_cast<int>(quads.size()); ++qi)
             for (int k = 0; k < 4; ++k) {
-                const int bone = corners_per_particle_ > 0 ? corner_of(qi, k) : 0;   // of this particle
+                const int bone = bones_.vertex_bones() ? corner_of(qi, k) : 0;   // which of this particle's bones
                 const Vec3 n = quads[static_cast<std::size_t>(qi)][static_cast<std::size_t>(k)].normal;
                 const bool known = std::ranges::any_of(kept, [&](const std::pair<int, Vec3>& e) {
                     return e.first == bone && e.second.x * n.x + e.second.y * n.y + e.second.z * n.z > same;

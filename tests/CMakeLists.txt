@@ -23,6 +23,7 @@ add_executable(particlemdl_tests
     test_one_shot.cpp
     test_randomness.cpp
     test_additive.cpp
+    test_bone_layout.cpp
     test_clusters.cpp
     test_align.cpp
     test_bounce.cpp

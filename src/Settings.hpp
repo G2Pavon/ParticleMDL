@@ -186,6 +186,8 @@ void for_each_field(S& s, F&& f)
 int quads_for(Geometry g) noexcept;
 // Distinct corner positions of a geometry. The six quads of a box share eight; the others share none.
 int corners_for(Geometry g) noexcept;
+// Bones of one particle: its own, and with vertex bones one for each corner. The settings are
+// checked with this before there is a system; ParticleSystem builds its BoneLayout to agree.
 int bones_per_particle(Geometry g, ScaleMode s) noexcept;
 int max_particles(Geometry g, ScaleMode s) noexcept;
 void enforce_bone_limits(Settings& s) noexcept;

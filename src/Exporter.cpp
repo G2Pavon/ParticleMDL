@@ -36,14 +36,10 @@ void emit(std::string& out, std::format_string<Args...> fmt, Args&&... args)
 
 void write_nodes(std::string& out, const ParticleSystem& sys)
 {
-    out += "version 1\nnodes\n  0 \"root\" -1\n";
-    for (const Particle& p : sys.particles()) {
-        emit(out, "  {} \"p_{}\" 0\n", p.base_bone, p.base_bone);
-        for (int c = 0; c < sys.corners_per_particle(); ++c) {
-            const int cb = ParticleSystem::corner_bone(p, c);
-            emit(out, "  {} \"c_{}\" {}\n", cb, cb, p.base_bone);
-        }
-    }
+    const BoneLayout& bones = sys.bones();
+    out += "version 1\nnodes\n";
+    for (int bone = 0; bone < bones.count(); ++bone)
+        emit(out, "  {} \"{}\" {}\n", bone, bones.name(bone), bones.parent(bone));
     out += "end\n";
 }
 
@@ -75,13 +71,9 @@ std::string make_ref_smd(const ParticleSystem& sys, const std::string& tex_ref)
     std::string out;
     out.reserve(quads * 4 * (tex_ref.size() + 1 + 3 * 80) + 4096);
     write_nodes(out, sys);
-    out += "skeleton\n  time 0\n    0 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000\n";
-    for (const Particle& p : sys.particles()) {
-        emit(out, "    {} 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000\n", p.base_bone);
-        for (int c = 0; c < sys.corners_per_particle(); ++c)
-            emit(out, "    {} 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000\n",
-                 ParticleSystem::corner_bone(p, c));
-    }
+    out += "skeleton\n  time 0\n";
+    for (int bone = 0; bone < sys.bones().count(); ++bone)
+        emit(out, "    {} 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000\n", bone);
     out += "end\ntriangles\n";
 
     // Pre-rotate by -90 deg around Z to cancel studiomdl's +90 deg: (x, y) -> (y, -x).
@@ -99,7 +91,7 @@ std::string make_ref_smd(const ParticleSystem& sys, const std::string& tex_ref)
         write_vertex(b2, v2);
     };
 
-    const bool vertex_bones = sys.corners_per_particle() > 0;
+    const bool vertex_bones = sys.bones().vertex_bones();
     const bool back_faces = sys.settings().double_sided && sys.settings().geometry != Geometry::VolumetricBox;
     for (int pi = 0; pi < sys.num_particles(); ++pi) {
         const Particle& p = sys.particles()[static_cast<std::size_t>(pi)];
@@ -109,10 +101,8 @@ std::string make_ref_smd(const ParticleSystem& sys, const std::string& tex_ref)
             const Quad& q = quads_of_p[static_cast<std::size_t>(qi)];
             // Each corner hangs on a bone of its own with vertex bones (quads that meet share it),
             // else on the particle's.
-            auto bone = [&](int k) {
-                return vertex_bones ? ParticleSystem::corner_bone(p, sys.corner_of(qi, k)) : p.base_bone;
-            };
-            const int b0 = bone(0), b1 = bone(1), b2 = bone(2), b3 = bone(3);
+            const int b0 = sys.vertex_bone(pi, qi, 0), b1 = sys.vertex_bone(pi, qi, 1), b2 = sys.vertex_bone(pi, qi, 2),
+                      b3 = sys.vertex_bone(pi, qi, 3);
 
             write_tri(b0, q[0], b1, q[1], b2, q[2]);
             write_tri(b0, q[0], b2, q[2], b3, q[3]);
@@ -211,21 +201,21 @@ AnimationTable animation_table(const ParticleSystem& sys, const BakedPoses& bake
 {
     AnimationTable t;
     t.frames = sys.export_frames();
-    t.bones = sys.bone_count();
+    const BoneLayout& bones = sys.bones();
+    t.bones = bones.count();
     t.values.assign(static_cast<std::size_t>(t.frames) * t.bones, {});   // root stays at zero
     for (int frame = 0; frame < t.frames; ++frame) {
         for (int i = 0; i < sys.num_particles(); ++i) {
-            const Particle& p = sys.particles()[static_cast<std::size_t>(i)];
             // Every bone in every frame: studiomdl puts a missing bone at the origin.
             const ParticlePose& pose = baked.at(frame, i);
             const Vec3 rot = sys.has_micro_rotation() ? studio_angles(pose.rot) : Vec3{};
             // Same -90 deg Z correction for translations as for the geometry.
-            t.values[static_cast<std::size_t>(frame) * t.bones + p.base_bone] = {pose.pos.y, -pose.pos.x, pose.pos.z,
-                                                                                rot.x, rot.y, rot.z};
+            t.values[static_cast<std::size_t>(frame) * t.bones + bones.particle_bone(i)] = {pose.pos.y, -pose.pos.x, pose.pos.z,
+                                                                                            rot.x, rot.y, rot.z};
             // Corner bones shift each corner so the quad appears scaled.
-            for (int corner = 0; corner < sys.corners_per_particle(); ++corner) {
+            for (int corner = 0; corner < bones.corners_per_particle(); ++corner) {
                 const Vec3 offset = sys.corners()[static_cast<std::size_t>(corner)] * (pose.scale - 1.0);
-                const int bone = ParticleSystem::corner_bone(p, corner);
+                const int bone = bones.corner_bone(i, corner);
                 t.values[static_cast<std::size_t>(frame) * t.bones + bone] = {offset.y, -offset.x, offset.z, 0.0, 0.0, 0.0};
             }
         }
@@ -377,7 +367,7 @@ namespace {
 void require_built_from(const ParticleSystem& sys, const BakedPoses& baked, const AnimationTable& table)
 {
     if (baked.particles() != sys.num_particles() || baked.steps() != sys.loop_steps() ||
-        baked.looping() != sys.looping() || table.frames != sys.export_frames() || table.bones != sys.bone_count() ||
+        baked.looping() != sys.looping() || table.frames != sys.export_frames() || table.bones != sys.bones().count() ||
         table.values.size() != static_cast<std::size_t>(table.frames) * static_cast<std::size_t>(table.bones))
         throw std::invalid_argument("the baked frames or the animation table were not built from this particle system");
 }
@@ -407,10 +397,10 @@ ExportReport analyze_export(const ParticleSystem& sys, const AnimationTable& tab
             "Animation data is {}: studiomdl accepts at most {} per sequence ({} frames x {} bones). "
             "Lower Particle Count, Duration or FPS.",
             kilobytes(r.sequence_bytes), kilobytes(kMaxSequenceBytes), r.frames, table.bones);
-        if (sys.corners_per_particle() > 0)
+        if (sys.bones().vertex_bones())
             message += std::format(" Vertex-bone scaling uses {} bones per particle: turning it off or using fewer "
                                    "quads saves the most.",
-                                   1 + sys.corners_per_particle());
+                                   1 + sys.bones().corners_per_particle());
         r.blockers.push_back({ExportBlocker::Kind::SequenceTooLarge, std::move(message)});
     }
     if (r.vertices > kMaxStudioVertices) {
@@ -467,8 +457,8 @@ ExportBlocked::ExportBlocked(std::vector<ExportBlocker> blockers)
 std::vector<std::string> compare_with_export(const MdlInfo& mdl, const ParticleSystem& sys)
 {
     std::vector<std::string> problems;
-    if (static_cast<int>(mdl.bones.size()) != sys.bone_count())
-        problems.push_back(std::format("the model has {} bones, the export has {}", mdl.bones.size(), sys.bone_count()));
+    if (static_cast<int>(mdl.bones.size()) != sys.bones().count())
+        problems.push_back(std::format("the model has {} bones, the export has {}", mdl.bones.size(), sys.bones().count()));
 
     if (mdl.sequences.size() != 1) {
         problems.push_back(std::format("the model has {} sequences, the export has 1", mdl.sequences.size()));

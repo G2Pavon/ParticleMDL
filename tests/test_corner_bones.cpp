@@ -38,7 +38,7 @@ TEST_CASE("the quads of a box share eight corners, the other geometries share no
         CAPTURE(enum_id(g));
         const ParticleSystem sys(with(g));
         CHECK(static_cast<int>(sys.corners().size()) == corners_for(g));
-        CHECK(sys.corners_per_particle() == corners_for(g));
+        CHECK(sys.bones().corners_per_particle() == corners_for(g));
     }
 }
 
@@ -95,13 +95,12 @@ TEST_CASE("the exported animation moves a shared corner by the same offset for e
     const AnimationTable table = animation_table(sys, baked);
     CHECK(table.bones == 1 + 3 * 9);
 
-    const Particle& p = sys.particles().front();
     for (int frame : {0, 10, 20}) {
         const double scale = baked.at(frame, 0).scale;
         for (int qi = 0; qi < static_cast<int>(sys.quads().size()); ++qi)
             for (int k = 0; k < 4; ++k) {
                 const Vec3 v = sys.quads()[static_cast<std::size_t>(qi)][static_cast<std::size_t>(k)].pos;
-                const auto& row = table.at(frame, ParticleSystem::corner_bone(p, sys.corner_of(qi, k)));
+                const auto& row = table.at(frame, sys.vertex_bone(0, qi, k));
                 // the SMD axes of the exporter: (y, -x, z)
                 CHECK(row[0] == doctest::Approx(v.y * (scale - 1.0)));
                 CHECK(row[1] == doctest::Approx(-v.x * (scale - 1.0)));
