@@ -29,13 +29,12 @@ void set_additive_blend(const ImDrawList*, const ImDrawCmd*)
 
 void PreviewRenderer::update_textures(const TextureSettings& s)
 {
-    set_texture(export_texture(s), s.blend);
+    set_texture(export_texture(s));
 }
 
-void PreviewRenderer::set_texture(const IndexedImage& image, BlendMode blend)
+void PreviewRenderer::set_texture(const IndexedImage& image)
 {
-    blend_ = blend;
-    game_.upload(expand_rgba(image));   // the transparent colour of a masked texture has alpha 0
+    game_.upload(to_rgba(expand(image)));
 }
 
 void PreviewRenderer::draw(ImDrawList* dl, ImVec2 origin, ImVec2 size, Rgb background, const Scene& scene) const
@@ -47,10 +46,8 @@ void PreviewRenderer::draw(ImDrawList* dl, ImVec2 origin, ImVec2 size, Rgb backg
     for (const SceneLine& l : scene.lines)
         dl->AddLine(to_imvec(l.a), to_imvec(l.b), to_imcol(l.color), ui::px(l.thickness));
 
-    // Additive adds the colour to the picture; the others are drawn over it, the transparent pixels of a
-    // masked texture having alpha 0.
-    if (blend_ == BlendMode::Additive)
-        dl->AddCallback(set_additive_blend, nullptr);
+    // Additive: the colour is added to the picture.
+    dl->AddCallback(set_additive_blend, nullptr);
     for (const SceneFace& f : scene.faces)
         dl->AddImageQuad(game_.imgui_id(), to_imvec(f.pts[0]), to_imvec(f.pts[1]), to_imvec(f.pts[2]),
                          to_imvec(f.pts[3]), to_imvec(f.uvs[0]), to_imvec(f.uvs[1]), to_imvec(f.uvs[2]),

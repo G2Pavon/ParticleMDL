@@ -13,7 +13,6 @@ enum class EndBehavior { DropThroughFloor, HideUnderground, HideInCore, StopAndS
 enum class TexPattern { RadialOrb, HollowRing, SharpStar, SoftCloud, FlowerPetals, Snowflake, RainDrop };
 enum class EmitterShape { Disk, Sphere, Hemisphere, Cone, Box, Line };
 enum class ColorMode { SolidColor, Gradient };
-enum class BlendMode { Additive, Masked, Solid };
 enum class ScaleMode { Static, VertexBone };
 
 // An enum value with its id in settings files and its label in the editor.
@@ -83,15 +82,6 @@ struct EnumTable<ColorMode> {
 };
 
 template <>
-struct EnumTable<BlendMode> {
-    static constexpr std::array names{
-        EnumName<BlendMode>{BlendMode::Additive, "additive", "Additive (glow)"},
-        EnumName<BlendMode>{BlendMode::Masked, "masked", "Masked (cut-out)"},
-        EnumName<BlendMode>{BlendMode::Solid, "solid", "Solid"},
-    };
-};
-
-template <>
 struct EnumTable<ScaleMode> {
     static constexpr std::array names{
         EnumName<ScaleMode>{ScaleMode::Static, "static", "Static"},
@@ -146,7 +136,6 @@ static_assert(table_in_declaration_order<EndBehavior>());
 static_assert(table_in_declaration_order<TexPattern>());
 static_assert(table_in_declaration_order<EmitterShape>());
 static_assert(table_in_declaration_order<ColorMode>());
-static_assert(table_in_declaration_order<BlendMode>());
 static_assert(table_in_declaration_order<ScaleMode>());
 
 } // namespace gs

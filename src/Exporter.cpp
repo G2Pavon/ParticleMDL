@@ -59,21 +59,8 @@ std::string make_qc(const ParticleSystem& sys, const BakedPoses& baked, const st
     emit(out, "$bbox {:.2f} {:.2f} {:.2f} {:.2f} {:.2f} {:.2f}\n\n", std::floor(b.min.x) - 1, std::floor(b.min.y) - 1,
          std::floor(b.min.z) - 1, std::ceil(b.max.x) + 1, std::ceil(b.max.y) + 1, std::ceil(b.max.z) + 1);
 
-    // How the game draws the texture: one line for each flag.
-    const TextureSettings& texture = sys.settings().texture;
-    bool any_flag = false;
-    auto render_mode = [&](const char* mode) {
-        emit(out, "$texrendermode \"{}\" {}\n", tex_ref, mode);
-        any_flag = true;
-    };
-    if (texture.blend == BlendMode::Additive)
-        render_mode("additive");
-    else if (texture.blend == BlendMode::Masked)
-        render_mode("masked");
-    if (texture.fullbright)
-        render_mode("fullbright");
-    if (any_flag)
-        out += "\n";
+    // The game adds the texture's colour to what is behind it.
+    emit(out, "$texrendermode \"{}\" additive\n\n", tex_ref);
     emit(out, "$body \"studio\" \"{}_ref\"\n\n", safe);
     emit(out, "$sequence \"idle\" \"{}_anim\"{} fps {}\n", safe, sys.looping() ? " loop" : "", static_cast<int>(sys.export_fps()));
     return out;
@@ -518,13 +505,8 @@ std::vector<std::string> compare_with_export(const MdlInfo& mdl, const ParticleS
         problems.push_back(std::format("the model has {} textures, the export has 1", mdl.textures.size()));
     } else {
         const MdlTexture& tex = mdl.textures.front();
-        const TextureSettings& texture = sys.settings().texture;
-        const int wanted = (texture.blend == BlendMode::Additive ? kMdlTextureAdditive : 0) |
-                           (texture.blend == BlendMode::Masked ? kMdlTextureMasked : 0) |
-                           (texture.fullbright ? kMdlTextureFullbright : 0);
-        const int mine = kMdlTextureAdditive | kMdlTextureMasked | kMdlTextureFullbright;
-        if ((tex.flags & mine) != wanted)
-            problems.push_back(std::format("the texture has the render flags {:#x}, the export asks for {:#x}", tex.flags & mine, wanted));
+        if ((tex.flags & kMdlTextureAdditive) == 0)
+            problems.push_back(std::format("the texture is not additive (render flags {:#x})", tex.flags));
         const int size = sys.settings().texture.size;
         if (tex.width != size || tex.height != size)
             problems.push_back(std::format("the texture is {} x {}, the export has {} x {}", tex.width, tex.height, size, size));

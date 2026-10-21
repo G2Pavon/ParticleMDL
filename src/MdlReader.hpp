@@ -13,11 +13,7 @@ namespace gs {
 // What can be read back from a compiled GoldSrc model (studio format, version 10): enough
 // to check what studiomdl made of an export. Not a full model reader.
 
-inline constexpr int kMdlTextureFlatShade = 0x0001;
-inline constexpr int kMdlTextureChrome = 0x0002;
-inline constexpr int kMdlTextureFullbright = 0x0004;
-inline constexpr int kMdlTextureAdditive = 0x0020;
-inline constexpr int kMdlTextureMasked = 0x0040;
+inline constexpr int kMdlTextureAdditive = 0x0020;   // the render flag ParticleMDL asks for
 inline constexpr int kMdlSequenceLooping = 0x0001;
 
 struct MdlBone {

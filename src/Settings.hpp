@@ -33,10 +33,7 @@ struct TextureSettings {
     int size = 64;
     double hardness = 0.8;
     std::string file{};   // imported image, a UTF-8 path; empty: the procedural pattern above
-    // How the game draws it: Additive adds the colour to what is behind (black is invisible), Masked
-    // draws the pixels that are not transparent (palette entry 255), Solid draws every pixel.
-    BlendMode blend = BlendMode::Additive;
-    bool fullbright = false;   // ignore the map's lighting: always shown at its own brightness
+    // The game draws it additively: its colour is added to what is behind, so black is invisible.
 
     friend bool operator==(const TextureSettings&, const TextureSettings&) = default;
 };
@@ -171,8 +168,6 @@ void for_each_field(S& s, F&& f)
     f("texture_size", s.texture.size);
     f("hardness", s.texture.hardness);
     f("texture_file", s.texture.file);
-    f("blend_mode", s.texture.blend);
-    f("fullbright", s.texture.fullbright);
     f("scale_mode", s.scale_mode);
     f("scale_start", s.scale_start);
     f("scale_end", s.scale_end);

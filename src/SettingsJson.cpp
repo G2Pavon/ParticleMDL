@@ -181,6 +181,23 @@ void warn_bad_value(Warnings& w, std::string_view key, std::string_view expected
     w.push_back(std::string(key) + ": expected " + std::string(expected) + ", got " + shown + " (ignored)");
 }
 
+// Settings that earlier versions had and this one does not: a file that holds the value every
+// export now has loads without a word, any other value with a warning that it is ignored.
+struct RetiredKey {
+    std::string_view key;
+    json kept;           // the value this version always uses
+    std::string_view why;
+};
+
+const std::vector<RetiredKey>& retired_keys()
+{
+    static const std::vector<RetiredKey> keys = {
+        {"blend_mode", "additive", "ParticleMDL draws particles additively only"},
+        {"fullbright", false, "ParticleMDL draws particles additively only, with the map's lighting"},
+    };
+    return keys;
+}
+
 bool is_known_key(std::string_view key)
 {
     static const std::vector<std::string_view> keys = [] {
@@ -221,9 +238,15 @@ std::vector<std::string> apply_json(Settings& s, const json& j)
         throw std::runtime_error("a settings file must contain a JSON object");
 
     Warnings w;
-    for (const auto& item : j.items())
-        if (!is_known_key(item.key()))
+    for (const auto& item : j.items()) {
+        if (is_known_key(item.key()))
+            continue;
+        const auto retired = std::ranges::find(retired_keys(), item.key(), &RetiredKey::key);
+        if (retired == retired_keys().end())
             w.push_back("unknown setting '" + item.key() + "' (ignored)");
+        else if (item.value() != retired->kept)
+            w.push_back(item.key() + " " + item.value().dump() + ": " + std::string(retired->why) + " (ignored)");
+    }
 
     for_each_field(s, [&](std::string_view key, auto& field) {
         using T = std::remove_cvref_t<decltype(field)>;

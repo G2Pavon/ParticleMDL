@@ -44,7 +44,7 @@ void put32(std::vector<std::uint8_t>& bytes, std::size_t at, std::uint32_t value
 }
 
 // Offsets of the header fields the tests patch.
-constexpr std::size_t kLength = 72, kNumBones = 140, kBoneIndex = 144, kSeqIndex = 168;
+constexpr std::size_t kLength = 72, kNumBones = 140, kBoneIndex = 144, kSeqIndex = 168, kTextureIndex = 184;
 
 } // namespace
 
@@ -372,22 +372,21 @@ TEST_CASE("a one-shot effect compiles to a sequence that does not loop")
     CHECK(m.sequences[0].value_bytes + 12 == sequence_bytes(sys));
 }
 
-TEST_CASE("a masked fullbright texture compiles with both render flags")
+TEST_CASE("a texture that is not additive is reported")
 {
-    const MdlInfo m = read_mdl(read_bytes(kFixtures / "masked_fullbright.mdl"));
-    REQUIRE(m.textures.size() == 1);
-    CHECK(m.textures[0].flags == (kMdlTextureMasked | kMdlTextureFullbright));
-    CHECK(describe_mdl(m).find("(masked, fullbright)") != std::string::npos);
+    std::vector<std::uint8_t> bytes = read_bytes(kFixtures / "crossed_static.mdl");
+    const MdlInfo good = read_mdl(bytes);
+    CHECK(good.textures[0].flags == kMdlTextureAdditive);
 
-    const ParticleSystem sys(settings_of("masked_fullbright"));
-    CHECK(compare_with_export(m, sys).empty());
+    // Clear the flags of the one texture: its description starts at the offset in the header.
+    const std::size_t textures = static_cast<std::size_t>(bytes[kTextureIndex]) | static_cast<std::size_t>(bytes[kTextureIndex + 1]) << 8 |
+                                 static_cast<std::size_t>(bytes[kTextureIndex + 2]) << 16;
+    put32(bytes, textures + 64, 0);
+    const MdlInfo plain = read_mdl(bytes);
+    CHECK(plain.textures[0].flags == 0);
+    CHECK(describe_mdl(plain).find("1 texture (not additive)") != std::string::npos);
 
-    // The same model asked for as an additive one differs in its render flags.
-    Settings additive = settings_of("masked_fullbright");
-    additive.texture.blend = BlendMode::Additive;
-    additive.texture.fullbright = false;
-    const std::vector<std::string> problems = compare_with_export(m, ParticleSystem(additive));
+    const std::vector<std::string> problems = compare_with_export(plain, ParticleSystem(settings_of("crossed_static")));
     REQUIRE(problems.size() == 1);
-    CHECK(problems[0].find("render flags 0x44") != std::string::npos);
-    CHECK(problems[0].find("asks for 0x20") != std::string::npos);
+    CHECK(problems[0] == "the texture is not additive (render flags 0x0)");
 }
