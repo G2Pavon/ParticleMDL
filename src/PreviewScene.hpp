@@ -33,7 +33,6 @@ struct SceneOptions {
     bool axes = true;
     bool bounds = true;
     bool emitter = true;   // where particles start and the directions they leave in
-    bool game_accurate = true;   // the baked frames, blended the way the engine plays them
 };
 
 // Preview display list: draw the lines first, then the faces in order.
@@ -49,8 +48,8 @@ struct Scene {
 std::array<Vec3, 8> bounds_corners(const ParticleSystem& sys, double time);
 
 // Projects grid, axes, volume bounds and every particle face at loop time
-// `time`: the particles from the baked frames with options.game_accurate, else
-// from the ideal motion. Reuses the storage of `out`.
+// `time`: the particles from the baked frames, blended the way the engine plays
+// them, so the preview shows what the game will. Reuses the storage of `out`.
 void build_scene(const ParticleSystem& sys, const BakedPoses& baked, const OrbitCamera& camera, double time,
                  Point2 center, const SceneOptions& options, Scene& out);
 

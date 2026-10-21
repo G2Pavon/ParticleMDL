@@ -205,7 +205,6 @@ TEST_CASE("the preview draws every copy")
     Scene scene;
     SceneOptions options;
     options.grid = options.axes = options.bounds = options.emitter = false;
-    options.game_accurate = false;
     build_scene(sys, baked, camera, 0.5, {0, 0}, options, scene);
     // double sided: no face is dropped for facing away
     CHECK(scene.faces.size() == 6 * 4);

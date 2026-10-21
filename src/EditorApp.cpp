@@ -696,12 +696,6 @@ void EditorApp::draw_middle_panel()
     ImGui::Checkbox("Bounds", &scene_options_.bounds);
     ImGui::SameLine();
     ImGui::Checkbox("Emitter", &scene_options_.emitter);
-    ImGui::SameLine();
-    ImGui::Checkbox("Game view", &scene_options_.game_accurate);
-    if (ImGui::BeginItemTooltip()) {
-        ImGui::TextUnformatted("Show the exported frames blended the way GoldSrc plays them,\nrespawn streaks included. Off: the ideal, smooth motion.");
-        ImGui::EndTooltip();
-    }
 
     const ImVec2 avail = ImGui::GetContentRegionAvail();
     draw_canvas(ImVec2(std::max(avail.x, 10.0f), std::max(avail.y - bottom_height_, 10.0f)));

@@ -502,19 +502,6 @@ TEST_CASE("slerp takes the short way round, also across a full turn")
     CHECK(length(same - rotate(c, {1, 2, 3})) < 1e-9);
 }
 
-TEST_CASE("to_sampled keeps the rotation of the ideal pose")
-{
-    ParticlePose pose;
-    pose.pos = {1, 2, 3};
-    pose.rot = {0.4, 5.9, 2.2};
-    pose.scale = 2.5;
-    const SampledPose s = to_sampled(pose);
-    const Vec3 expected = ParticleSystem::apply_static_rotation({1, 0, 0}, 0.4, 5.9, 2.2);
-    CHECK(length(rotate(s.rot, {1, 0, 0}) - expected) < 1e-9);
-    CHECK(s.pos == pose.pos);
-    CHECK(s.scale == 2.5);
-}
-
 // ---------------------------------------------------------------------------
 // Bounds
 // ---------------------------------------------------------------------------

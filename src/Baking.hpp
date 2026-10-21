@@ -77,9 +77,6 @@ private:
 
 BakedPoses bake(const ParticleSystem& sys);
 
-// The converted ideal pose, for code that treats both kinds the same way.
-SampledPose to_sampled(const ParticlePose& pose);
-
 // Smallest box around every quad corner of every particle in every exported
 // frame (hidden, parked particles included).
 ParticleSystem::Bounds animation_bounds(const ParticleSystem& sys, const BakedPoses& baked);

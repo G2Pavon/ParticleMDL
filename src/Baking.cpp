@@ -161,11 +161,6 @@ BakedPoses bake(const ParticleSystem& sys)
     return b;
 }
 
-SampledPose to_sampled(const ParticlePose& pose)
-{
-    return {pose.pos, quat_from_euler(pose.rot.x, pose.rot.y, pose.rot.z), pose.scale, pose.visible};
-}
-
 SampledPose BakedPoses::sample(int particle, double loop_time) const
 {
     // In a loop the time wraps; a one-shot sequence stops at its ends.

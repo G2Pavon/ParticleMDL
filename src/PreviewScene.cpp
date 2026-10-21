@@ -183,11 +183,11 @@ void add_emitter(Scene& out, const ParticleSystem& sys, const OrbitCamera& cam, 
         line({0, 0, -s.spawn_height}, {0, 0, s.spawn_height});
 }
 
-void add_particles(Scene& out, const ParticleSystem& sys, const BakedPoses& baked, bool game_accurate,
-                   const OrbitCamera& cam, double time, Point2 center)
+void add_particles(Scene& out, const ParticleSystem& sys, const BakedPoses& baked, const OrbitCamera& cam, double time,
+                   Point2 center)
 {
     for (int i = 0; i < sys.num_particles(); ++i) {
-        const SampledPose pose = game_accurate ? baked.sample(i, time) : to_sampled(sys.pose_at(sys.particles()[i], time));
+        const SampledPose pose = baked.sample(i, time);
         // A quad of no size (a collapsed vertex-bone quad) draws nothing.
         if (!pose.visible || pose.scale <= 0.0)
             continue;
@@ -259,7 +259,7 @@ void build_scene(const ParticleSystem& sys, const BakedPoses& baked, const Orbit
         add_bounds(out, sys, camera, time, center);
     if (options.emitter)
         add_emitter(out, sys, camera, time, center);
-    add_particles(out, sys, baked, options.game_accurate, camera, time, center);
+    add_particles(out, sys, baked, camera, time, center);
 }
 
 } // namespace gs
