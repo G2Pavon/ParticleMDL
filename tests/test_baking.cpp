@@ -295,6 +295,31 @@ TEST_CASE("static endless loops warn about the jump that cannot be hidden")
     CHECK(analyze_export(ParticleSystem(hide)).warnings.empty());
 }
 
+TEST_CASE("particles whose lives are too short to be drawn are warned about")
+{
+    // 1.6 frames of life: the collapse around birth and death leaves nothing to draw.
+    Settings s;
+    s.count = 20;
+    s.duration = 2.0;
+    s.fps = 10;
+    s.lifespan = 0.08;
+    s.geometry = Geometry::SingleQuad;
+    s.scale_mode = ScaleMode::VertexBone;
+    s.end_behavior = EndBehavior::HideInCore;
+    const ExportReport short_lives = analyze_export(ParticleSystem(s));
+    REQUIRE(short_lives.warnings.size() == 1);
+    CHECK(short_lives.warnings.front().find("20 of 20 particles are never drawn") != std::string::npos);
+    CHECK(short_lives.warnings.front().find("Vertex Bone") != std::string::npos);
+
+    // Three frames of life are enough.
+    Settings longer = s;
+    longer.lifespan = 0.15;
+    CHECK(analyze_export(ParticleSystem(longer)).warnings.empty());
+    Settings faster = s;
+    faster.fps = 20;
+    CHECK(analyze_export(ParticleSystem(faster)).warnings.empty());
+}
+
 // ---------------------------------------------------------------------------
 // The baked table and sampling
 // ---------------------------------------------------------------------------

@@ -421,6 +421,24 @@ ExportReport analyze_export(const ParticleSystem& sys, const AnimationTable& tab
         r.blockers.push_back({ExportBlocker::Kind::TooManyVertices, std::move(message)});
     }
 
+    // A particle drawn in none of the frames: with vertex bones the frames around a birth and a death
+    // are collapsed, so a life shorter than about two frames disappears.
+    int never_drawn = 0;
+    for (int i = 0; i < baked.particles(); ++i) {
+        bool drawn = false;
+        for (int f = 0; f < baked.stored_frames() && !drawn; ++f)
+            drawn = baked.at(f, i).visible && baked.at(f, i).scale > 0.0;
+        never_drawn += drawn ? 0 : 1;
+    }
+    if (never_drawn > 0) {
+        std::string message = std::format("{} of {} particles are never drawn", never_drawn, baked.particles());
+        message += s.scale_mode == ScaleMode::VertexBone
+                       ? ": their lives are too short for the frame rate (Vertex Bone scaling collapses a quad on the "
+                         "frames around its birth and its death). Raise Lifespan or FPS."
+                       : ". Raise Lifespan or FPS.";
+        r.warnings.push_back(std::move(message));
+    }
+
     if (s.end_behavior == EndBehavior::HideInCore && s.scale_mode == ScaleMode::Static)
         r.warnings.push_back("Hide in Core needs Vertex Bone scaling: static particles stay visible at the center");
     else if (s.scale_mode == ScaleMode::Static && baked.unhidden_jump() > std::max(s.quad_width, s.quad_height) &&
