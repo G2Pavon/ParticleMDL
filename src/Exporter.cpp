@@ -405,6 +405,7 @@ ExportReport analyze_export(const ParticleSystem& sys, const AnimationTable& tab
     r.frames = table.frames;
     r.sequence_bytes = sequence_bytes(table);
     r.vertices = sys.vertex_count();
+    r.normals = sys.normal_count();
 
     if (r.frames > kMaxStudioFrames) {
         // Frames are lround(duration * fps) + 1, so this many steps fit.
@@ -430,6 +431,14 @@ ExportReport analyze_export(const ParticleSystem& sys, const AnimationTable& tab
                                           r.vertices, kMaxStudioVertices);
         message += s.cluster_size > 1 ? ", Cluster Size or use geometry with fewer quads." : " or use geometry with fewer quads.";
         r.blockers.push_back({ExportBlocker::Kind::TooManyVertices, std::move(message)});
+    }
+    if (r.normals > kMaxStudioNormals) {
+        // studiomdl keeps a normal for each direction on each bone: with vertex bones a corner
+        // shared by several faces has one for each of them.
+        std::string message = std::format("{} normals: studiomdl accepts at most {} in a model. Lower Particle Count",
+                                          r.normals, kMaxStudioNormals);
+        message += s.cluster_size > 1 ? ", Cluster Size or use geometry with fewer quads." : " or use geometry with fewer quads.";
+        r.blockers.push_back({ExportBlocker::Kind::TooManyNormals, std::move(message)});
     }
 
     // A particle drawn in none of the frames: with vertex bones the frames around a birth and a death
@@ -499,6 +508,11 @@ std::vector<std::string> compare_with_export(const MdlInfo& mdl, const ParticleS
         vertices += model.vertices;
     if (vertices != sys.vertex_count())
         problems.push_back(std::format("the model has {} vertices, the export has {}", vertices, sys.vertex_count()));
+    int normals = 0;
+    for (const MdlModel& model : mdl.models)
+        normals += model.normals;
+    if (normals != sys.normal_count())
+        problems.push_back(std::format("the model has {} normals, the export has {}", normals, sys.normal_count()));
 
     if (mdl.textures.size() != 1) {
         problems.push_back(std::format("the model has {} textures, the export has 1", mdl.textures.size()));

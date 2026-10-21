@@ -751,6 +751,7 @@ void EditorApp::draw_middle_panel()
         case ExportBlocker::Kind::TooManyFrames: label = "Blocked: too many frames###export"; break;
         case ExportBlocker::Kind::SequenceTooLarge: label = "Blocked: animation over 64 KB###export"; break;
         case ExportBlocker::Kind::TooManyVertices: label = "Blocked: too many vertices###export"; break;
+        case ExportBlocker::Kind::TooManyNormals: label = "Blocked: too many normals###export"; break;
         }
     ImGui::BeginDisabled(!can_export());
     if (ImGui::Button(label, ImVec2(-1, ui::px(40))))

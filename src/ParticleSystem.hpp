@@ -95,6 +95,8 @@ public:
     }
     // Vertices studiomdl makes of the model: the distinct corners of every copy of the geometry on every particle.
     int vertex_count() const noexcept;
+    // Normals studiomdl makes of the model: one for each direction on each bone (see the .cpp).
+    int normal_count() const;
     // The distinct corner positions of the quads (rotated like them), in order of first use. With
     // vertex bones each has a bone of its own, and quads that meet at a corner share it.
     const std::vector<Vec3>& corners() const noexcept { return corners_; }

@@ -21,6 +21,7 @@ namespace gs {
 // cuts the effect short and breaks its loop (seen with Sven Co-op's studiomdl, Nov 30 2018).
 inline constexpr int kMaxStudioFrames = 2048;
 inline constexpr int kMaxStudioVertices = 2048;   // MAXSTUDIOVERTS: "too many vertices in model" above this
+inline constexpr int kMaxStudioNormals = 2048;    // MAXSTUDIOVERTS too: "too many normals in model" above this
 inline constexpr int kMaxTextureNameLength = 63;  // MAXTEXTURENAMELENGTH minus the terminator
 // The texture is "<model name>.bmp", so the name leaves room for the extension.
 inline constexpr int kMaxModelNameLength = kMaxTextureNameLength - 4;
@@ -75,7 +76,7 @@ std::size_t sequence_bytes(const ParticleSystem& sys);
 // A limit that studiomdl enforces. An export that hits one cannot be compiled,
 // so it is refused instead of written.
 struct ExportBlocker {
-    enum class Kind { TooManyFrames, SequenceTooLarge, TooManyVertices };
+    enum class Kind { TooManyFrames, SequenceTooLarge, TooManyVertices, TooManyNormals };
     Kind kind;
     std::string message;   // what is over, by how much, and what to lower
 };
@@ -85,6 +86,7 @@ struct ExportReport {
     int frames = 0;
     std::size_t sequence_bytes = 0;        // as studiomdl will measure it
     int vertices = 0;                      // as studiomdl will count them
+    int normals = 0;                       // likewise
     std::vector<ExportBlocker> blockers;   // fatal, frame limit first
     std::vector<std::string> warnings;     // advisory
 };
@@ -104,7 +106,7 @@ private:
 };
 
 // What differs between a model studiomdl compiled and the export it was made from: bones,
-// frames, frame rate, loop flag, vertices, texture and the size of the animation. Empty when they agree.
+// frames, frame rate, loop flag, vertices, normals, texture and the size of the animation. Empty when they agree.
 // A difference means the compiler read the files differently than expected; the one about
 // the animation size also says the 64 KB check may be off for this compiler.
 std::vector<std::string> compare_with_export(const MdlInfo& mdl, const ParticleSystem& sys);

@@ -213,3 +213,75 @@ TEST_CASE("the vertex blocker agrees with the models studiomdl accepted and refu
         CHECK(report.vertices == v.vertices);
     }
 }
+
+// ---------------------------------------------------------------------------
+// Normals. studiomdl prints "(N vertices, M normals)" and refuses a model with more than 2048
+// normals ("too many normals in model"; seen with a hand-written model of 2049 triangles on
+// three vertices, while 2048 compiled). It keeps one normal for each bone and direction, two
+// directions under 2 degrees apart counting as one (1.9 degrees gave one normal, 2.1 two), so
+// clusters of copies turned at random share a few.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+struct NormalVerdict {
+    const char* name;
+    const char* settings;
+    int normals;   // what studiomdl counted
+};
+
+constexpr NormalVerdict kNormalVerdicts[] = {
+    {"default settings", R"({"model_name":"n14"})", 128},
+    {"tri-planar quads, double sided",
+     R"({"model_name":"n1","count":40,"geometry":"tri_planar_quads","double_sided":true,"duration":1,"fps":10})", 120},
+    {"tri-planar quads with vertex bones",
+     R"({"model_name":"n2","count":9,"geometry":"tri_planar_quads","scale_mode":"vertex_bone","duration":1,"fps":10})", 108},
+    {"crossed quads with vertex bones",
+     R"({"model_name":"n3","count":14,"geometry":"crossed_quads","scale_mode":"vertex_bone","duration":1,"fps":10})", 112},
+    {"crossed quads along the velocity",
+     R"({"model_name":"n6","count":30,"geometry":"crossed_quads","align_to_velocity":true,"mesh_rotation":[0,45,0],"duration":1,"fps":10})",
+     60},
+    {"forty turned copies of a quad",
+     R"({"model_name":"n11","count":1,"geometry":"single_quad","cluster_size":40,"mesh_rotation":[20,30,40],"duration":1,"fps":30})",
+     39},
+    {"clusters of tri-planar quads",
+     R"({"model_name":"n12","count":4,"geometry":"tri_planar_quads","cluster_size":20,"cluster_radius":5,"duration":1,"fps":30})",
+     238},
+    {"clusters of boxes",
+     R"({"model_name":"u2","count":30,"duration":1.0,"fps":10,"geometry":"volumetric_box","cluster_size":8})", 1428},
+};
+
+} // namespace
+
+TEST_CASE("normal_count is the number of normals the real studiomdl counts")
+{
+    for (const NormalVerdict& v : kNormalVerdicts) {
+        CAPTURE(v.name);
+        const SettingsLoad loaded = settings_from_json(nlohmann::json::parse(v.settings), Settings{});
+        REQUIRE(loaded.warnings.empty());
+        const ParticleSystem sys(loaded.settings);
+        CHECK(sys.normal_count() == v.normals);
+        const ExportReport report = analyze_export(sys);
+        CHECK(report.normals == v.normals);
+        CHECK(std::ranges::none_of(report.blockers,
+                                   [](const ExportBlocker& b) { return b.kind == ExportBlocker::Kind::TooManyNormals; }));
+    }
+}
+
+TEST_CASE("the normal blocker names the normals over the limit")
+{
+    // Nothing reaches 2048 normals before 2048 vertices yet: six clusters of 64 boxes are over both.
+    Settings s;
+    s.count = 6;
+    s.geometry = Geometry::VolumetricBox;
+    s.cluster_size = 64;
+    const ParticleSystem sys(s);
+    REQUIRE(sys.normal_count() > kMaxStudioNormals);
+    CHECK(sys.normal_count() <= 6 * 64 * 6);
+    const ExportReport report = analyze_export(sys);
+    const auto it = std::ranges::find_if(report.blockers,
+                                         [](const ExportBlocker& b) { return b.kind == ExportBlocker::Kind::TooManyNormals; });
+    REQUIRE(it != report.blockers.end());
+    CHECK(it->message.find(std::to_string(sys.normal_count()) + " normals") != std::string::npos);
+    CHECK(it->message.find("Cluster Size") != std::string::npos);
+}
