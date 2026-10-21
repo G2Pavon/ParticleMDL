@@ -105,6 +105,8 @@ public:
     // the particle's own bone; 0 without vertex bones.
     int corners_per_particle() const noexcept { return corners_per_particle_; }
     static int corner_bone(const Particle& p, int corner) noexcept { return p.base_bone + 1 + corner; }
+    // Bones of the exported skeleton: the root (bone 0), then each particle's bone followed by its corner bones.
+    int bone_count() const noexcept { return 1 + num_particles() * (1 + corners_per_particle_); }
 
     double loop_duration() const noexcept { return settings_.duration; }
     double export_fps() const noexcept { return export_fps_; }

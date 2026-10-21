@@ -135,7 +135,8 @@ TEST_CASE("analyzing with a prebuilt table gives the same report")
 {
     const ParticleSystem sys(straight_quads(60, 10.0, 30));
     const ExportReport a = analyze_export(sys);
-    const ExportReport b = analyze_export(sys, animation_table(sys));
+    const BakedPoses baked = bake(sys);
+    const ExportReport b = analyze_export(sys, animation_table(sys, baked), baked);
     CHECK(a.frames == b.frames);
     CHECK(a.sequence_bytes == b.sequence_bytes);
     REQUIRE(a.blockers.size() == b.blockers.size());
@@ -227,4 +228,27 @@ TEST_CASE("exporting with the baked frames and animation already at hand writes 
     const ParticleSystem big(over);
     const BakedPoses big_baked = bake(big);
     CHECK_THROWS_AS(export_model(big, big_baked, animation_table(big, big_baked), reused.path), ExportBlocked);
+}
+
+TEST_CASE("frames and a table built from another system are refused")
+{
+    const ParticleSystem sys{Settings{}};
+    const BakedPoses baked = bake(sys);
+    const AnimationTable table = animation_table(sys, baked);
+
+    Settings more;
+    more.count = sys.num_particles() + 1;
+    const ParticleSystem other(more);
+    Settings longer;
+    longer.duration = Settings{}.duration * 2;
+    const ParticleSystem slower(longer);
+
+    CHECK_THROWS_AS(analyze_export(other, table, baked), std::invalid_argument);
+    CHECK_THROWS_AS(analyze_export(slower, table, baked), std::invalid_argument);
+    const BakedPoses other_baked = bake(other);
+    CHECK_THROWS_AS(analyze_export(sys, table, other_baked), std::invalid_argument);
+    const TempDir dir("particlemdl_export_mismatch");
+    CHECK_THROWS_AS(export_model(other, baked, table, dir.path), std::invalid_argument);
+    CHECK(dir.file_count() == 0);
+    CHECK_NOTHROW(analyze_export(sys, table, baked));
 }

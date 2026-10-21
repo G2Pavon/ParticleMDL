@@ -224,7 +224,7 @@ AnimationTable animation_table(const ParticleSystem& sys, const BakedPoses& bake
 {
     AnimationTable t;
     t.frames = sys.export_frames();
-    t.bones = 1 + sys.num_particles() * (1 + sys.corners_per_particle());
+    t.bones = sys.bone_count();
     t.values.assign(static_cast<std::size_t>(t.frames) * t.bones, {});   // root stays at zero
     for (int frame = 0; frame < t.frames; ++frame) {
         for (int i = 0; i < sys.num_particles(); ++i) {
@@ -379,16 +379,27 @@ std::string kilobytes(std::size_t bytes)
 
 ExportReport analyze_export(const ParticleSystem& sys)
 {
-    return analyze_export(sys, animation_table(sys), bake(sys));
+    const BakedPoses baked = bake(sys);
+    return analyze_export(sys, animation_table(sys, baked), baked);
 }
 
-ExportReport analyze_export(const ParticleSystem& sys, const AnimationTable& table)
+namespace {
+
+// The baked frames and the table are built from a system, and given back with one: a cheap check that
+// they have its shape, so frames of an older system are not exported (or measured) with a new one.
+void require_built_from(const ParticleSystem& sys, const BakedPoses& baked, const AnimationTable& table)
 {
-    return analyze_export(sys, table, bake(sys));
+    if (baked.particles() != sys.num_particles() || baked.steps() != sys.loop_steps() ||
+        baked.looping() != sys.looping() || table.frames != sys.export_frames() || table.bones != sys.bone_count() ||
+        table.values.size() != static_cast<std::size_t>(table.frames) * static_cast<std::size_t>(table.bones))
+        throw std::invalid_argument("the baked frames or the animation table were not built from this particle system");
 }
+
+} // namespace
 
 ExportReport analyze_export(const ParticleSystem& sys, const AnimationTable& table, const BakedPoses& baked)
 {
+    require_built_from(sys, baked, table);
     const Settings& s = sys.settings();
     ExportReport r;
     r.frames = table.frames;
@@ -456,9 +467,8 @@ ExportBlocked::ExportBlocked(std::vector<ExportBlocker> blockers)
 std::vector<std::string> compare_with_export(const MdlInfo& mdl, const ParticleSystem& sys)
 {
     std::vector<std::string> problems;
-    const int bones = 1 + sys.num_particles() * (1 + sys.corners_per_particle());
-    if (static_cast<int>(mdl.bones.size()) != bones)
-        problems.push_back(std::format("the model has {} bones, the export has {}", mdl.bones.size(), bones));
+    if (static_cast<int>(mdl.bones.size()) != sys.bone_count())
+        problems.push_back(std::format("the model has {} bones, the export has {}", mdl.bones.size(), sys.bone_count()));
 
     if (mdl.sequences.size() != 1) {
         problems.push_back(std::format("the model has {} sequences, the export has 1", mdl.sequences.size()));

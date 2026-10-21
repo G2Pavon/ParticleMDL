@@ -89,7 +89,8 @@ struct ExportReport {
     std::vector<std::string> warnings;     // advisory
 };
 ExportReport analyze_export(const ParticleSystem& sys);
-ExportReport analyze_export(const ParticleSystem& sys, const AnimationTable& table);   // reuses a table
+// The same for the baked frames and the table of `sys` already at hand; throws std::invalid_argument
+// if their shape shows they were built from another system.
 ExportReport analyze_export(const ParticleSystem& sys, const AnimationTable& table, const BakedPoses& baked);
 
 // Thrown by export_model() when the export has blockers. Nothing is written.
@@ -116,7 +117,8 @@ std::vector<std::string> compare_with_export(const MdlInfo& mdl, const ParticleS
 // and renamed into place together: a failed export leaves no partial files.
 void export_model(const ParticleSystem& sys, const std::filesystem::path& out_dir = ".");
 // The same for a caller that has the baked frames and the animation of `sys` already (the
-// editor builds them for every change of a setting): they must be the ones of this `sys`.
+// editor builds them for every change of a setting): they must be the ones of this `sys`, and
+// std::invalid_argument is thrown when their shape shows they are not.
 void export_model(const ParticleSystem& sys, const BakedPoses& baked, const AnimationTable& table,
                   const std::filesystem::path& out_dir);
 
