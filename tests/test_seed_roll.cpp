@@ -1,8 +1,10 @@
 #include <doctest/doctest.h>
 
+#include <algorithm>
 #include <cmath>
 #include <vector>
 
+#include "Exporter.hpp"
 #include "SeedRoll.hpp"
 
 using namespace gs;
@@ -13,6 +15,7 @@ namespace {
 Settings all_in_use()
 {
     Settings s;
+    s.geometry = Geometry::SingleQuad;   // the cheapest to export: the rolls export many times
     s.count = 40;
     s.duration = 3.0;
     s.lifespan = 0.7;
@@ -51,6 +54,25 @@ Settings all_in_use()
     return s;
 }
 
+struct Range {
+    double lo, hi;
+};
+
+// The slider ranges of the values in system_values() and particle_values(), in the same order.
+std::vector<Range> system_ranges(const Settings& s)
+{
+    return {{1, double(max_particles(s.geometry, s.scale_mode))}, {0.5, 10}, {0.1, 1}, {0, 0.9}, {0, 1}, {1, 1024}, {1, 1024},
+            {1, 1024}, {-500, 500}, {-500, 500}, {-500, 500}, {-360, 360}, {-360, 360}, {-360, 360}, {1, 360},
+            {0, 500}, {0, 400}, {-180, 180}, {-180, 180}, {-180, 180}, {-200, 400}, {-300, 300}, {0, 150},
+            {-600, 200}, {0, 5}, {0, 0.95}, {-300, 300}, {0, 200}, {-720, 720}, {-300, 300}};
+}
+
+std::vector<Range> particle_ranges(const Settings&)
+{
+    return {{0.1, 5}, {0, 5}, {1, 100}, {1, 100}, {0, 0.9}, {1, 16}, {0, 200}, {-180, 180}, {-180, 180}, {-180, 180},
+            {-360, 360}, {-360, 360}, {-360, 360}, {0, 360}};
+}
+
 std::vector<double> system_values(const Settings& s)
 {
     return {double(s.count), s.duration, s.lifespan, s.lifespan_variance, s.burst_window, s.volume_width, s.volume_depth,
@@ -82,28 +104,95 @@ TEST_CASE("seed 0 leaves the values as they are and sets the seed")
     CHECK(s == base);   // back to the values before the roll
 }
 
-TEST_CASE("a seed varies every value of its side that is in use, and the same seed in the same way")
+TEST_CASE("a seed draws every value of its side anywhere in its range, and the same seed the same")
 {
     const Settings base = all_in_use();
     for (const SeedSide side : {SeedSide::System, SeedSide::Particle}) {
         CAPTURE(side == SeedSide::System);
         auto values = side == SeedSide::System ? system_values : particle_values;
-        Settings a = base, b = base, c = base;
+        const std::vector<Range> ranges = side == SeedSide::System ? system_ranges(base) : particle_ranges(base);
+        Settings a = base, b = base;
         roll_settings(a, base, side, 7);
         roll_settings(b, base, side, 7);
-        roll_settings(c, base, side, 8);
         CHECK(a == b);
         CHECK((side == SeedSide::System ? a.system_seed : a.particle_seed) == 7);
-        const std::vector<double> before = values(base), seven = values(a), eight = values(c);
-        const std::size_t whole_number = side == SeedSide::System ? 0 : 5;   // the count, the cluster size
-        for (std::size_t i = 0; i < before.size(); ++i) {
-            CAPTURE(i);
-            if (i != whole_number) {   // a whole number may round to the same one
-                CHECK(seven[i] != before[i]);
-                CHECK(seven[i] != eight[i]);
+
+        // Over many seeds each value lands all over its range, not near where it was.
+        std::vector<double> low(ranges.size(), 1e300), high(ranges.size(), -1e300);
+        for (int seed = 1; seed <= 100; ++seed) {
+            Settings s = base;
+            roll_settings(s, base, side, seed);
+            const std::vector<double> v = values(s);
+            for (std::size_t i = 0; i < v.size(); ++i) {
+                CHECK(v[i] >= ranges[i].lo);
+                CHECK(v[i] <= ranges[i].hi);
+                low[i] = std::min(low[i], v[i]);
+                high[i] = std::max(high[i], v[i]);
             }
-            // By at most a quarter of itself (a whole unit for a count).
-            CHECK(std::abs(seven[i] - before[i]) <= kRollAmount * std::abs(before[i]) + 0.5);
+        }
+        const std::size_t fitted = side == SeedSide::System ? 0 : 5;   // the count, the cluster: see below
+        for (std::size_t i = 0; i < ranges.size(); ++i) {
+            CAPTURE(i);
+            if (i == fitted)
+                continue;
+            const double span = ranges[i].hi - ranges[i].lo;
+            CHECK(low[i] <= ranges[i].lo + 0.15 * span);
+            CHECK(high[i] >= ranges[i].hi - 0.15 * span);
+        }
+    }
+}
+
+TEST_CASE("what a seed draws does not depend on the values before")
+{
+    const Settings on = all_in_use();
+    for (const SeedSide side : {SeedSide::System, SeedSide::Particle}) {
+        Settings off = on;
+        roll_settings(off, Settings{}, side, 0);   // this side's values from the defaults, much of them 0
+        REQUIRE_FALSE(same_rolled_values(off, on, side));
+        Settings from_off = off, from_on = on;
+        roll_settings(from_off, off, side, 21);
+        roll_settings(from_on, on, side, 21);
+        CHECK(same_rolled_values(from_off, from_on, side));
+    }
+}
+
+TEST_CASE("a feature that 0 turns off is on with some seeds and off with others")
+{
+    const Settings base = all_in_use();
+    int drag_on = 0, bounce_on = 0, spin_on = 0, cluster_on = 0, quads_differ = 0;
+    for (int seed = 1; seed <= 60; ++seed) {
+        Settings s = base;
+        roll_settings(s, base, SeedSide::System, seed);
+        roll_settings(s, base, SeedSide::Particle, seed);
+        drag_on += s.drag != 0.0;
+        bounce_on += s.bounce != 0.0;
+        spin_on += s.particle_spin.z != 0.0;
+        cluster_on += s.cluster_size > 1;
+        quads_differ += s.quad_width != base.quad_width;   // not optional: always drawn
+    }
+    for (const int on : {drag_on, bounce_on, spin_on, cluster_on}) {
+        CHECK(on > 15);
+        CHECK(on < 45);
+    }
+    CHECK(quads_differ == 60);
+}
+
+TEST_CASE("a seed never makes an effect studiomdl would refuse")
+{
+    // Large effects: many particles, long and fast, clustered boxes with vertex bones off.
+    Settings big = all_in_use();
+    big.geometry = Geometry::VolumetricBox;
+    big.fps = 60;
+    for (int seed = 1; seed <= 12; ++seed) {
+        CAPTURE(seed);
+        for (const SeedSide side : {SeedSide::System, SeedSide::Particle}) {
+            Settings s = big;
+            roll_settings(s, big, side, seed);
+            validate(s);
+            const ExportReport r = analyze_export(ParticleSystem(s));
+            CHECK(r.blockers.empty());
+            if (side == SeedSide::Particle)
+                CHECK(s.count <= big.count);   // lowered if it must be, never raised
         }
     }
 }
@@ -125,38 +214,10 @@ TEST_CASE("a seed changes nothing but its own side's values")
     }
 }
 
-TEST_CASE("values that are off, and a full fan or an endless life, stay as they are")
-{
-    Settings base;   // much of it at 0: no velocity, spin, tilt, drag, bounce, turbulence, vortex
-    base.emission_angle = 360;
-    base.lifespan = 1.0;
-    Settings s = base;
-    roll_settings(s, base, SeedSide::System, 5);
-    CHECK(s.velocity == Vec3{});
-    CHECK(s.spin == Vec3{});
-    CHECK(s.emitter_tilt == Vec3{});
-    CHECK(s.drag == 0.0);
-    CHECK(s.bounce == 0.0);
-    CHECK(s.turbulence == 0.0);
-    CHECK(s.vortex_spin == 0.0);
-    CHECK(s.emission_angle == 360.0);
-    CHECK(s.lifespan == 1.0);
-    CHECK(s.speed != base.speed);   // what is in use still varies
-
-    Settings p = base;
-    roll_settings(p, base, SeedSide::Particle, 5);
-    CHECK(p.cluster_size == 1);   // no cluster stays no cluster
-    CHECK(p.particle_spin == Vec3{});
-    CHECK(p.quad_width != base.quad_width);
-}
-
 TEST_CASE("rolled values stay inside the slider ranges and the count inside the bones")
 {
-    Settings base = all_in_use();
-    base.count = 126;
-    base.lifespan = 0.95;
-    base.velocity.x = 480;
-    for (int seed = 1; seed <= 200; ++seed) {
+    const Settings base = all_in_use();
+    for (int seed = 1; seed <= 30; ++seed) {
         Settings s = base;
         roll_settings(s, base, SeedSide::System, seed);
         CHECK(s.count >= 1);

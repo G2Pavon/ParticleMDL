@@ -615,10 +615,11 @@ void EditorApp::draw_left_panel()
     if (int seed = s.system_seed;
         seed_input("system_seed", seed,
                    "System seed (Seed picks a new one).\n"
-                   "Varies the values of this panel that are in use by up to 25% each (not the FPS, nor the\n"
-                   "choices), and picks where each particle starts, the direction and speed it leaves with, its\n"
-                   "turbulence and its lifespan variance. 0 keeps the values as they were before any seed;\n"
-                   "a value set by hand is kept and varied from then on."))
+                   "Draws every value of this panel at random anywhere in its slider's range, turning drag,\n"
+                   "bounce, turbulence, vortex, velocity, rotation and tilt on or off at random (not the FPS,\n"
+                   "nor the choices). The particle count is drawn among those the export accepts. It also\n"
+                   "picks where each particle starts, the direction and speed it leaves with, its turbulence\n"
+                   "and its lifespan variance. 0 brings back the values from before any seed."))
         set_seed(SeedSide::System, seed);
     const Settings before = s;
     group_label("Animation");
@@ -789,10 +790,11 @@ void EditorApp::draw_right_panel()
     if (int seed = s.particle_seed;
         seed_input("particle_seed", seed,
                    "Particle seed (Seed picks a new one).\n"
-                   "Varies the scaling, geometry and spin values of this panel that are in use by up to 25%\n"
-                   "each (not the texture, nor the choices), and picks each particle's spin spread, its size\n"
-                   "variance and where the copies of a cluster sit and how they are turned. 0 keeps the\n"
-                   "values as they were before any seed; a value set by hand is kept and varied from then on."))
+                   "Draws the scaling, geometry and spin values of this panel at random anywhere in their\n"
+                   "slider's range, turning size variance, cluster, mesh rotation and spin on or off at random\n"
+                   "(not the texture, nor the choices). The cluster size is drawn among those the export\n"
+                   "accepts, and the particle count is lowered if it must be. It also picks each particle's\n"
+                   "spin spread, size variance and cluster copies. 0 brings back the values from before any seed."))
         set_seed(SeedSide::Particle, seed);
     const Settings before = s;
     ImGui::Dummy(ImVec2(0, ui::px(5)));

@@ -67,9 +67,9 @@ private:
     void draw_canvas(ImVec2 size);
 
     Settings settings_;
-    // What each panel's values were before its seed varied them, so another seed varies the same
-    // values and seed 0 brings them back. Forgotten when a value of the panel is set by hand, or
-    // the whole effect is replaced (preset, new, load): those values are then the ones to vary.
+    // What each panel's values were before its seed drew them, for seed 0 to bring back. Forgotten
+    // when a value of the panel is set by hand, or the whole effect is replaced (preset, new,
+    // load): those values are then the ones seed 0 brings back.
     std::optional<Settings> system_base_, particle_base_;
     void set_seed(SeedSide side, int seed);
     std::optional<ParticleSystem> system_;
