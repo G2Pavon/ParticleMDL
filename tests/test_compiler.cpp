@@ -205,6 +205,30 @@ TEST_CASE("compile_model reads a lot of output without stalling")
     CHECK(r.output.find("line 19999:") != std::string::npos);
 }
 
+TEST_CASE("compile_model keeps the start and the end of output past its limit")
+{
+    const Folder dir("particlemdl_compile_bounded");
+    dir.qc("fx", "lots");
+    CompileOptions options = in(dir);
+    options.max_output_bytes = 100000;
+    const CompileResult r = compile_model(self_path, "fx", options);
+    CHECK(r.output.size() < 100200);
+    CHECK(r.output.starts_with("line 00000:"));
+    CHECK(r.output.find("line 19999:") != std::string::npos);
+    CHECK(r.output.find("line 10000:") == std::string::npos);
+    constexpr std::string_view end_of_note = " bytes of output left out ...]";
+    const std::size_t note = r.output.find(end_of_note);
+    REQUIRE(note != std::string::npos);
+    // The note says how much is missing: all of it but the 100000 bytes kept.
+    const std::size_t open = r.output.rfind("[... ", note);
+    REQUIRE(open != std::string::npos);
+    const std::size_t dropped = std::stoul(r.output.substr(open + 5, note - open - 5));
+    const std::size_t note_size = note + end_of_note.size() - open;
+    const std::size_t kept = r.output.size() - note_size - 2;   // without the note and its two line breaks
+    CHECK(kept == 100000);
+    CHECK(dropped > 1500000);
+}
+
 TEST_CASE("compile_model kills a compiler that runs past the time limit")
 {
     const Folder dir("particlemdl_compile_timeout");

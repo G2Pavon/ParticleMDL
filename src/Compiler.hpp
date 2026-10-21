@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <cstddef>
 #include <filesystem>
 #include <stop_token>
 #include <string>
@@ -14,8 +15,10 @@ struct CompileOptions {
     std::chrono::milliseconds timeout = std::chrono::minutes(2);
     // Keep the .qc, .smd and .bmp after a successful compile, to edit and compile again.
     bool keep_sources = false;
-    // Requesting a stop kills the compiler (checked about every 100 ms).
+    // Requesting a stop kills the compiler (checked every 20 to 100 ms).
     std::stop_token stop;
+    // Past this much output only its start and its end are kept, with a note of what was left out.
+    std::size_t max_output_bytes = 2u << 20;
 };
 
 struct CompileResult {

@@ -1,5 +1,6 @@
 #include "Compiler.hpp"
 
+#include <algorithm>
 #include <array>
 #include <format>
 #include <optional>
@@ -50,6 +51,45 @@ bool same_directory(const fs::path& a, const fs::path& b)
 }
 #endif
 
+// What the compiler writes, kept to a limit: the start (where the errors of a bad QC are) and
+// the end (where it says what stopped it), with the middle left out.
+class BoundedOutput {
+public:
+    explicit BoundedOutput(std::size_t limit) : head_limit_(limit / 2), tail_limit_(limit - limit / 2) {}
+
+    void append(const char* data, std::size_t size)
+    {
+        const std::size_t to_head = std::min(size, head_limit_ - head_.size());
+        head_.append(data, to_head);
+        if (size == to_head)
+            return;
+        tail_.append(data + to_head, size - to_head);
+        if (tail_.size() > 2 * tail_limit_)   // trimmed now and then, not on every append
+            trim();
+    }
+
+    std::string take()
+    {
+        trim();
+        if (dropped_ == 0)
+            return head_ + tail_;
+        return std::format("{}\n[... {} bytes of output left out ...]\n{}", head_, dropped_, tail_);
+    }
+
+private:
+    void trim()
+    {
+        if (tail_.size() > tail_limit_) {
+            dropped_ += tail_.size() - tail_limit_;
+            tail_.erase(0, tail_.size() - tail_limit_);
+        }
+    }
+
+    std::size_t head_limit_, tail_limit_;
+    std::string head_, tail_;
+    std::size_t dropped_ = 0;
+};
+
 void remove_intermediates(const fs::path& dir, const std::string& safe_name)
 {
     std::error_code ec;
@@ -61,7 +101,7 @@ void remove_intermediates(const fs::path& dir, const std::string& safe_name)
 
 // Collects what the compiler writes, and tells the runner when to give up.
 struct WinRun {
-    std::string* output;
+    BoundedOutput* output;
     const std::stop_token* stop;
 };
 
@@ -74,7 +114,8 @@ CompileResult run_compiler(const std::string& compiler, const std::string& qc, c
                            quote_windows_argument(from_utf8(qc).wstring());
     const std::wstring work_dir = fs::absolute(options.work_dir).wstring();
 
-    WinRun run{&result.output, &options.stop};
+    BoundedOutput output(options.max_output_bytes);
+    WinRun run{&output, &options.stop};
     ProcessCallbacks callbacks;
     callbacks.user = &run;
     callbacks.output = [](void* user, const char* data, unsigned long size) {
@@ -87,6 +128,7 @@ CompileResult run_compiler(const std::string& compiler, const std::string& qc, c
                                       ? kNoTimeout - 1
                                       : static_cast<unsigned long>(millis);
     const ProcessResult run_result = run_process(command.data(), work_dir.c_str(), timeout, callbacks);
+    result.output = output.take();
     switch (run_result.status) {
     case ProcessStatus::Exited:
         result.exit_zero = run_result.exit_code == 0;
@@ -190,6 +232,7 @@ CompileResult run_compiler(const std::string& compiler, const std::string& qc, c
     std::optional<CompileResult::Status> stopped;
     int wstatus = 0;
     bool reaped = false;
+    BoundedOutput output(options.max_output_bytes);
     char buf[4096];
     for (;;) {
         if (!stopped) {
@@ -223,8 +266,9 @@ CompileResult run_compiler(const std::string& compiler, const std::string& qc, c
                 continue;
             break;
         }
-        result.output.append(buf, static_cast<std::size_t>(n));
+        output.append(buf, static_cast<std::size_t>(n));
     }
+    result.output = output.take();
 
     while (!reaped && waitpid(pid, &wstatus, 0) < 0 && errno == EINTR) {
     }
