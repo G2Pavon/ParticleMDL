@@ -77,7 +77,7 @@ EditorApp::EditorApp()
       export_dialog_("Export Folder", FileDialog::Mode::Directory),
       texture_dialog_("Choose Image", FileDialog::Mode::Open, {".png", ".jpg", ".jpeg", ".bmp", ".tga"}),
       config_path_(app_config_path()),
-      config_(read_app_config(config_path_)),
+      config_(read_app_config(config_path_, earlier_app_config_path())),
       game_dialog_("Game Folder", FileDialog::Mode::Directory)
 {
     refresh_export_dir_problem();

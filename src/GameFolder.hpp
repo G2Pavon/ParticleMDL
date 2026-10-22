@@ -44,13 +44,23 @@ struct AppConfig {
     std::string sky_name;      // which one ("desert"); empty: none chosen yet
 };
 
-// Where AppConfig is kept: %APPDATA%\ParticleMDL\config.json on Windows, else
-// $XDG_CONFIG_HOME/particlemdl/config.json or ~/.config/particlemdl/config.json. Empty if there is
-// no such place (no home folder).
+// The folder of the running program, or empty if the system does not say.
+std::filesystem::path executable_folder();
+
+// Where AppConfig is kept: config.json beside the program, so a copy of it carries its settings.
+// Empty if the program's folder is unknown.
 std::filesystem::path app_config_path();
+
+// Where earlier versions kept it: %APPDATA%\ParticleMDL\config.json on Windows, else
+// $XDG_CONFIG_HOME/particlemdl/config.json or ~/.config/particlemdl/config.json. Empty if there is
+// no such place (no home folder). Only read, when there is no config beside the program yet.
+std::filesystem::path earlier_app_config_path();
 
 // The config at `path`; the defaults if it is missing or cannot be read.
 AppConfig read_app_config(const std::filesystem::path& path);
+// The config at `path`, or while there is no file there, the one at `earlier` (the next save puts
+// it at `path`).
+AppConfig read_app_config(const std::filesystem::path& path, const std::filesystem::path& earlier);
 // Writes it whole or not at all, making its folder if needed. Throws on failure.
 void write_app_config(const std::filesystem::path& path, const AppConfig& config);
 

@@ -125,3 +125,28 @@ TEST_CASE("a Windows game folder works with either separator")
           export_folder(from_utf8("C:/Games/Half-Life/cstrike"), "fx"));
 }
 #endif
+
+TEST_CASE("the config is kept beside the program, and read from where it was until it is saved there")
+{
+    // The tests are a program too: their config would be beside them.
+    const fs::path folder = executable_folder();
+    REQUIRE_FALSE(folder.empty());
+    CHECK(fs::is_directory(folder));
+    CHECK(app_config_path() == folder / "config.json");
+#ifdef __linux__
+    CHECK(fs::equivalent(folder, fs::read_symlink("/proc/self/exe").parent_path()));
+#endif
+
+    const fs::path dir = fs::temp_directory_path() / "particlemdl_app_config_move";
+    fs::remove_all(dir);
+    const fs::path beside = dir / "bin" / "config.json", earlier = dir / "home" / "config.json";
+    write_app_config(earlier, AppConfig{"/games/Half-Life/valve", true, "city"});
+    // Nothing beside the program yet: the earlier file's settings.
+    CHECK(read_app_config(beside, earlier).sky_name == "city");
+    // Once saved beside the program, that file is the one read.
+    write_app_config(beside, AppConfig{"/games/Half-Life/cstrike", false, ""});
+    CHECK(read_app_config(beside, earlier).game_folder == "/games/Half-Life/cstrike");
+    // No earlier file either: the defaults.
+    CHECK(read_app_config(dir / "none" / "config.json", dir / "nothing.json").game_folder.empty());
+    fs::remove_all(dir);
+}

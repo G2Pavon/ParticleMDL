@@ -10,6 +10,13 @@
 #include "PathUtil.hpp"
 #include "StagedFiles.hpp"
 
+#ifdef _WIN32
+#include <windows.h>
+#elif defined(__APPLE__)
+#include <cstdint>
+#include <mach-o/dyld.h>
+#endif
+
 namespace gs {
 
 namespace fs = std::filesystem;
@@ -107,7 +114,42 @@ std::optional<std::string> subfolder_within_models(const fs::path& game, const f
     return joined;
 }
 
+fs::path executable_folder()
+{
+    std::error_code ec;
+#ifdef _WIN32
+    std::wstring buffer(260, L'\0');
+    for (;;) {
+        const DWORD n = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
+        if (n == 0)
+            return {};
+        if (n < buffer.size()) {
+            buffer.resize(n);
+            return fs::path(buffer).parent_path();
+        }
+        buffer.resize(buffer.size() * 2);   // cut short: try again with more room
+    }
+#elif defined(__APPLE__)
+    std::uint32_t size = 0;
+    _NSGetExecutablePath(nullptr, &size);
+    std::string buffer(size, '\0');
+    if (_NSGetExecutablePath(buffer.data(), &size) != 0)
+        return {};
+    const fs::path exe = fs::weakly_canonical(fs::path(buffer.c_str()), ec);
+    return ec ? fs::path() : exe.parent_path();
+#else
+    const fs::path exe = fs::read_symlink("/proc/self/exe", ec);
+    return ec ? fs::path() : exe.parent_path();
+#endif
+}
+
 fs::path app_config_path()
+{
+    const fs::path folder = executable_folder();
+    return folder.empty() ? fs::path() : folder / "config.json";
+}
+
+fs::path earlier_app_config_path()
 {
 #ifdef _WIN32
     if (const wchar_t* appdata = _wgetenv(L"APPDATA"); appdata && *appdata)
@@ -119,6 +161,14 @@ fs::path app_config_path()
         return fs::path(home) / ".config" / "particlemdl" / "config.json";
 #endif
     return {};
+}
+
+AppConfig read_app_config(const fs::path& path, const fs::path& earlier)
+{
+    std::error_code ec;
+    if (path.empty() || !fs::exists(path, ec))
+        return read_app_config(earlier);
+    return read_app_config(path);
 }
 
 AppConfig read_app_config(const fs::path& path)
@@ -142,7 +192,7 @@ AppConfig read_app_config(const fs::path& path)
 void write_app_config(const fs::path& path, const AppConfig& config)
 {
     if (path.empty())
-        throw std::runtime_error("there is no place to keep the settings (no home folder)");
+        throw std::runtime_error("there is no place to keep the settings (the program's folder is unknown)");
     fs::create_directories(path.parent_path());
     const nlohmann::json j = {{"game_folder", config.game_folder}, {"sky", config.sky}, {"sky_name", config.sky_name}};
     write_file_atomically(path, j.dump(2) + "\n");
