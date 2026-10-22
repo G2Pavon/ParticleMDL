@@ -2,7 +2,7 @@
 
 Simulate particles using animated models
 
-<img width="2083" height="1308" alt="image" src="https://github.com/user-attachments/assets/328bd91c-af3f-48b2-b1a2-aeec5cf75a9c" />
+<img width="2083" height="1308" alt="image" src="https://github.com/user-attachments/assets/bb2cfa86-8ac4-437a-b066-850209331f3e" />
 
 
 # Build
