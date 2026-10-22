@@ -74,7 +74,7 @@ void add_bounds(Scene& out, const ParticleSystem& sys, const OrbitCamera& cam, d
 
 
 void add_particles(Scene& out, const ParticleSystem& sys, const BakedPoses& baked, const OrbitCamera& cam, double time,
-                   Point2 center, const EntityLook& look)
+                   Point2 center)
 {
     for (int i = 0; i < sys.num_particles(); ++i) {
         const SampledPose pose = baked.sample(i, time);
@@ -112,9 +112,6 @@ void add_particles(Scene& out, const ParticleSystem& sys, const BakedPoses& bake
                 continue;
 
             face.depth = depth_sum / 4.0;
-            // The quad is flat: one normal, turned with the particle, lights it all.
-            const FaceColor c = face_color(look, rotate(pose.rot, q[0].normal));
-            face.color = {c.r, c.g, c.b, c.a};
             out.faces.push_back(face);
         }
     }
@@ -181,7 +178,7 @@ void build_scene(const ParticleSystem& sys, const BakedPoses& baked, const Orbit
         add_axes(out, camera, center);
     if (options.bounds)
         add_bounds(out, sys, camera, time, center);
-    add_particles(out, sys, baked, camera, time, center, options.look);
+    add_particles(out, sys, baked, camera, time, center);
 }
 
 } // namespace gs

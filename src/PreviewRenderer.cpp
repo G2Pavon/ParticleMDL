@@ -20,11 +20,11 @@ ImU32 to_imcol(Rgba8 c)
     return IM_COL32(c.r, c.g, c.b, c.a);
 }
 
-// The engine adds an additive model texture times its vertex colour, times its alpha: glBlendFunc
-// GL_SRC_ALPHA, GL_ONE for an Additive entity, GL_ONE, GL_ONE for a Normal one, whose alpha is 255.
+// GoldSrc adds an additive model texture to the picture (an Additive entity at renderamt 255: colour
+// and alpha both 255, glBlendFunc GL_SRC_ALPHA, GL_ONE, which is the texture added as it is).
 void set_additive_blend(const ImDrawList*, const ImDrawCmd*)
 {
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+    glBlendFunc(GL_ONE, GL_ONE);
 }
 
 } // namespace
@@ -69,7 +69,7 @@ void PreviewRenderer::draw(ImDrawList* dl, ImVec2 origin, ImVec2 size, Rgb backg
     for (const SceneFace& f : scene.faces)
         dl->AddImageQuad(game_.imgui_id(), to_imvec(f.pts[0]), to_imvec(f.pts[1]), to_imvec(f.pts[2]),
                          to_imvec(f.pts[3]), to_imvec(f.uvs[0]), to_imvec(f.uvs[1]), to_imvec(f.uvs[2]),
-                         to_imvec(f.uvs[3]), to_imcol(f.color));
+                         to_imvec(f.uvs[3]));
     dl->AddCallback(ImDrawCallback_ResetRenderState, nullptr);
 
     dl->PopClipRect();

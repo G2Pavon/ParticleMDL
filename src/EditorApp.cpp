@@ -83,7 +83,6 @@ EditorApp::EditorApp()
     refresh_export_dir_problem();
     refresh_skies();
     apply_sky();
-    apply_look();
     if (config_.game_folder.empty()) {   // the first start: exports need it
         show_game_folder_ = true;
         game_folder_edit_.clear();
@@ -239,25 +238,6 @@ void EditorApp::refresh_skies()
 {
     const std::filesystem::path game = from_utf8(config_.game_folder);
     skies_ = game_folder_problem(game) ? std::vector<std::string>{} : list_skyboxes(game);
-}
-
-EditorApp::~EditorApp()
-{
-    // A light colour dragged in its picker is not saved on every change; it is here at the latest.
-    try {
-        write_app_config(config_path_, config_);
-    } catch (const std::exception&) {
-        // Nowhere to say it any more; the settings are as the last save left them.
-    }
-}
-
-void EditorApp::apply_look()
-{
-    EntityLook& look = scene_options_.look;
-    look.mode = config_.lit ? EntityRenderMode::Normal : EntityRenderMode::Additive;
-    look.renderamt = config_.renderamt;
-    look.light = {static_cast<std::uint8_t>(config_.light[0]), static_cast<std::uint8_t>(config_.light[1]),
-                  static_cast<std::uint8_t>(config_.light[2])};
 }
 
 void EditorApp::apply_sky()
@@ -919,39 +899,6 @@ void EditorApp::draw_middle_panel()
             ImGui::EndCombo();
         }
     }
-
-    // How the effect's entity is set up in the map decides how the game colours it.
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted("In game");
-    ImGui::SameLine();
-    int mode = config_.lit ? 1 : 0;
-    ImGui::SetNextItemWidth(ui::px(120));
-    bool look_changed = ImGui::Combo("##render_mode", &mode, "Additive\0Normal (lit)\0");
-    ImGui::SetItemTooltip("The render mode of the effect's entity in the map.\n"
-                          "Additive: not lit by the map, faded by renderamt (in the colour and again in the alpha).\n"
-                          "Normal: its additive texture is lit by the map's light where it stands.");
-    config_.lit = mode == 1;
-    bool save_look = look_changed;
-    ImGui::SameLine();
-    if (!config_.lit) {
-        ImGui::SetNextItemWidth(ui::px(160));
-        look_changed |= ImGui::SliderInt("renderamt", &config_.renderamt, 0, 255, "%d", ImGuiSliderFlags_AlwaysClamp);
-        ImGui::SetItemTooltip("The entity's renderamt: 255 shows the texture as it is");
-    } else {
-        Rgb light{static_cast<std::uint8_t>(config_.light[0]), static_cast<std::uint8_t>(config_.light[1]),
-                  static_cast<std::uint8_t>(config_.light[2])};
-        if (ui::color_edit("Light", light, ImGuiColorEditFlags_NoInputs)) {
-            config_.light = {light.r, light.g, light.b};
-            look_changed = true;
-        }
-        ImGui::SetItemTooltip("The map's light where the entity stands (on the floor below it), as a colour:\n"
-                              "the game lights it from above with this, through its own light curve.");
-    }
-    save_look |= ImGui::IsItemDeactivatedAfterEdit();   // a drag is saved when it ends
-    if (look_changed)
-        apply_look();
-    if (save_look)
-        save_config();
 
     const ImVec2 avail = ImGui::GetContentRegionAvail();
     draw_canvas(ImVec2(std::max(avail.x, 10.0f), std::max(avail.y - bottom_height_, 10.0f)));

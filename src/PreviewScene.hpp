@@ -5,7 +5,6 @@
 #include <vector>
 
 #include "Baking.hpp"
-#include "EngineLook.hpp"
 #include "OrbitCamera.hpp"
 #include "ParticleSystem.hpp"
 
@@ -27,7 +26,6 @@ struct SceneFace {
     double depth;   // mean camera depth of the corners
     std::array<Point2, 4> pts;
     std::array<Point2, 4> uvs;
-    Rgba8 color;    // what the engine multiplies the texture by, and its alpha (see face_color)
 };
 
 struct SceneOptions {
@@ -35,7 +33,6 @@ struct SceneOptions {
     bool axes = true;
     bool bounds = true;
     bool sky = false;   // the game's sky behind everything (the renderer holds its images)
-    EntityLook look;    // how the effect's entity is set up in the map, which colours its faces
 };
 
 // A piece of the sky: part of one face of the cube around the camera, showing image `side` (an index

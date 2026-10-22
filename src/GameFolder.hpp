@@ -1,6 +1,5 @@
 #pragma once
 
-#include <array>
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -43,10 +42,6 @@ struct AppConfig {
     std::string game_folder;   // UTF-8; empty until it is set
     bool sky = false;          // the preview shows a sky of the game instead of the background colour
     std::string sky_name;      // which one ("desert"); empty: none chosen yet
-    // How the preview shows the effect's entity: its render mode in the map, and what goes with it.
-    bool lit = false;                          // render mode Normal (lit by the map) instead of Additive
-    int renderamt = 255;                       // Additive
-    std::array<int, 3> light{128, 128, 128};   // Normal: the map's light at the entity
 };
 
 // Where AppConfig is kept: %APPDATA%\ParticleMDL\config.json on Windows, else
