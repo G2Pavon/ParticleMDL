@@ -17,7 +17,7 @@ TEST_CASE("the zoom factor is 1 in the default view and grows as the camera come
     CHECK(camera.zoom_factor() == doctest::Approx(6.0));   // as close as it goes
     for (int i = 0; i < 100; ++i)
         camera.zoom(-1);
-    CHECK(camera.zoom_factor() == doctest::Approx(0.1));   // as far as it goes
+    CHECK(camera.zoom_factor() == doctest::Approx(0.5));   // as far as it goes
 
     camera.reset();
     CHECK(camera.zoom_factor() == doctest::Approx(1.0));

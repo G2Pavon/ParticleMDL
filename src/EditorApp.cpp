@@ -551,7 +551,7 @@ void EditorApp::draw_status_bar(float height)
     ImGui::SetCursorPosX(ImGui::GetWindowWidth() - style.WindowPadding.x - right_width);
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted(zoom);
-    ImGui::SetItemTooltip("The preview's zoom against the default view (10%% to 600%%).\nThe mouse wheel over the preview zooms.");
+    ImGui::SetItemTooltip("The preview's zoom against the default view (50%% to 600%%).\nThe mouse wheel over the preview zooms.");
     ImGui::SameLine();   // the memory text keeps its place, however wide the zoom text is
     ImGui::SetCursorPosX(ImGui::GetWindowWidth() - style.WindowPadding.x - (memory_width + style.ItemSpacing.x + bar_width));
     ImGui::TextColored(used_kb > limit_kb ? kError : ImGui::GetStyleColorVec4(ImGuiCol_Text), "%s", memory);

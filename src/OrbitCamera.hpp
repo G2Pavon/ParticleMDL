@@ -27,7 +27,9 @@ class OrbitCamera {
 public:
     static constexpr double kNear = 0.1;
     static constexpr double kFocalLength = 500.0;   // pixels, at UI scale 1
-    static constexpr double kDefaultDistance = 300.0, kMinDistance = 50.0, kMaxDistance = 3000.0;
+    // Farthest: half the default size, where the largest volume (256 on each axis) still fits with
+    // room around it, its far corner about 314 units from the origin.
+    static constexpr double kDefaultDistance = 300.0, kMinDistance = 50.0, kMaxDistance = 600.0;
 
     OrbitCamera() noexcept { reset(); }
 
@@ -42,7 +44,7 @@ public:
     double yaw() const noexcept { return yaw_; }
     double pitch() const noexcept { return pitch_; }
     double distance() const noexcept { return dist_; }
-    // How much larger than in the default view things look: 1 after reset(), 6 closest, 0.1 farthest.
+    // How much larger than in the default view things look: 1 after reset(), 6 closest, 0.5 farthest.
     double zoom_factor() const noexcept { return kDefaultDistance / dist_; }
 
     CamPoint to_camera_space(Vec3 p) const noexcept;
