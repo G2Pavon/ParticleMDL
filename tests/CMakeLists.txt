@@ -35,8 +35,9 @@ add_executable(particlemdl_tests
     test_utf8_paths.cpp
     test_golden.cpp)
 target_link_libraries(particlemdl_tests PRIVATE particles_editor_support doctest gs_flags)
+# doctest's own declaration of std::ostream is not enough for MSVC to print a std::string_view.
 target_compile_definitions(particlemdl_tests PRIVATE GS_GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/golden"
-    GS_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+    GS_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures" DOCTEST_CONFIG_USE_STD_HEADERS)
 # The golden snapshots were recorded on Linux/glibc. libm is not bit-exact
 # across platforms (audit M9), so elsewhere the golden tests are left out.
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")

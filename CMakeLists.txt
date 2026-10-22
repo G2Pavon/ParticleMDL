@@ -91,6 +91,11 @@ elseif(MSVC)
         target_compile_options(gs_flags INTERFACE /WX)
     endif()
 endif()
+if(WIN32)
+    # <windows.h> must not define min and max as macros: they break std::min and std::max.
+    # The C runtime's "may be unsafe" notices (getenv, sscanf) are about functions used safely here.
+    target_compile_definitions(gs_flags INTERFACE NOMINMAX _CRT_SECURE_NO_WARNINGS)
+endif()
 
 # ---------------------------------------------------------------------------
 # stb_image: decode imported textures (PNG, JPG, BMP, TGA). Single-header library.

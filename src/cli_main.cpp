@@ -11,6 +11,9 @@
 
 #ifdef _WIN32
 #include <cwchar>
+#ifndef NOMINMAX
+#define NOMINMAX   // or <windows.h> makes min and max macros, which break std::min (Baking.hpp)
+#endif
 #include <windows.h>
 #include <shellapi.h>
 #endif
