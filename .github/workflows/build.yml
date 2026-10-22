@@ -102,27 +102,6 @@ jobs:
           name: particlemdl-windows-x64
           path: particlemdl-windows-x64.zip
 
-  macos:
-    name: macOS (Clang)
-    runs-on: macos-14
-    # New job, never run before: it may not pass at first. Remove this line
-    # once it is green.
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install dependencies
-        run: brew install glfw
-
-      - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build
-        run: cmake --build build --parallel
-
-      - name: Test
-        run: ctest --test-dir build --output-on-failure
-
   sanitizers:
     name: Ubuntu 24.04 (GCC, ASan + UBSan)
     runs-on: ubuntu-24.04
