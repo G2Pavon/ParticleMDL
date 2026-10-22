@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <optional>
 
+#include "Skybox.hpp"
+
 namespace gs {
 
 namespace {
@@ -133,11 +135,43 @@ std::array<Vec3, 8> bounds_corners(const ParticleSystem& sys, double time)
     return c;
 }
 
+void add_sky(std::vector<SkyQuad>& out, const OrbitCamera& camera, Point2 center)
+{
+    // Each corner projected once per face: (kSkyGrid + 1)^2 of them.
+    constexpr int n = kSkyGrid + 1;
+    std::array<std::optional<Point2>, n * n> pts;
+    std::array<Point2, n * n> uvs;
+    for (int face = 0; face < 6; ++face) {
+        for (int j = 0; j < n; ++j)
+            for (int i = 0; i < n; ++i) {
+                const SkyPoint p = sky_point(face, -1.0 + 2.0 * i / kSkyGrid, -1.0 + 2.0 * j / kSkyGrid);
+                const CamPoint c = camera.direction_to_camera_space(p.dir);
+                const std::size_t k = static_cast<std::size_t>(j * n + i);
+                // In front of the camera by a margin, so no piece reaches across it.
+                pts[k] = c.depth > 0.05 ? camera.project_camera_space(c, center) : std::nullopt;
+                uvs[k] = {static_cast<float>(p.uv.x), static_cast<float>(p.uv.y)};
+            }
+        for (int j = 0; j < kSkyGrid; ++j)
+            for (int i = 0; i < kSkyGrid; ++i) {
+                const std::size_t k[4] = {static_cast<std::size_t>(j * n + i), static_cast<std::size_t>(j * n + i + 1),
+                                          static_cast<std::size_t>((j + 1) * n + i + 1),
+                                          static_cast<std::size_t>((j + 1) * n + i)};
+                if (!pts[k[0]] || !pts[k[1]] || !pts[k[2]] || !pts[k[3]])
+                    continue;
+                out.push_back({sky_face_side(face), {*pts[k[0]], *pts[k[1]], *pts[k[2]], *pts[k[3]]},
+                               {uvs[k[0]], uvs[k[1]], uvs[k[2]], uvs[k[3]]}});
+            }
+    }
+}
+
 void build_scene(const ParticleSystem& sys, const BakedPoses& baked, const OrbitCamera& camera, double time,
                  Point2 center, const SceneOptions& options, Scene& out)
 {
+    out.sky.clear();
     out.lines.clear();
     out.faces.clear();
+    if (options.sky)
+        add_sky(out.sky, camera, center);
     if (options.grid)
         add_grid(out, camera, center);
     if (options.axes)

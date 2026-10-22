@@ -161,6 +161,7 @@ add_library(particles_editor_support STATIC
     src/PreviewScene.cpp
     src/PathInput.cpp
     src/GameFolder.cpp
+    src/Skybox.cpp
     src/NativeDialog.cpp)
 target_link_libraries(particles_editor_support
     PUBLIC particles_core

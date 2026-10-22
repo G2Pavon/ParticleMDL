@@ -11,6 +11,7 @@
 #include "Exporter.hpp"
 #include "FileDialog.hpp"
 #include "GameFolder.hpp"
+#include "Skybox.hpp"
 #include "NativeDialog.hpp"
 #include "OrbitCamera.hpp"
 #include "ParticleSystem.hpp"
@@ -123,6 +124,11 @@ private:
     std::string game_folder_edit_;
     void draw_game_folder_window();
     void set_game_folder(std::string folder);
+    void save_config();
+    // The preview's sky: config_.sky and config_.sky_name say which, skies_ what the game folder has.
+    std::vector<std::string> skies_;
+    void refresh_skies();
+    void apply_sky();   // loads the chosen sky into the renderer, or takes it away
     bool show_about_ = false;
 
     float bottom_height_ = 170.0f;   // measured each frame, used to size the canvas

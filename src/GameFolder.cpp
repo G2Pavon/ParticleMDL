@@ -128,9 +128,14 @@ AppConfig read_app_config(const fs::path& path)
     if (!in)
         return config;
     const nlohmann::json j = nlohmann::json::parse(in, nullptr, false);
-    if (j.is_object())
-        if (const auto it = j.find("game_folder"); it != j.end() && it->is_string())
-            config.game_folder = it->get<std::string>();
+    if (!j.is_object())
+        return config;
+    if (const auto it = j.find("game_folder"); it != j.end() && it->is_string())
+        config.game_folder = it->get<std::string>();
+    if (const auto it = j.find("sky"); it != j.end() && it->is_boolean())
+        config.sky = it->get<bool>();
+    if (const auto it = j.find("sky_name"); it != j.end() && it->is_string())
+        config.sky_name = it->get<std::string>();
     return config;
 }
 
@@ -139,7 +144,8 @@ void write_app_config(const fs::path& path, const AppConfig& config)
     if (path.empty())
         throw std::runtime_error("there is no place to keep the settings (no home folder)");
     fs::create_directories(path.parent_path());
-    write_file_atomically(path, nlohmann::json{{"game_folder", config.game_folder}}.dump(2) + "\n");
+    const nlohmann::json j = {{"game_folder", config.game_folder}, {"sky", config.sky}, {"sky_name", config.sky_name}};
+    write_file_atomically(path, j.dump(2) + "\n");
 }
 
 } // namespace gs

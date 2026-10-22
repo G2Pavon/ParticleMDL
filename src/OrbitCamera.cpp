@@ -23,19 +23,26 @@ void OrbitCamera::zoom(double wheel) noexcept
     dist_ = std::clamp(dist_ - wheel * 50.0, kMinDistance, kMaxDistance);
 }
 
-CamPoint OrbitCamera::to_camera_space(Vec3 p) const noexcept
+CamPoint OrbitCamera::direction_to_camera_space(Vec3 d) const noexcept
 {
     const double cyaw = std::cos(yaw_), syaw = std::sin(yaw_);
     const double cpitch = std::cos(pitch_), spitch = std::sin(pitch_);
 
-    const double x1 = p.x * cyaw - p.y * syaw;
-    const double y1 = p.x * syaw + p.y * cyaw;
-    const double z1 = p.z;
+    const double x1 = d.x * cyaw - d.y * syaw;
+    const double y1 = d.x * syaw + d.y * cyaw;
+    const double z1 = d.z;
 
     const double x2 = x1 * cpitch - z1 * spitch;
     const double z2 = x1 * spitch + z1 * cpitch;
 
-    return {y1, z2, x2 + dist_};
+    return {y1, z2, x2};
+}
+
+CamPoint OrbitCamera::to_camera_space(Vec3 p) const noexcept
+{
+    CamPoint c = direction_to_camera_space(p);
+    c.depth += dist_;   // the camera is dist_ back from the origin it looks at
+    return c;
 }
 
 std::optional<Point2> OrbitCamera::project_camera_space(const CamPoint& c, Point2 center) const noexcept

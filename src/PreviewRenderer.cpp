@@ -37,11 +37,26 @@ void PreviewRenderer::set_texture(const IndexedImage& image)
     game_.upload(to_rgba(expand(image)));
 }
 
+void PreviewRenderer::set_sky(const std::array<RgbaImage, 6>* sides)
+{
+    has_sky_ = sides != nullptr;
+    if (sides)
+        for (std::size_t i = 0; i < sky_.size(); ++i)
+            sky_[i].upload((*sides)[i]);
+}
+
 void PreviewRenderer::draw(ImDrawList* dl, ImVec2 origin, ImVec2 size, Rgb background, const Scene& scene) const
 {
     const ImVec2 end(origin.x + size.x, origin.y + size.y);
     dl->PushClipRect(origin, end, true);
     dl->AddRectFilled(origin, end, IM_COL32(background.r, background.g, background.b, 255));
+
+    // The sky, opaque, behind everything (the engine draws it without blending too).
+    if (has_sky_)
+        for (const SkyQuad& q : scene.sky)
+            dl->AddImageQuad(sky_[static_cast<std::size_t>(q.side)].imgui_id(), to_imvec(q.pts[0]), to_imvec(q.pts[1]),
+                             to_imvec(q.pts[2]), to_imvec(q.pts[3]), to_imvec(q.uvs[0]), to_imvec(q.uvs[1]),
+                             to_imvec(q.uvs[2]), to_imvec(q.uvs[3]));
 
     for (const SceneLine& l : scene.lines)
         dl->AddLine(to_imvec(l.a), to_imvec(l.b), to_imcol(l.color), ui::px(l.thickness));

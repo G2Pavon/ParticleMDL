@@ -40,6 +40,8 @@ std::optional<std::string> subfolder_within_models(const std::filesystem::path& 
 // What the editor keeps between sessions.
 struct AppConfig {
     std::string game_folder;   // UTF-8; empty until it is set
+    bool sky = false;          // the preview shows a sky of the game instead of the background colour
+    std::string sky_name;      // which one ("desert"); empty: none chosen yet
 };
 
 // Where AppConfig is kept: %APPDATA%\ParticleMDL\config.json on Windows, else

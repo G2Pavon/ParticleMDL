@@ -48,6 +48,9 @@ public:
     double zoom_factor() const noexcept { return kDefaultDistance / dist_; }
 
     CamPoint to_camera_space(Vec3 p) const noexcept;
+    // A direction seen from the camera: turned like a point, but not moved, as a point infinitely
+    // far away (the sky) would be.
+    CamPoint direction_to_camera_space(Vec3 d) const noexcept;
     // nullopt when the point is behind the near plane.
     std::optional<Point2> project_camera_space(const CamPoint& c, Point2 center) const noexcept;
     std::optional<Projection> project(Vec3 p, Point2 center) const noexcept;

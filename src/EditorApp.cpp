@@ -1,6 +1,7 @@
 #include "EditorApp.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <fstream>
 
@@ -80,6 +81,8 @@ EditorApp::EditorApp()
       game_dialog_("Game Folder", FileDialog::Mode::Directory)
 {
     refresh_export_dir_problem();
+    refresh_skies();
+    apply_sky();
     if (config_.game_folder.empty()) {   // the first start: exports need it
         show_game_folder_ = true;
         game_folder_edit_.clear();
@@ -216,11 +219,53 @@ void EditorApp::set_game_folder(std::string folder)
 {
     config_.game_folder = std::move(folder);
     refresh_export_dir_problem();
+    refresh_skies();
+    apply_sky();
+    set_status("Game folder: " + config_.game_folder, StatusTone::Success);
+    save_config();
+}
+
+void EditorApp::save_config()
+{
     try {
         write_app_config(config_path_, config_);
-        set_status("Game folder: " + config_.game_folder, StatusTone::Success);
     } catch (const std::exception& e) {
-        set_status(std::string("The game folder is set for this session only: ") + e.what(), StatusTone::Warning);
+        set_status(std::string("The settings are kept for this session only: ") + e.what(), StatusTone::Warning);
+    }
+}
+
+void EditorApp::refresh_skies()
+{
+    const std::filesystem::path game = from_utf8(config_.game_folder);
+    skies_ = game_folder_problem(game) ? std::vector<std::string>{} : list_skyboxes(game);
+}
+
+void EditorApp::apply_sky()
+{
+    scene_options_.sky = false;
+    renderer_.set_sky(nullptr);
+    if (!config_.sky || skies_.empty())
+        return;
+    // The chosen sky, else the engine's default (desert), else the first there is.
+    auto named = [&](std::string_view name) {
+        return std::ranges::find_if(skies_, [&](const std::string& s) {
+            return s.size() == name.size() && std::equal(s.begin(), s.end(), name.begin(), [](char a, char b) {
+                       return std::tolower(static_cast<unsigned char>(a)) == std::tolower(static_cast<unsigned char>(b));
+                   });
+        });
+    };
+    auto it = named(config_.sky_name);
+    if (it == skies_.end())
+        it = named("desert");
+    if (it == skies_.end())
+        it = skies_.begin();
+    config_.sky_name = *it;
+    try {
+        const auto sides = load_skybox(from_utf8(config_.game_folder), config_.sky_name);
+        renderer_.set_sky(&sides);
+        scene_options_.sky = true;
+    } catch (const std::exception& e) {
+        set_status("Sky " + config_.sky_name + ": " + e.what(), StatusTone::Error);
     }
 }
 
@@ -818,6 +863,37 @@ void EditorApp::draw_middle_panel()
     ImGui::Checkbox("Grid", &scene_options_.grid);
     ImGui::SameLine();
     ImGui::Checkbox("Bounds", &scene_options_.bounds);
+    ImGui::SameLine();
+    // The game's sky instead of the background colour, from the game folder's gfx/env.
+    ImGui::BeginDisabled(skies_.empty());
+    bool sky = config_.sky && !skies_.empty();
+    if (ImGui::Checkbox("Skybox", &sky)) {
+        config_.sky = sky;
+        apply_sky();
+        save_config();
+    }
+    ImGui::EndDisabled();
+    if (!skies_.empty())
+        ImGui::SetItemTooltip("The game's sky behind the effect, as the game shows it for an entity at yaw 0");
+    else if (game_folder_problem(from_utf8(config_.game_folder)))
+        ImGui::SetItemTooltip("Set the game folder in Settings > Game Folder to show its skies");
+    else
+        ImGui::SetItemTooltip("The game folder has no sky in gfx/env (all six sides of one)");
+    if (config_.sky && !skies_.empty()) {
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(ui::px(140));
+        if (ImGui::BeginCombo("##sky", config_.sky_name.c_str())) {
+            if (ImGui::IsWindowAppearing())
+                refresh_skies();   // skies added to the game since
+            for (const std::string& name : skies_)
+                if (ImGui::Selectable(name.c_str(), name == config_.sky_name) && name != config_.sky_name) {
+                    config_.sky_name = name;
+                    apply_sky();
+                    save_config();
+                }
+            ImGui::EndCombo();
+        }
+    }
 
     const ImVec2 avail = ImGui::GetContentRegionAvail();
     draw_canvas(ImVec2(std::max(avail.x, 10.0f), std::max(avail.y - bottom_height_, 10.0f)));

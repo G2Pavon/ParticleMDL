@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+
 #include <imgui.h>
 
 #include "GlTexture.hpp"
@@ -17,6 +19,9 @@ public:
     void update_textures(const TextureSettings& s);
     // Shows a texture that was made elsewhere (see TextureJob).
     void set_texture(const IndexedImage& image);
+    // The six sides of the sky the scene's sky pieces show (kSkySides order), or none.
+    void set_sky(const std::array<RgbaImage, 6>* sides);
+    bool has_sky() const noexcept { return has_sky_; }
     // The exported texture, palettized exactly as written to the BMP.
     ImTextureID swatch() const { return game_.imgui_id(); }
 
@@ -26,6 +31,8 @@ public:
 
 private:
     GlTexture game_;   // export texture: color premultiplied by intensity, palettized
+    std::array<GlTexture, 6> sky_;
+    bool has_sky_ = false;
 };
 
 } // namespace gs
