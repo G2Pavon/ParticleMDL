@@ -27,13 +27,14 @@ class OrbitCamera {
 public:
     static constexpr double kNear = 0.1;
     static constexpr double kFocalLength = 500.0;   // pixels, at UI scale 1
+    static constexpr double kDefaultDistance = 300.0, kMinDistance = 50.0, kMaxDistance = 3000.0;
 
     OrbitCamera() noexcept { reset(); }
 
     void reset() noexcept;
     // Mouse drag in pixels; pitch is clamped just short of straight up/down.
     void orbit(double dx, double dy) noexcept;
-    // Mouse wheel notches; distance is clamped to [50, 3000].
+    // Mouse wheel notches; distance is clamped to [kMinDistance, kMaxDistance].
     void zoom(double wheel) noexcept;
     // Focal length in pixels (grows with the UI scale on HiDPI screens).
     void set_focal_length(double f) noexcept { focal_length_ = f; }
@@ -41,6 +42,8 @@ public:
     double yaw() const noexcept { return yaw_; }
     double pitch() const noexcept { return pitch_; }
     double distance() const noexcept { return dist_; }
+    // How much larger than in the default view things look: 1 after reset(), 6 closest, 0.1 farthest.
+    double zoom_factor() const noexcept { return kDefaultDistance / dist_; }
 
     CamPoint to_camera_space(Vec3 p) const noexcept;
     // nullopt when the point is behind the near plane.

@@ -9,7 +9,7 @@ void OrbitCamera::reset() noexcept
 {
     yaw_ = 3 * kPi / 4.0;   // 135 deg: camera in the +X, +Y quadrant
     pitch_ = kPi / 6.0;     // 30 deg look-down
-    dist_ = 300.0;
+    dist_ = kDefaultDistance;
 }
 
 void OrbitCamera::orbit(double dx, double dy) noexcept
@@ -20,7 +20,7 @@ void OrbitCamera::orbit(double dx, double dy) noexcept
 
 void OrbitCamera::zoom(double wheel) noexcept
 {
-    dist_ = std::clamp(dist_ - wheel * 50.0, 50.0, 3000.0);
+    dist_ = std::clamp(dist_ - wheel * 50.0, kMinDistance, kMaxDistance);
 }
 
 CamPoint OrbitCamera::to_camera_space(Vec3 p) const noexcept

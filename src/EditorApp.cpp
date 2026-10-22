@@ -530,7 +530,11 @@ void EditorApp::draw_status_bar(float height)
     std::snprintf(memory, sizeof memory, "Sequence memory: %.1f / %.1f KB", used_kb, limit_kb);
     const float bar_width = ui::px(160);
     const float memory_width = ImGui::CalcTextSize(memory).x;
-    const float right_width = memory_width + style.ItemSpacing.x + bar_width;
+    // Before it, how far the preview is zoomed, against the default view.
+    char zoom[32];
+    std::snprintf(zoom, sizeof zoom, "Zoom: %.0f%%", camera_.zoom_factor() * 100.0);
+    const float zoom_width = ImGui::CalcTextSize("Zoom: 600%").x;   // the widest, so the text does not shift
+    const float right_width = zoom_width + style.ItemSpacing.x * 3 + memory_width + style.ItemSpacing.x + bar_width;
 
     // Left: the last status message, cut at the memory text.
     const float message_width = std::max(0.0f, ImGui::GetContentRegionAvail().x - right_width - style.ItemSpacing.x);
@@ -546,6 +550,10 @@ void EditorApp::draw_status_bar(float height)
     ImGui::SameLine();
     ImGui::SetCursorPosX(ImGui::GetWindowWidth() - style.WindowPadding.x - right_width);
     ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(zoom);
+    ImGui::SetItemTooltip("The preview's zoom against the default view (10%% to 600%%).\nThe mouse wheel over the preview zooms.");
+    ImGui::SameLine();   // the memory text keeps its place, however wide the zoom text is
+    ImGui::SetCursorPosX(ImGui::GetWindowWidth() - style.WindowPadding.x - (memory_width + style.ItemSpacing.x + bar_width));
     ImGui::TextColored(used_kb > limit_kb ? kError : ImGui::GetStyleColorVec4(ImGuiCol_Text), "%s", memory);
     budget_tooltip();
     ImGui::SameLine();
