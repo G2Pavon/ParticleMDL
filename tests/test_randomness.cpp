@@ -284,6 +284,7 @@ TEST_CASE("the mesh of a static quad is drawn at the size of its particle")
         if (triangles && std::sscanf(line.c_str(), " %d %lf %lf %lf", &bone, &x, &y, &z) == 4)
             extent[static_cast<std::size_t>(bone)] = std::max({extent[static_cast<std::size_t>(bone)], std::abs(x), std::abs(z)});
     }
+    in.close();   // Windows does not delete a file that is open
     std::filesystem::remove_all(dir);
     for (std::size_t i = 0; i < sys.particles().size(); ++i)
         CHECK(extent[i + 1] == doctest::Approx(5.0 * sys.particles()[i].size).epsilon(1e-5));

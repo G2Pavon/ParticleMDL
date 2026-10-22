@@ -132,6 +132,7 @@ TEST_CASE("the reference mesh of a box names the shared corner bones, and no bon
             bones_in_triangles.insert(std::stoi(line.substr(2)));
         }
     }
+    in.close();   // Windows does not delete a file that is open
     std::filesystem::remove_all(dir);
 
     // 3 particles x 8 corners; the particle bones themselves hold no vertex with vertex bones.

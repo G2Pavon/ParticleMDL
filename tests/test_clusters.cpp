@@ -175,6 +175,7 @@ TEST_CASE("the reference mesh holds every copy on its particle's bone")
             ++vertex_lines;
         }
     }
+    in.close();   // Windows does not delete a file that is open
     fs::remove_all(dir);
 
     // 4 particles x 3 copies x 1 quad x 4 triangles (double sided) x 3 vertex lines

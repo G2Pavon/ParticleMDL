@@ -147,6 +147,7 @@ TEST_CASE("the sequence of a one-shot effect has no loop flag, a loop has")
         std::ifstream in(dir / "custom_particles.qc");
         std::stringstream text;
         text << in.rdbuf();
+        in.close();   // Windows does not delete a file that is open
         fs::remove_all(dir);
         return text.str();
     };

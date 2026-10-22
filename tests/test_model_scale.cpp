@@ -26,6 +26,7 @@ std::string qc_of(const Settings& s)
     std::ifstream in(dir / (s.model_name + ".qc"));
     std::stringstream text;
     text << in.rdbuf();
+    in.close();   // Windows does not delete a file that is open
     fs::remove_all(dir);
     return text.str();
 }
