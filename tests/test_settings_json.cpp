@@ -63,8 +63,9 @@ TEST_CASE("awkward values survive a write and a read")
     s.model_name = "with \"quotes\", \\ and ünïcode";
     s.texture.file = "dir/with space/tex.png";
     s.duration = 0.1 + 0.2;   // not exactly representable
-    s.gravity = -1e-7;
-    s.velocity = {1.0 / 3.0, -2.5, 1e6};
+    s.drag = 1e-7;
+    s.lifespan = 1.0 / 3.0;
+    s.velocity = {-2, 7, 1e6};   // whole numbers go here
     s.texture.core_color = {0, 1, 255};
 
     const SettingsLoad loaded = settings_from_json(json::parse(settings_file_text(s)), Settings{});

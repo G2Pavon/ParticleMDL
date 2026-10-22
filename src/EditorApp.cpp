@@ -664,47 +664,47 @@ void EditorApp::draw_left_panel()
     }
 
     group_label("Volume");
-    changed |= reset_slider("volume_width", "Width (X)", s.volume_width, 1, kMaxVolume, 128);
-    changed |= reset_slider("volume_depth", "Depth (Y)", s.volume_depth, 1, kMaxVolume, 128);
-    changed |= reset_slider("volume_height", "Height (Z)", s.volume_height, 1, kMaxVolume, 256);
+    changed |= whole_slider("volume_width", "Width (X)", s.volume_width, 1, kMaxVolume, 128);
+    changed |= whole_slider("volume_depth", "Depth (Y)", s.volume_depth, 1, kMaxVolume, 128);
+    changed |= whole_slider("volume_height", "Height (Z)", s.volume_height, 1, kMaxVolume, 256);
 
     group_label("Velocity");
-    changed |= reset_slider("velocity.x", "X", s.velocity.x, -500, 500, 0);
-    changed |= reset_slider("velocity.y", "Y", s.velocity.y, -500, 500, 0);
-    changed |= reset_slider("velocity.z", "Z", s.velocity.z, -500, 500, 0);
+    changed |= whole_slider("velocity.x", "X", s.velocity.x, -500, 500, 0);
+    changed |= whole_slider("velocity.y", "Y", s.velocity.y, -500, 500, 0);
+    changed |= whole_slider("velocity.z", "Z", s.velocity.z, -500, 500, 0);
 
     group_label("Rotation");
-    changed |= reset_slider("spin.x", "X (deg/s)", s.spin.x, -360, 360, 0);
-    changed |= reset_slider("spin.y", "Y (deg/s)", s.spin.y, -360, 360, 0);
-    changed |= reset_slider("spin.z", "Z (deg/s)", s.spin.z, -360, 360, 0);
+    changed |= whole_slider("spin.x", "X (deg/s)", s.spin.x, -360, 360, 0);
+    changed |= whole_slider("spin.y", "Y (deg/s)", s.spin.y, -360, 360, 0);
+    changed |= whole_slider("spin.z", "Z (deg/s)", s.spin.z, -360, 360, 0);
 
     group_label("Emitter");
-    changed |= reset_slider("emission_angle", "Angle (Fan)", s.emission_angle, 1, 360, 360);
+    changed |= whole_slider("emission_angle", "Angle (Fan)", s.emission_angle, 1, 360, 360);
     ImGui::SetItemTooltip("The sector of the disk the particles start in and fly out along (360 = all around)");
-    changed |= reset_slider("spawn_radius", "Radius", s.spawn_radius, 0, 500, 0);
+    changed |= whole_slider("spawn_radius", "Radius", s.spawn_radius, 0, 500, 0);
     ImGui::SetItemTooltip("Particles start on a disk of this radius (on its edge with Hollow Ring Mode)");
-    changed |= reset_slider("spawn_height", "Height", s.spawn_height, 0, 400, 0);
+    changed |= whole_slider("spawn_height", "Height", s.spawn_height, 0, 400, 0);
     ImGui::SetItemTooltip("Particles start up to this far above or below the disk");
-    changed |= reset_slider("emitter_tilt.x", "Tilt X (Pitch)", s.emitter_tilt.x, -180, 180, 0);
-    changed |= reset_slider("emitter_tilt.y", "Tilt Y (Yaw)", s.emitter_tilt.y, -180, 180, 0);
-    changed |= reset_slider("emitter_tilt.z", "Tilt Z (Roll)", s.emitter_tilt.z, -180, 180, 0);
+    changed |= whole_slider("emitter_tilt.x", "Tilt X (Pitch)", s.emitter_tilt.x, -180, 180, 0);
+    changed |= whole_slider("emitter_tilt.y", "Tilt Y (Yaw)", s.emitter_tilt.y, -180, 180, 0);
+    changed |= whole_slider("emitter_tilt.z", "Tilt Z (Roll)", s.emitter_tilt.z, -180, 180, 0);
     changed |= ImGui::Checkbox("Hollow Ring Mode", &s.hollow_ring);
 
     group_label("Physics");
-    changed |= reset_slider("speed", "Horizontal Speed", s.speed, -200, 400, 60);
-    changed |= reset_slider("burst", "Vertical Burst", s.burst, -300, 300, 120);
-    changed |= reset_slider("spread", "Spread", s.spread, 0, 150, 30);
-    changed |= reset_slider("gravity", "Gravity", s.gravity, -600, 200, -150);
+    changed |= whole_slider("speed", "Horizontal Speed", s.speed, -200, 400, 60);
+    changed |= whole_slider("burst", "Vertical Burst", s.burst, -300, 300, 120);
+    changed |= whole_slider("spread", "Spread", s.spread, 0, 150, 30);
+    changed |= whole_slider("gravity", "Gravity", s.gravity, -600, 200, -150);
     changed |= reset_slider("drag", "Drag", s.drag, 0.0, 5.0, 0.0, "%.2f");
     changed |= reset_slider("bounce", "Bounce", s.bounce, 0.0, 0.95, 0.0, "%.2f");
     ImGui::SetItemTooltip("0: no floor. Above 0 particles bounce off a floor at the height below and keep this share of\n"
                           "their speed at each hit; a particle that starts under the floor does not bounce.");
     if (s.bounce > 0.0)
-        changed |= reset_slider("floor_height", "Floor Height", s.floor_height, -300, 300, 0);
+        changed |= whole_slider("floor_height", "Floor Height", s.floor_height, -300, 300, 0);
     ImGui::SetItemTooltip("How fast the velocity dies away, per second (0 = none).\nWith gravity it gives a terminal speed.");
-    changed |= reset_slider("turbulence", "Turbulence", s.turbulence, 0, 200, 0);
-    changed |= reset_slider("vortex_spin", "Vortex Spin", s.vortex_spin, -720, 720, 0);
-    changed |= reset_slider("vortex_pull", "Vortex Pull", s.vortex_pull, -300, 300, 0);
+    changed |= whole_slider("turbulence", "Turbulence", s.turbulence, 0, 200, 0);
+    changed |= whole_slider("vortex_spin", "Vortex Spin", s.vortex_spin, -720, 720, 0);
+    changed |= whole_slider("vortex_pull", "Vortex Pull", s.vortex_pull, -300, 300, 0);
     if (!same_rolled_values(before, s, SeedSide::System))
         system_base_.reset();   // set by hand: these are the values the seed varies now
     dirty_ |= changed;
@@ -855,8 +855,8 @@ void EditorApp::draw_right_panel()
 
     group_label("Geometry");
     changed |= enum_combo("Type", s.geometry);
-    changed |= reset_slider("quad_width", "Width", s.quad_width, 1, 100, 6);
-    changed |= reset_slider("quad_height", "Height", s.quad_height, 1, 100, 6);
+    changed |= whole_slider("quad_width", "Width", s.quad_width, 1, 100, 6);
+    changed |= whole_slider("quad_height", "Height", s.quad_height, 1, 100, 6);
     changed |= reset_slider("size_variance", "Size Variance", s.size_variance, 0.0, 0.9, 0.0, "%.2f");
     ImGui::SetItemTooltip("Each particle is up to this fraction larger or smaller, at random");
     changed |= ImGui::Checkbox("Double Sided", &s.double_sided);
@@ -866,20 +866,20 @@ void EditorApp::draw_right_panel()
                           "at random: many quads for one bone. studiomdl accepts 2048 vertices in a model.\n"
                           "Needs Static scaling (vertex bones scale each quad on its own).");
     if (s.cluster_size > 1)
-        changed |= reset_slider("cluster_radius", "Cluster Radius", s.cluster_radius, 0, 200, 20);
+        changed |= whole_slider("cluster_radius", "Cluster Radius", s.cluster_radius, 0, 200, 20);
     ImGui::EndDisabled();
-    changed |= reset_slider("mesh_rotation.x", "Rot X (Pitch)", s.mesh_rotation.x, -180, 180, 0);
-    changed |= reset_slider("mesh_rotation.y", "Rot Y (Yaw)", s.mesh_rotation.y, -180, 180, 0);
-    changed |= reset_slider("mesh_rotation.z", "Rot Z (Roll)", s.mesh_rotation.z, -180, 180, 0);
+    changed |= whole_slider("mesh_rotation.x", "Rot X (Pitch)", s.mesh_rotation.x, -180, 180, 0);
+    changed |= whole_slider("mesh_rotation.y", "Rot Y (Yaw)", s.mesh_rotation.y, -180, 180, 0);
+    changed |= whole_slider("mesh_rotation.z", "Rot Z (Roll)", s.mesh_rotation.z, -180, 180, 0);
 
     group_label("Rotation");
     changed |= ImGui::Checkbox("Face Direction of Travel", &s.align_to_velocity);
     ImGui::SetItemTooltip("The quad's Z axis points the way the particle moves (sparks, rain, tracers).\n"
                           "Spin Z then rolls it around that direction; Spin X and Y have no effect.");
-    changed |= reset_slider("particle_spin.x", "X (deg/s)", s.particle_spin.x, -360, 360, 0);
-    changed |= reset_slider("particle_spin.y", "Y (deg/s)", s.particle_spin.y, -360, 360, 0);
-    changed |= reset_slider("particle_spin.z", "Z (deg/s)", s.particle_spin.z, -360, 360, 0);
-    changed |= reset_slider("spin_spread", "Random Spread", s.spin_spread, 0, 360, 0);
+    changed |= whole_slider("particle_spin.x", "X (deg/s)", s.particle_spin.x, -360, 360, 0);
+    changed |= whole_slider("particle_spin.y", "Y (deg/s)", s.particle_spin.y, -360, 360, 0);
+    changed |= whole_slider("particle_spin.z", "Z (deg/s)", s.particle_spin.z, -360, 360, 0);
+    changed |= whole_slider("spin_spread", "Random Spread", s.spin_spread, 0, 360, 0);
     if (!same_rolled_values(before, s, SeedSide::Particle))
         particle_base_.reset();   // set by hand: these are the values the seed varies now
     dirty_ |= changed;

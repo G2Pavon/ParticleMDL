@@ -89,12 +89,25 @@ int nearest_texture_size(int size)
 
 } // namespace
 
+bool round_whole_values(Settings& s) noexcept
+{
+    bool changed = false;
+    for_each_whole_value(s, [&](double& v) {
+        if (const double whole = std::round(v); whole != v && std::isfinite(v)) {
+            v = whole;
+            changed = true;
+        }
+    });
+    return changed;
+}
+
 bool validate(Settings& s)
 {
     const Settings defaults;
     ResetInvalid reset{defaults};
     for_each_field(s, reset);
     bool changed = reset.changed;
+    changed |= round_whole_values(s);
 
     changed |= clamp_value(s.count, 1, max_particles(s.geometry, s.scale_mode));
     changed |= clamp_value(s.duration, kMinDuration, kMaxDuration);

@@ -35,6 +35,10 @@ bool reset_slider(const char* id, const char* label, int& v, int vmin, int vmax,
 bool reset_slider(const char* id, const char* label, double& v, double vmin, double vmax, double def,
                   const char* format = "%.6g", ImGuiSliderFlags flags = 0);
 
+// A double setting that only takes whole numbers (see for_each_whole_value): the slider steps by 1 and
+// a typed value is rounded.
+bool whole_slider(const char* id, const char* label, double& v, double vmin, double vmax, double def);
+
 // A random seed: typed in, or a new one from the "Seed" button beside it, across the panel with no
 // label (the tooltip says which seed it is). `id` keeps two of them apart.
 bool seed_input(const char* id, int& seed, const char* tooltip);

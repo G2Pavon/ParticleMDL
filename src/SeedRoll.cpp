@@ -141,6 +141,8 @@ void roll_settings(Settings& s, const Settings& base, SeedSide side, int seed)
         for_each_rolled(s, side, [&](auto& v, double, double, Kind) { v = static_cast<std::remove_reference_t<decltype(v)>>(from[i++]); });
     } else {
         RollRng rng(side, seed);
+        std::vector<const double*> whole;   // the values drawn as whole numbers
+        for_each_whole_value(s, [&](const double& v) { whole.push_back(&v); });
         // The particle count and the cluster size are what make an export too large: they are
         // drawn last, among the values that keep it within studiomdl's limits.
         int* const sized = side == SeedSide::System ? &s.count : &s.cluster_size;
@@ -158,6 +160,8 @@ void roll_settings(Settings& s, const Settings& base, SeedSide side, int seed)
                 v = static_cast<T>(std::clamp(0.0, lo, hi));   // its rest value: 0, or no cluster
             else if constexpr (std::is_integral_v<T>)   // every whole number in the range equally likely
                 v = static_cast<T>(std::min(lo + std::floor(u * (hi - lo + 1.0)), hi));
+            else if (std::ranges::find(whole, static_cast<const void*>(&v)) != whole.end())
+                v = std::round(lo + u * (hi - lo));   // the ranges of these have whole ends
             else
                 v = lo + u * (hi - lo);
         });

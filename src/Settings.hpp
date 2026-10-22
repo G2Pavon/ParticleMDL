@@ -187,6 +187,25 @@ void for_each_field(S& s, F&& f)
     f("spin_spread", s.spin_spread);
 }
 
+// The values that only take whole numbers (units, degrees, degrees per second, speeds): all but the
+// duration and the fractions (lifespan and its variance, burst window, size variance, drag, bounce,
+// hardness, the vertex-bone scales and the model scale). The int settings are whole already.
+template <typename S, typename F>
+    requires std::same_as<std::remove_const_t<S>, Settings>
+void for_each_whole_value(S& s, F&& f)
+{
+    for (auto* v : {&s.volume_width, &s.volume_depth, &s.volume_height, &s.velocity.x, &s.velocity.y, &s.velocity.z,
+                    &s.spin.x, &s.spin.y, &s.spin.z, &s.emission_angle, &s.spawn_radius, &s.spawn_height,
+                    &s.emitter_tilt.x, &s.emitter_tilt.y, &s.emitter_tilt.z, &s.speed, &s.burst, &s.spread, &s.gravity,
+                    &s.floor_height, &s.turbulence, &s.vortex_spin, &s.vortex_pull, &s.quad_width, &s.quad_height,
+                    &s.cluster_radius, &s.mesh_rotation.x, &s.mesh_rotation.y, &s.mesh_rotation.z, &s.particle_spin.x,
+                    &s.particle_spin.y, &s.particle_spin.z, &s.spin_spread})
+        f(*v);
+}
+
+// Rounds every value of for_each_whole_value() to the nearest whole number; true if one changed.
+bool round_whole_values(Settings& s) noexcept;
+
 int quads_for(Geometry g) noexcept;
 // Distinct corner positions of a geometry. The six quads of a box share eight; the others share none.
 int corners_for(Geometry g) noexcept;

@@ -64,6 +64,16 @@ bool reset_slider(const char* id, const char* label, double& v, double vmin, dou
     return changed;
 }
 
+bool whole_slider(const char* id, const char* label, double& v, double vmin, double vmax, double def)
+{
+    bool changed = reset_slider(id, label, v, vmin, vmax, def, "%.0f");
+    if (const double whole = std::round(v); whole != v) {
+        v = whole;
+        changed = true;
+    }
+    return changed;
+}
+
 bool seed_input(const char* id, int& seed, const char* tooltip)
 {
     ImGui::PushID(id);

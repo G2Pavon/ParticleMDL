@@ -275,6 +275,8 @@ std::vector<std::string> apply_json(Settings& s, const json& j)
             warn_bad_value(w, "seed", describe<int>(), *it);
         }
     }
+    // A value that takes whole numbers is rounded without a word: it is not out of range.
+    round_whole_values(s);
     // Files saved before depth existed had one width for X and Y: keep that look.
     if (!j.contains("volume_depth") && j.contains("volume_width"))
         s.volume_depth = s.volume_width;
