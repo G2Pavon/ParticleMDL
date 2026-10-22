@@ -115,6 +115,7 @@ bool validate(Settings& s)
     changed |= clamp_value(s.texture.hardness, kMinHardness, kMaxHardness);
     changed |= clamp_value(s.scale_start, 0.0, kMaxScale);
     changed |= clamp_value(s.scale_end, 0.0, kMaxScale);
+    changed |= clamp_value(s.model_scale, kMinModelScale, kMaxModelScale);
     changed |= clamp_value(s.volume_width, 1.0, kMaxVolume);
     changed |= clamp_value(s.volume_depth, 1.0, kMaxVolume);
     changed |= clamp_value(s.volume_height, 1.0, kMaxVolume);

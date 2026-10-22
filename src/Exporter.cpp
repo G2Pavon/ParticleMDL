@@ -43,15 +43,27 @@ void write_nodes(std::string& out, const ParticleSystem& sys)
     out += "end\n";
 }
 
+// A number for the .qc: as few digits as it needs, with at least one decimal ("1.0", "0.25").
+std::string qc_number(double v)
+{
+    std::string text = std::format("{:.6f}", v);
+    while (text.back() == '0' && text[text.size() - 2] != '.')
+        text.pop_back();
+    return text;
+}
+
 std::string make_qc(const ParticleSystem& sys, const BakedPoses& baked, const std::string& safe,
                     const std::string& tex_ref)
 {
     std::string out;
-    emit(out, "$modelname \"{}.mdl\"\n$cd \".\"\n$cdtexture \".\"\n$scale 1.0\n\n", safe);
+    emit(out, "$modelname \"{}.mdl\"\n$cd \".\"\n$cdtexture \".\"\n$scale {}\n\n", safe, qc_number(sys.settings().model_scale));
 
     // The exact extent of the animation with a unit of margin. studiomdl
-    // computes the sequence box (used for culling) itself; this is the header box.
-    const ParticleSystem::Bounds b = animation_bounds(sys, baked);
+    // computes the sequence box (used for culling) itself, scaled; this is the header box, which
+    // studiomdl takes as it is written (Sven Co-op's: unscaled by $scale), so it is scaled here.
+    ParticleSystem::Bounds b = animation_bounds(sys, baked);
+    b.min = b.min * sys.settings().model_scale;
+    b.max = b.max * sys.settings().model_scale;
     emit(out, "$bbox {:.2f} {:.2f} {:.2f} {:.2f} {:.2f} {:.2f}\n\n", std::floor(b.min.x) - 1, std::floor(b.min.y) - 1,
          std::floor(b.min.z) - 1, std::ceil(b.max.x) + 1, std::ceil(b.max.y) + 1, std::ceil(b.max.z) + 1);
 

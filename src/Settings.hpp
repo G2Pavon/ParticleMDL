@@ -42,6 +42,9 @@ struct TextureSettings {
 // units, times in seconds.
 struct Settings {
     std::string model_name = "custom_particles";
+    // Written to the .qc as $scale: studiomdl multiplies the whole model, its animation included, by
+    // it. An export setting like the name: presets and File > New leave it as it is.
+    double model_scale = 1.0;
 
     // Animation
     int count = 64;
@@ -130,6 +133,7 @@ template <typename S, typename F>
 void for_each_field(S& s, F&& f)
 {
     f("model_name", s.model_name);
+    f("model_scale", s.model_scale);
     f("count", s.count);
     f("duration", s.duration);
     f("lifespan", s.lifespan);
@@ -207,6 +211,7 @@ inline constexpr double kMaxBounce = 0.95;
 inline constexpr double kMaxFloorHeight = 2000.0;
 inline constexpr double kMinHardness = 0.05, kMaxHardness = 20.0;
 inline constexpr double kMaxScale = 100.0;
+inline constexpr double kMinModelScale = 0.01, kMaxModelScale = 100.0;
 inline constexpr double kMaxVolume = 256;   // the volume the effect is fitted into, per axis
 inline constexpr double kMaxQuadSize = 4096;
 

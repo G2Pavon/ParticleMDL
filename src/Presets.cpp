@@ -141,8 +141,10 @@ const Preset* find_preset(std::string_view name)
 void apply_preset(Settings& s, const Preset& preset)
 {
     std::string model_name = std::move(s.model_name);
+    const double model_scale = s.model_scale;
     s = preset.settings;
     s.model_name = std::move(model_name);
+    s.model_scale = model_scale;
     enforce_bone_limits(s);
 }
 

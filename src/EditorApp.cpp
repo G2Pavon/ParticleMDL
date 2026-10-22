@@ -140,8 +140,10 @@ void EditorApp::apply_preset(int index)
 void EditorApp::new_system()
 {
     const std::string name = settings_.model_name;
+    const double scale = settings_.model_scale;
     settings_ = blank_settings();
     settings_.model_name = name;
+    settings_.model_scale = scale;
     system_base_.reset();
     particle_base_.reset();
     preset_index_ = -1;
@@ -736,6 +738,14 @@ void EditorApp::draw_middle_panel()
     ImGui::SetNextItemWidth(ui::px(150));
     if (ImGui::InputText("Model Name", &settings_.model_name))
         dirty_ = true;   // the system holds a copy of the name, and the problem is worked out when it is rebuilt
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(ui::px(80));
+    if (ImGui::InputDouble("Scale", &settings_.model_scale, 0.0, 0.0, "%.3g")) {
+        settings_.model_scale = std::clamp(settings_.model_scale, kMinModelScale, kMaxModelScale);
+        dirty_ = true;
+    }
+    ImGui::SetItemTooltip("The size of the model in the game, written to the .qc as $scale: studiomdl multiplies\n"
+                          "the whole model by it (%g to %g). The preview stays at scale 1.", kMinModelScale, kMaxModelScale);
     if (name_problem_)
         wrapped_text(kError, *name_problem_);
     for (const ExportBlocker& b : export_report_.blockers)
