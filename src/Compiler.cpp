@@ -128,7 +128,7 @@ CompileResult run_compiler(const std::string& compiler, const std::string& qc, c
                                       ? kNoTimeout - 1
                                       : static_cast<unsigned long>(millis);
     const ProcessResult run_result = run_process(command.data(), work_dir.c_str(), timeout, callbacks);
-    // The compiler prints in the ANSI code page (its paths too); the log is UTF-8.
+    // The compiler prints in the ANSI code page (its paths too); the editor shows UTF-8.
     const std::string ansi = output.take();
     result.output.resize(ansi_to_utf8(ansi.data(), static_cast<unsigned long>(ansi.size()), nullptr, 0));
     if (result.output.empty() && !ansi.empty())
@@ -339,6 +339,60 @@ std::string timeout_message(std::chrono::milliseconds timeout, bool looping)
                    "Sven Co-op's studiomdl compiles them. A slightly different Duration or FPS, or Loop turned "
                    "off, also avoids it.";
     return message;
+}
+
+namespace {
+
+std::vector<std::string_view> text_lines(std::string_view text)
+{
+    std::vector<std::string_view> lines;
+    while (!text.empty()) {
+        const std::size_t end = std::min(text.find('\n'), text.size());
+        std::string_view line = text.substr(0, end);
+        if (!line.empty() && line.back() == '\r')
+            line.remove_suffix(1);
+        lines.push_back(line);
+        text.remove_prefix(std::min(end + 1, text.size()));
+    }
+    return lines;
+}
+
+std::string_view trimmed(std::string_view s)
+{
+    while (!s.empty() && (s.front() == ' ' || s.front() == '\t'))
+        s.remove_prefix(1);
+    while (!s.empty() && (s.back() == ' ' || s.back() == '\t'))
+        s.remove_suffix(1);
+    return s;
+}
+
+} // namespace
+
+std::string compiler_error(std::string_view output)
+{
+    const std::vector<std::string_view> lines = text_lines(output);
+    for (std::size_t i = 0; i < lines.size(); ++i) {
+        if (lines[i].find("* ERROR *") == std::string_view::npos)
+            continue;
+        for (std::size_t k = i + 1; k < lines.size(); ++k)   // the message is on a line of its own after it
+            if (!trimmed(lines[k]).empty())
+                return std::string(trimmed(lines[k]));
+    }
+    for (std::size_t i = lines.size(); i-- > 0;)
+        if (!trimmed(lines[i]).empty())
+            return std::string(trimmed(lines[i]));
+    return {};
+}
+
+std::string last_lines(std::string_view text, std::size_t lines)
+{
+    std::size_t at = text.size();
+    if (at > 0 && text[at - 1] == '\n')
+        --at;   // a closing line break does not start another line
+    for (std::size_t seen = 0; at > 0; --at)
+        if (text[at - 1] == '\n' && ++seen == lines)
+            break;
+    return std::string(text.substr(at));
 }
 
 } // namespace gs

@@ -343,3 +343,21 @@ TEST_CASE("a timeout names the hang of studiomdl++ for looping sequences only")
     CHECK(once.find("within 30 s") != std::string::npos);
     CHECK(once.find("studiomdl++") == std::string::npos);
 }
+
+TEST_CASE("compiler_error finds studiomdl's error message, or else the last line")
+{
+    const std::string sven = "Processing \"a.qc\"\r\nGrabbing reference: a_ref.smd\r\n\r\n"
+                             "************ ERROR ************\r\ntoo many normals in model: \"n2049_ref\"\r\n";
+    CHECK(compiler_error(sven) == "too many normals in model: \"n2049_ref\"");
+    CHECK(compiler_error("line one\nunexpected end of file   \n\n") == "unexpected end of file");
+    CHECK(compiler_error("") == "");
+    CHECK(compiler_error("\n \n") == "");
+}
+
+TEST_CASE("last_lines keeps the end of a long output")
+{
+    CHECK(last_lines("a\nb\nc\nd\n", 2) == "c\nd\n");
+    CHECK(last_lines("a\nb\nc\nd", 2) == "c\nd");
+    CHECK(last_lines("a\nb", 5) == "a\nb");
+    CHECK(last_lines("", 3) == "");
+}

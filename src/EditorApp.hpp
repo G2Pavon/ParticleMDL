@@ -51,8 +51,8 @@ private:
     void poll_texture();
     void advance_clock(double delta);
     void refresh_preset_label();
-    void set_status(std::string text, StatusTone tone);
-    void set_log(std::string text);
+    // `detail`, when given, is shown in the status bar's tooltip: the whole of what one line cannot hold.
+    void set_status(std::string text, StatusTone tone, std::string detail = {});
 
     // Menus and dialogs
     void draw_menu_bar();
@@ -99,8 +99,7 @@ private:
     std::filesystem::path compiling_mdl_;
 
     std::string status_;
-    std::string log_;          // compiler output and load warnings, shown under the Export button
-    bool open_log_ = false;    // unfold the log once, when something new was put in it
+    std::string status_detail_;   // the warnings, differences or compiler output behind the status
     StatusTone status_tone_ = StatusTone::Success;
 
     FileDialog save_dialog_;

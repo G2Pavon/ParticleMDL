@@ -146,8 +146,7 @@ void EditorApp::new_system()
     particle_base_.reset();
     preset_index_ = -1;
     camera_.reset();
-    status_.clear();
-    set_log({});
+    set_status({}, StatusTone::Success);
     rebuild();
     preview_time_ = 0.0;
 }
@@ -182,17 +181,17 @@ void EditorApp::load_system(const fs::path& path)
         preset_index_ = -1;
         rebuild();
         preview_time_ = 0.0;
-        std::string log;
-        for (const std::string& w : loaded.warnings) {
-            std::fprintf(stderr, "%s: %s\n", to_utf8(path.filename()).c_str(), w.c_str());
-            log += to_utf8(path.filename()) + ": " + w + "\n";
-        }
-        set_log(std::move(log));
-        if (loaded.warnings.empty())
+        if (loaded.warnings.empty()) {
             set_status("Loaded: " + to_utf8(path.filename()), StatusTone::Success);
-        else
-            set_status("Loaded: " + to_utf8(path.filename()) + " with " + std::to_string(loaded.warnings.size()) +
-                           " warning(s), see the log", StatusTone::Warning);
+        } else {
+            std::string all;
+            for (const std::string& w : loaded.warnings)
+                all += w + "\n";
+            const std::size_t more = loaded.warnings.size() - 1;
+            set_status("Loaded: " + to_utf8(path.filename()) + ", " + loaded.warnings.front() +
+                           (more == 0 ? "" : " (and " + std::to_string(more) + " more warning" + (more == 1 ? ")" : "s)")),
+                       StatusTone::Warning, std::move(all));
+        }
     } catch (const std::exception& e) {
         set_status(std::string("Error: ") + e.what(), StatusTone::Error);
     }
@@ -241,40 +240,40 @@ void EditorApp::poll_compile()
         switch (result->status) {
         case CompileResult::Status::Ok: {
             // Read the model back: what the compiler made, and whether it is what was exported.
-            std::string summary, problems;
+            std::string summary;
+            std::vector<std::string> problems;
             try {
                 const MdlInfo model = read_mdl_file(compiling_mdl_);
                 summary = describe_mdl(model);
                 if (compiling_)
-                    for (const std::string& problem : compare_with_export(model, *compiling_))
-                        problems += "Check: " + problem + "\n";
+                    problems = compare_with_export(model, *compiling_);
             } catch (const std::exception& e) {
-                problems = std::string("Check: the compiled model could not be read: ") + e.what() + "\n";
+                problems.push_back(std::string("the compiled model could not be read: ") + e.what());
             }
-            set_log(problems + result->output);
-            open_log_ = !problems.empty();   // unfolded only when the check found something
-            if (problems.empty())
+            if (problems.empty()) {
                 set_status("Success! " + compile_job_.model_name() + ".mdl (" + summary + ")", StatusTone::Success);
-            else
-                set_status("Compiled " + compile_job_.model_name() + ".mdl, but it differs from the export: see the log",
-                           StatusTone::Warning);
+            } else {
+                std::string all;
+                for (const std::string& problem : problems)
+                    all += problem + "\n";
+                set_status("Compiled " + compile_job_.model_name() + ".mdl, but it differs from the export: " + problems.front(),
+                           StatusTone::Warning, std::move(all));
+            }
             break;
         }
         case CompileResult::Status::CompilerNotFound:
-            std::fprintf(stderr, "Compiler not found: '%s'\n", compiler_path_.c_str());
-            set_log("Compiler not found: '" + compiler_path_ + "'");
-            set_status("Compiler not found! Check path.", StatusTone::Error);
+            set_status("Compiler not found: " + compiler_path_, StatusTone::Error);
             break;
-        case CompileResult::Status::Failed:
-            std::fprintf(stderr, "--- COMPILER ERROR ---\n%s\n", result->output.c_str());
-            set_log(result->output.empty() ? "The compiler failed without any output." : result->output);
-            set_status("Compile failed! See the log below.", StatusTone::Error);
+        case CompileResult::Status::Failed: {
+            const std::string reason = compiler_error(result->output);
+            set_status(reason.empty() ? "Compile failed, without any output from the compiler." : "Compile failed: " + reason,
+                       StatusTone::Error, last_lines(result->output, 30));
             break;
+        }
         case CompileResult::Status::TimedOut:
-            std::fprintf(stderr, "--- COMPILER TIMED OUT ---\n%s\n", result->output.c_str());
-            set_log(result->output + (result->output.empty() ? "" : "\n") +
-                    timeout_message(CompileOptions{}.timeout, settings_.loop));
-            set_status("Compile timed out! See the log below.", StatusTone::Error);
+            set_status("Compile timed out.", StatusTone::Error,
+                       timeout_message(CompileOptions{}.timeout, settings_.loop) +
+                           (result->output.empty() ? "" : "\n\n" + last_lines(result->output, 30)));
             break;
         case CompileResult::Status::Cancelled:
             set_status("Compile cancelled.", StatusTone::Warning);
@@ -306,16 +305,11 @@ void EditorApp::advance_clock(double delta)
         preview_time_ = floor_mod(preview_time_, loop);
 }
 
-void EditorApp::set_log(std::string text)
-{
-    log_ = std::move(text);
-    open_log_ = !log_.empty();
-}
-
-void EditorApp::set_status(std::string text, StatusTone tone)
+void EditorApp::set_status(std::string text, StatusTone tone, std::string detail)
 {
     status_ = std::move(text);
     status_tone_ = tone;
+    status_detail_ = std::move(detail);
 }
 
 // ---------------------------------------------------------------------------
@@ -546,6 +540,19 @@ void EditorApp::draw_status_bar(float height)
     else
         ImGui::TextColored(status_tone_color(status_tone_), "%s", status_.c_str());
     ImGui::EndChild();
+    // What one line cannot hold: the whole message, and what is behind it.
+    if (!status_.empty() && ImGui::IsItemHovered() &&
+        (!status_detail_.empty() || ImGui::CalcTextSize(status_.c_str()).x > message_width)) {
+        ImGui::BeginTooltip();
+        ImGui::PushTextWrapPos(ui::px(700));
+        ImGui::TextUnformatted(status_.c_str());
+        if (!status_detail_.empty()) {
+            ImGui::Separator();
+            ImGui::TextUnformatted(status_detail_.c_str());
+        }
+        ImGui::PopTextWrapPos();
+        ImGui::EndTooltip();
+    }
 
     ImGui::SameLine();
     ImGui::SetCursorPosX(ImGui::GetWindowWidth() - style.WindowPadding.x - right_width);
@@ -772,15 +779,6 @@ void EditorApp::draw_middle_panel()
     if (ImGui::Button(label, ImVec2(-1, ui::px(40))))
         export_data();
     ImGui::EndDisabled();
-
-    if (!log_.empty()) {
-        if (open_log_) {
-            ImGui::SetNextItemOpen(true);
-            open_log_ = false;
-        }
-        if (ImGui::CollapsingHeader("Log"))
-            ImGui::InputTextMultiline("##log", &log_, ImVec2(-1, ui::px(110)), ImGuiInputTextFlags_ReadOnly);
-    }
 
     bottom_height_ = ImGui::GetCursorPosY() - bottom_start + ImGui::GetStyle().ItemSpacing.y;
 }

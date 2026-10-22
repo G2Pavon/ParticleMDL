@@ -50,4 +50,11 @@ CompileResult compile_model(const std::string& compiler, const std::string& safe
 // names the one known cause: studiomdl++ hangs on some looping sequences.
 std::string timeout_message(std::chrono::milliseconds timeout, bool looping);
 
+// The reason a compile failed, from the compiler's output: the line after studiomdl's
+// "************ ERROR ************", else the last line with text; empty for no output.
+std::string compiler_error(std::string_view output);
+
+// The last `lines` lines of `text`, for showing the end of a long compiler output.
+std::string last_lines(std::string_view text, std::size_t lines);
+
 } // namespace gs
