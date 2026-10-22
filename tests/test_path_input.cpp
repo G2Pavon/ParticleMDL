@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 
+#include "NativeDialog.hpp"
 #include "PathInput.hpp"
 
 using namespace gs;
@@ -142,3 +143,19 @@ TEST_CASE("~ stands for the home folder")
         unsetenv("HOME");
 }
 #endif
+
+TEST_CASE("only a path the shell reads nothing into starts a native folder dialog")
+{
+    CHECK(native::shell_safe_path("/home/me/Half-Life/cstrike/models"));
+    CHECK(native::shell_safe_path("/home/me/juegos ñ/Half-Life (Steam)/valve/models"));
+    CHECK_FALSE(native::shell_safe_path("/home/me/$(rm -rf ~)/models"));
+    CHECK_FALSE(native::shell_safe_path("/home/me/`id`/models"));
+    CHECK_FALSE(native::shell_safe_path("/home/me/\"quoted\"/models"));
+    CHECK_FALSE(native::shell_safe_path("/home/me/it's/models"));
+    CHECK_FALSE(native::shell_safe_path("/home/me/a\nb"));
+#ifdef _WIN32
+    CHECK(native::shell_safe_path("C:\\Games\\Half-Life\\cstrike\\models"));
+#else
+    CHECK_FALSE(native::shell_safe_path("/home/me/back\\slash"));
+#endif
+}

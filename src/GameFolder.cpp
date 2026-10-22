@@ -14,6 +14,29 @@ namespace gs {
 
 namespace fs = std::filesystem;
 
+std::string clean_folder_text(std::string_view text)
+{
+    auto is_space = [](char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; };
+    while (!text.empty() && is_space(text.front()))
+        text.remove_prefix(1);
+    while (!text.empty() && is_space(text.back()))
+        text.remove_suffix(1);
+    if (text.size() >= 2 && text.front() == '"' && text.back() == '"')
+        text = text.substr(1, text.size() - 2);
+    return std::string(text);
+}
+
+std::string normalized_subfolder(std::string_view sub)
+{
+    std::string out = clean_folder_text(sub);
+    for (char& c : out)
+        if (c == '\\')
+            c = '/';
+    while (out.size() > 1 && out.back() == '/')   // a lone "/" stays, to be refused as a root
+        out.pop_back();
+    return out;
+}
+
 std::optional<std::string> game_folder_problem(const fs::path& game)
 {
     if (game.empty())
@@ -27,8 +50,9 @@ std::optional<std::string> game_folder_problem(const fs::path& game)
     return std::nullopt;
 }
 
-std::optional<std::string> models_subfolder_problem(std::string_view sub)
+std::optional<std::string> models_subfolder_problem(std::string_view typed)
 {
+    const std::string sub = normalized_subfolder(typed);
     const fs::path p = from_utf8(sub);
     if (p.has_root_name() || p.has_root_directory())
         return "The export folder is a folder inside models: write it without a drive or a leading slash";
@@ -42,8 +66,9 @@ std::optional<std::string> models_subfolder_problem(std::string_view sub)
     return std::nullopt;
 }
 
-fs::path export_folder(const fs::path& game, std::string_view sub)
+fs::path export_folder(const fs::path& game, std::string_view typed)
 {
+    const std::string sub = normalized_subfolder(typed);
     fs::path folder = game / "models";
     if (!sub.empty())
         folder /= from_utf8(sub);

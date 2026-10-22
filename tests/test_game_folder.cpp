@@ -91,3 +91,32 @@ TEST_CASE("the app config keeps the game folder, and a missing or broken file gi
     CHECK(read_app_config(file).game_folder.empty());
     fs::remove_all(dir);
 }
+
+TEST_CASE("either separator works in the export folder, on every system")
+{
+    const fs::path game = from_utf8("/games/Half-Life/cstrike");
+    CHECK(normalized_subfolder("fx\\smoke") == "fx/smoke");
+    CHECK(normalized_subfolder(" mymodels/ ") == "mymodels");
+    CHECK(normalized_subfolder("fx\\smoke\\") == "fx/smoke");
+    CHECK(export_folder(game, "fx\\smoke") == export_folder(game, "fx/smoke"));
+    CHECK_FALSE(models_subfolder_problem("fx\\smoke"));
+    CHECK(models_subfolder_problem("..\\sprites"));
+    CHECK(models_subfolder_problem("\\"));   // the root, whichever way it is written
+}
+
+TEST_CASE("a pasted folder loses the spaces and quotes around it")
+{
+    CHECK(clean_folder_text("  \"C:\\Games\\Half-Life\\cstrike\"  ") == "C:\\Games\\Half-Life\\cstrike");
+    CHECK(clean_folder_text("/games/hl/valve\n") == "/games/hl/valve");
+    CHECK(clean_folder_text("\"") == "\"");   // a lone quote is not a pair
+}
+
+#ifdef _WIN32
+TEST_CASE("a Windows game folder works with either separator")
+{
+    CHECK(models_label(from_utf8("C:\\Games\\Half-Life\\cstrike")) == "cstrike/models/");
+    CHECK(models_label(from_utf8("C:/Games/Half-Life/cstrike\\")) == "cstrike/models/");
+    CHECK(export_folder(from_utf8("C:\\Games\\Half-Life\\cstrike"), "fx") ==
+          export_folder(from_utf8("C:/Games/Half-Life/cstrike"), "fx"));
+}
+#endif

@@ -4,6 +4,7 @@
 #include <future>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace gs::native {
@@ -23,7 +24,16 @@ struct Request {
     std::string default_name;
     std::vector<std::string> patterns;   // "*.png" etc.; empty accepts any file
     std::string description;             // label of the pattern filter
+    // The folder a folder dialog starts in. It does reach a shell command on Linux, inside double
+    // quotes, so it is passed only when shell_safe_path() accepts it; otherwise the dialog starts
+    // where the system would.
+    std::filesystem::path start_folder;
 };
+
+// Whether a UTF-8 path can go inside double quotes in a shell command without the shell reading
+// anything into it: no $, backquote, quote or control character, and no backslash but on Windows,
+// where the dialogs do not go through a shell. The dialog library itself only refuses quotes.
+bool shell_safe_path(std::string_view path);
 
 // Shows the dialog and waits for it. Empty when cancelled. A save over an
 // existing file is confirmed first.

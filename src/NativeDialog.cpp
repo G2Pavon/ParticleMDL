@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <string_view>
 
+#include "PathUtil.hpp"
 #include "tinyfiledialogs.h"
 
 namespace gs::native {
@@ -42,6 +43,20 @@ bool available()
 #endif
 }
 
+bool shell_safe_path(std::string_view path)
+{
+    for (const char c : path) {
+        const auto u = static_cast<unsigned char>(c);
+        if (u < 0x20 || u == 0x7F || c == '$' || c == '`' || c == '"' || c == '\'')
+            return false;
+#ifndef _WIN32
+        if (c == '\\')
+            return false;
+#endif
+    }
+    return true;
+}
+
 std::optional<fs::path> run(const Request& request)
 {
     std::vector<const char*> patterns;
@@ -60,9 +75,13 @@ std::optional<fs::path> run(const Request& request)
     case Kind::SaveFile:
         result = tinyfd_saveFileDialog(request.title.c_str(), default_name, pattern_count, patterns_arg, description);
         break;
-    case Kind::SelectFolder:
-        result = tinyfd_selectFolderDialog(request.title.c_str(), default_name);
+    case Kind::SelectFolder: {
+        std::string start = request.start_folder.empty() ? std::string() : to_utf8(request.start_folder);
+        if (!start.empty() && !shell_safe_path(start))
+            start.clear();
+        result = tinyfd_selectFolderDialog(request.title.c_str(), start.empty() ? default_name : start.c_str());
         break;
+    }
     }
     if (!result)
         return std::nullopt;   // cancelled
