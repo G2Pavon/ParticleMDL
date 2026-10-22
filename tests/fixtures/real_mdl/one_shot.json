@@ -12,7 +12,6 @@
   "volume_height": 256.0,
   "velocity": [0.0,0.0,0.0],
   "spin": [0.0,0.0,0.0],
-  "emitter_shape": "sphere",
   "emission_angle": 360.0,
   "spawn_radius": 8.0,
   "spawn_height": 0.0,

@@ -662,14 +662,12 @@ void EditorApp::draw_left_panel()
     changed |= reset_slider("spin.z", "Z (deg/s)", s.spin.z, -360, 360, 0);
 
     group_label("Emitter");
-    changed |= enum_combo("Shape", s.emitter_shape);
-    ImGui::SetItemTooltip("Disk: on a disk, leaving in a horizontal fan\nSphere, Hemisphere: in a ball, leaving outward\n"
-                          "Cone: at the origin, leaving inside a cone around +Z\nBox: in a box, leaving outward\n"
-                          "Line: along X, leaving in a fan around +Y");
-    changed |= reset_slider("emission_angle", "Angle (Fan / Cone)", s.emission_angle, 1, 360, 360);
-    ImGui::SetItemTooltip("Disk, Line: the sector the particles fly out along (360 = all around)\nCone: the opening of the cone");
-    changed |= reset_slider("spawn_radius", "Radius / Half Width", s.spawn_radius, 0, 500, 0);
-    changed |= reset_slider("spawn_height", "Height (Volume)", s.spawn_height, 0, 400, 0);
+    changed |= reset_slider("emission_angle", "Angle (Fan)", s.emission_angle, 1, 360, 360);
+    ImGui::SetItemTooltip("The sector of the disk the particles start in and fly out along (360 = all around)");
+    changed |= reset_slider("spawn_radius", "Radius", s.spawn_radius, 0, 500, 0);
+    ImGui::SetItemTooltip("Particles start on a disk of this radius (on its edge with Hollow Ring Mode)");
+    changed |= reset_slider("spawn_height", "Height", s.spawn_height, 0, 400, 0);
+    ImGui::SetItemTooltip("Particles start up to this far above or below the disk");
     changed |= reset_slider("emitter_tilt.x", "Tilt X (Pitch)", s.emitter_tilt.x, -180, 180, 0);
     changed |= reset_slider("emitter_tilt.y", "Tilt Y (Yaw)", s.emitter_tilt.y, -180, 180, 0);
     changed |= reset_slider("emitter_tilt.z", "Tilt Z (Roll)", s.emitter_tilt.z, -180, 180, 0);
@@ -711,8 +709,6 @@ void EditorApp::draw_middle_panel()
     ImGui::Checkbox("Grid", &scene_options_.grid);
     ImGui::SameLine();
     ImGui::Checkbox("Bounds", &scene_options_.bounds);
-    ImGui::SameLine();
-    ImGui::Checkbox("Emitter", &scene_options_.emitter);
 
     const ImVec2 avail = ImGui::GetContentRegionAvail();
     draw_canvas(ImVec2(std::max(avail.x, 10.0f), std::max(avail.y - bottom_height_, 10.0f)));

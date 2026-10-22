@@ -102,7 +102,7 @@ std::span<const Preset> builtin_presets()
         Preset{"Explosion", {
             .count = 25, .duration = 1.5, .lifespan = 0.8, .fps = 30, .end_behavior = EndBehavior::HideInCore, .loop = false, .burst_window = 0.0,
             .volume_width = 256, .volume_depth = 256, .volume_height = 256, .velocity = {0, 0, 0}, .spin = {0, 0, 0},
-            .emitter_shape = EmitterShape::Sphere, .emission_angle = 360, .spawn_radius = 8, .spawn_height = 0, .emitter_tilt = {0, 0, 0}, .hollow_ring = false,
+            .emission_angle = 360, .spawn_radius = 8, .spawn_height = 0, .emitter_tilt = {0, 0, 0}, .hollow_ring = false,
             .speed = 220, .burst = 40, .spread = 90, .gravity = -120, .turbulence = 0, .vortex_spin = 0, .vortex_pull = 0,
             .texture = {.pattern = TexPattern::RadialOrb, .color_mode = ColorMode::Gradient, .core_color = {255, 220, 150}, .edge_color = {200, 40, 0}, .size = 64, .hardness = 0.6, .file = {}},
             .scale_mode = ScaleMode::VertexBone, .scale_start = 1.6, .scale_end = 0.2,
@@ -111,8 +111,8 @@ std::span<const Preset> builtin_presets()
         Preset{"Sparks", {
             .count = 60, .duration = 1.5, .lifespan = 0.75, .fps = 30, .end_behavior = EndBehavior::HideUnderground, .lifespan_variance = 0.4,
             .volume_width = 256, .volume_depth = 256, .volume_height = 160, .velocity = {0, 0, 0}, .spin = {0, 0, 0},
-            .emitter_shape = EmitterShape::Cone, .emission_angle = 50, .spawn_radius = 4, .spawn_height = 0, .emitter_tilt = {0, 0, 0}, .hollow_ring = false,
-            .speed = 230, .burst = 0, .spread = 90, .gravity = -420, .drag = 0.3, .turbulence = 0, .vortex_spin = 0, .vortex_pull = 0,
+            .emission_angle = 360, .spawn_radius = 4, .spawn_height = 0, .emitter_tilt = {0, 0, 0}, .hollow_ring = false,
+            .speed = 60, .burst = 230, .spread = 90, .gravity = -420, .drag = 0.3, .turbulence = 0, .vortex_spin = 0, .vortex_pull = 0,
             .texture = {.pattern = TexPattern::RainDrop, .color_mode = ColorMode::SolidColor, .core_color = {255, 190, 90}, .edge_color = {0, 0, 0}, .size = 64, .hardness = 0.7, .file = {}},
             .scale_mode = ScaleMode::Static, .scale_start = 1.0, .scale_end = 1.0,
             .geometry = Geometry::SingleQuad, .quad_width = 3, .quad_height = 16, .double_sided = true, .mesh_rotation = {0, 0, 0},

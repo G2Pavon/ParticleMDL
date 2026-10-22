@@ -19,7 +19,7 @@ add_executable(particlemdl_tests
     test_studiomdl_numbers.cpp
     test_texture_job.cpp
     test_corner_bones.cpp
-    test_emitter_shapes.cpp
+    test_emitter.cpp
     test_one_shot.cpp
     test_randomness.cpp
     test_additive.cpp

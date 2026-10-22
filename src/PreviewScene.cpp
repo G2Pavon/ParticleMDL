@@ -70,118 +70,6 @@ void add_bounds(Scene& out, const ParticleSystem& sys, const OrbitCamera& cam, d
     }
 }
 
-constexpr Rgba8 kEmitterColor{120, 220, 255, 255};
-
-// A point of the emitter's shape placed the way particles are: tilted by the
-// emitter, scaled to the volume, then turned by the system spin.
-Vec3 emitter_point(const ParticleSystem& sys, Vec3 p, double time)
-{
-    const Vec3 er = sys.emitter_rotation();
-    p = ParticleSystem::apply_static_rotation(p, er.x, er.y, er.z);
-    const Vec3 scale = sys.volume_scale();
-    p = Vec3{p.x * scale.x, p.y * scale.y, p.z * scale.z};
-    return sys.apply_macro_spin(p, time);
-}
-
-// The outline of the shapes that are not the disk: where particles start and the way they leave.
-template <typename Line, typename Arc>
-void add_shape_outline(Line&& line, Arc&& arc, const Settings& s)
-{
-    const double r = s.spawn_radius, h = s.spawn_height;
-    switch (s.emitter_shape) {
-    case EmitterShape::Sphere:
-    case EmitterShape::Hemisphere: {
-        const bool upper = s.emitter_shape == EmitterShape::Hemisphere;
-        arc(r, 0, 2 * kPi);   // the equator
-        const int kSegments = 48;
-        for (int plane = 0; plane < 2; ++plane) {   // a meridian in X-Z and one in Y-Z
-            for (int i = 0; i < kSegments; ++i) {
-                const double a0 = (upper ? 0.0 : -kPi) + (upper ? kPi : 2 * kPi) * i / kSegments;
-                const double a1 = (upper ? 0.0 : -kPi) + (upper ? kPi : 2 * kPi) * (i + 1) / kSegments;
-                const Vec3 p0 = plane == 0 ? Vec3{r * std::cos(a0), 0, r * std::sin(a0)} : Vec3{0, r * std::cos(a0), r * std::sin(a0)};
-                const Vec3 p1 = plane == 0 ? Vec3{r * std::cos(a1), 0, r * std::sin(a1)} : Vec3{0, r * std::cos(a1), r * std::sin(a1)};
-                line(p0, p1);
-            }
-        }
-        break;
-    }
-    case EmitterShape::Cone: {
-        const double half = std::min(radians(s.emission_angle) / 2.0, kPi);
-        const double length = 60.0;
-        const Vec3 tip{0, 0, 0};
-        for (int i = 0; i < 8; ++i) {
-            const double around = 2 * kPi * i / 8;
-            line(tip, {length * std::sin(half) * std::cos(around), length * std::sin(half) * std::sin(around), length * std::cos(half)});
-        }
-        const int kSegments = 48;
-        for (int i = 0; i < kSegments; ++i) {
-            const double a0 = 2 * kPi * i / kSegments, a1 = 2 * kPi * (i + 1) / kSegments;
-            line({length * std::sin(half) * std::cos(a0), length * std::sin(half) * std::sin(a0), length * std::cos(half)},
-                 {length * std::sin(half) * std::cos(a1), length * std::sin(half) * std::sin(a1), length * std::cos(half)});
-        }
-        break;
-    }
-    case EmitterShape::Box:
-        {
-            const Vec3 c[8] = {{-r, -r, -h}, {r, -r, -h}, {r, r, -h}, {-r, r, -h}, {-r, -r, h}, {r, -r, h}, {r, r, h}, {-r, r, h}};
-            for (int i = 0; i < 4; ++i) {
-                line(c[i], c[(i + 1) % 4]);
-                line(c[i + 4], c[(i + 1) % 4 + 4]);
-                line(c[i], c[i + 4]);
-            }
-        }
-        break;
-    case EmitterShape::Line: {
-        line({-r, 0, 0}, {r, 0, 0});
-        const double half = radians(s.emission_angle) / 2.0, length = std::max(r, 40.0);
-        line({0, 0, 0}, {length * std::sin(-half), length * std::cos(-half), 0});
-        line({0, 0, 0}, {length * std::sin(half), length * std::cos(half), 0});
-        break;
-    }
-    case EmitterShape::Disk:
-        break;
-    }
-}
-
-// The emission shape: the spawn disk or ring, the fan particles leave in, and
-// the spawn height. Particles start on the disk and fly out within the fan.
-void add_emitter(Scene& out, const ParticleSystem& sys, const OrbitCamera& cam, double time, Point2 center)
-{
-    constexpr int kSegments = 48;
-    const Settings& s = sys.settings();
-    const double fan_length = std::max(s.spawn_radius + 25.0, 40.0);   // outside the disk, so the fan stays visible
-    auto line = [&](Vec3 a, Vec3 b) {
-        add_clipped_line(out.overlay, cam, emitter_point(sys, a, time), emitter_point(sys, b, time), center,
-                         kEmitterColor);
-    };
-    auto arc = [&](double radius, double from, double to) {
-        for (int i = 0; i < kSegments; ++i) {
-            const double a0 = from + (to - from) * i / kSegments, a1 = from + (to - from) * (i + 1) / kSegments;
-            line({radius * std::cos(a0), radius * std::sin(a0), 0}, {radius * std::cos(a1), radius * std::sin(a1), 0});
-        }
-    };
-
-    if (s.emitter_shape != EmitterShape::Disk) {
-        add_shape_outline(line, arc, s);
-        return;
-    }
-
-    if (s.spawn_radius > 0)
-        arc(s.spawn_radius, 0, 2 * kPi);   // the disk's edge, or the ring itself
-
-    // Particles fan out around +X: a sector of emission_angle, or the full circle.
-    const double half = radians(s.emission_angle) / 2.0;
-    if (s.emission_angle >= 360) {
-        arc(fan_length, 0, 2 * kPi);
-    } else {
-        arc(fan_length, -half, half);
-        line({0, 0, 0}, {fan_length * std::cos(-half), fan_length * std::sin(-half), 0});
-        line({0, 0, 0}, {fan_length * std::cos(half), fan_length * std::sin(half), 0});
-    }
-
-    if (s.spawn_height > 0)
-        line({0, 0, -s.spawn_height}, {0, 0, s.spawn_height});
-}
 
 void add_particles(Scene& out, const ParticleSystem& sys, const BakedPoses& baked, const OrbitCamera& cam, double time,
                    Point2 center)
@@ -250,15 +138,12 @@ void build_scene(const ParticleSystem& sys, const BakedPoses& baked, const Orbit
 {
     out.lines.clear();
     out.faces.clear();
-    out.overlay.clear();
     if (options.grid)
         add_grid(out, camera, center);
     if (options.axes)
         add_axes(out, camera, center);
     if (options.bounds)
         add_bounds(out, sys, camera, time, center);
-    if (options.emitter)
-        add_emitter(out, sys, camera, time, center);
     add_particles(out, sys, baked, camera, time, center);
 }
 

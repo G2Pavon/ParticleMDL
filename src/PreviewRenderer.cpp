@@ -54,10 +54,6 @@ void PreviewRenderer::draw(ImDrawList* dl, ImVec2 origin, ImVec2 size, Rgb backg
                          to_imvec(f.uvs[3]));
     dl->AddCallback(ImDrawCallback_ResetRenderState, nullptr);
 
-    // Over the particles, so the emitter is never hidden by them.
-    for (const SceneLine& l : scene.overlay)
-        dl->AddLine(to_imvec(l.a), to_imvec(l.b), to_imcol(l.color), ui::px(l.thickness));
-
     dl->PopClipRect();
 }
 

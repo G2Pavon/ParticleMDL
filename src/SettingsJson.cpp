@@ -194,6 +194,7 @@ const std::vector<RetiredKey>& retired_keys()
     static const std::vector<RetiredKey> keys = {
         {"blend_mode", "additive", "ParticleMDL draws particles additively only"},
         {"fullbright", false, "ParticleMDL draws particles additively only, with the map's lighting"},
+        {"emitter_shape", "disk", "ParticleMDL emits from a disk only"},
     };
     return keys;
 }

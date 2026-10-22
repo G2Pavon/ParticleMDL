@@ -10,7 +10,7 @@ namespace gs {
 // first turned on or off at random. The particle count and the cluster size are drawn among the
 // values the export accepts, so a seed never makes an effect studiomdl would refuse; a particle seed
 // that would still exceed a limit lowers the particle count, the only value of the other side it
-// can change. Choices (shape, geometry, end behavior, loop, checkboxes), the frame rate and the
+// can change. Choices (geometry, end behavior, loop, checkboxes), the frame rate and the
 // texture are never changed.
 //   System: the animation (count, duration, lifespan and its variance, burst window), the
 //     volume, the system velocity, the emitter and the physics. Not the system rotation.

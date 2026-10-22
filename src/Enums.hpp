@@ -11,7 +11,6 @@ namespace gs {
 enum class Geometry { SingleQuad, CrossedQuads, TriPlanarQuads, VolumetricBox };
 enum class EndBehavior { DropThroughFloor, HideUnderground, HideInCore, StopAndStay, EndlessLoop };
 enum class TexPattern { RadialOrb, HollowRing, SharpStar, SoftCloud, FlowerPetals, Snowflake, RainDrop };
-enum class EmitterShape { Disk, Sphere, Hemisphere, Cone, Box, Line };
 enum class ColorMode { SolidColor, Gradient };
 enum class ScaleMode { Static, VertexBone };
 
@@ -58,18 +57,6 @@ struct EnumTable<TexPattern> {
         EnumName<TexPattern>{TexPattern::FlowerPetals, "flower_petals", "Flower Petals"},
         EnumName<TexPattern>{TexPattern::Snowflake, "snowflake", "Snowflake"},
         EnumName<TexPattern>{TexPattern::RainDrop, "rain_drop", "Rain Drop"},
-    };
-};
-
-template <>
-struct EnumTable<EmitterShape> {
-    static constexpr std::array names{
-        EnumName<EmitterShape>{EmitterShape::Disk, "disk", "Disk (Fan)"},
-        EnumName<EmitterShape>{EmitterShape::Sphere, "sphere", "Sphere"},
-        EnumName<EmitterShape>{EmitterShape::Hemisphere, "hemisphere", "Hemisphere"},
-        EnumName<EmitterShape>{EmitterShape::Cone, "cone", "Cone"},
-        EnumName<EmitterShape>{EmitterShape::Box, "box", "Box"},
-        EnumName<EmitterShape>{EmitterShape::Line, "line", "Line"},
     };
 };
 
@@ -134,7 +121,6 @@ constexpr bool table_in_declaration_order() noexcept
 static_assert(table_in_declaration_order<Geometry>());
 static_assert(table_in_declaration_order<EndBehavior>());
 static_assert(table_in_declaration_order<TexPattern>());
-static_assert(table_in_declaration_order<EmitterShape>());
 static_assert(table_in_declaration_order<ColorMode>());
 static_assert(table_in_declaration_order<ScaleMode>());
 

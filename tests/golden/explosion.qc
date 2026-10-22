@@ -3,7 +3,7 @@ $cd "."
 $cdtexture "."
 $scale 1.0
 
-$bbox -129.00 -129.00 -131.00 115.00 107.00 128.00
+$bbox -113.00 -124.00 -180.00 129.00 129.00 84.00
 
 $texrendermode "explosion.bmp" additive
 

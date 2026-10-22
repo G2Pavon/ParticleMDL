@@ -156,8 +156,7 @@ ParticleSystem::ParticleSystem(const Settings& settings) : settings_(validated(s
         const double direction = system.direction;
         const double speed_jitter = system.speed_jitter;
         const double burst_jitter = system.burst_jitter;
-        const double radius_draw = system.radius_draw;
-        const double radius = std::sqrt(radius_draw);   // uniform over the disk's area
+        const double radius = std::sqrt(system.radius_draw);   // uniform over the disk's area
         const double height = system.height;
 
         // Births are evenly spaced over the loop for a steady flow; a one-shot effect is born in a burst.
@@ -166,52 +165,11 @@ ParticleSystem::ParticleSystem(const Settings& settings) : settings_(validated(s
         const double p_speed = s.speed + (speed_jitter * s.spread);
         const double p_burst = s.burst + (burst_jitter * s.spread);
 
-        Vec3 spawn, vel;
-        switch (s.emitter_shape) {
-        case EmitterShape::Disk: {
-            const double angle = (direction * angle_rad) - (angle_rad / 2.0);
-            vel = {std::cos(angle) * p_speed, std::sin(angle) * p_speed, p_burst};
-            const double r_dist = s.hollow_ring ? s.spawn_radius : s.spawn_radius * radius;
-            spawn = {std::cos(angle) * r_dist, std::sin(angle) * r_dist, s.spawn_height * height};
-            break;
-        }
-        case EmitterShape::Sphere:
-        case EmitterShape::Hemisphere: {
-            // A direction uniform over the sphere: the height is uniform in [-1, 1], the angle around it too.
-            const double up = s.emitter_shape == EmitterShape::Hemisphere ? std::abs(height) : height;
-            const double ring = std::sqrt(1.0 - up * up), around = direction * 2.0 * kPi;
-            const Vec3 out{ring * std::cos(around), ring * std::sin(around), up};
-            const double r_dist = s.hollow_ring ? s.spawn_radius : s.spawn_radius * std::cbrt(radius_draw);   // uniform in volume
-            spawn = out * r_dist;
-            vel = out * p_speed + Vec3{0, 0, p_burst};
-            break;
-        }
-        case EmitterShape::Cone: {
-            // A direction uniform over the cap of half-angle emission_angle / 2 around +Z.
-            const double half = std::min(angle_rad / 2.0, kPi);
-            const double up = 1.0 - ((height + 1.0) / 2.0) * (1.0 - std::cos(half));
-            const double ring = std::sqrt(std::max(0.0, 1.0 - up * up)), around = direction * 2.0 * kPi;
-            const Vec3 out{ring * std::cos(around), ring * std::sin(around), up};
-            const double r_dist = s.hollow_ring ? s.spawn_radius : s.spawn_radius * radius;
-            spawn = {std::cos(around) * r_dist, std::sin(around) * r_dist, 0.0};
-            vel = out * p_speed + Vec3{0, 0, p_burst};
-            break;
-        }
-        case EmitterShape::Box: {
-            spawn = {s.spawn_radius * (2.0 * direction - 1.0), s.spawn_radius * (2.0 * radius_draw - 1.0),
-                     s.spawn_height * height};
-            // Away from the middle; straight up when it starts exactly in it.
-            const double away = (spawn.x != 0.0 || spawn.y != 0.0) ? std::atan2(spawn.y, spawn.x) : direction * 2.0 * kPi;
-            vel = {std::cos(away) * p_speed, std::sin(away) * p_speed, p_burst};
-            break;
-        }
-        case EmitterShape::Line: {
-            const double fan = (radius_draw - 0.5) * angle_rad;   // around +Y
-            spawn = {s.spawn_radius * (2.0 * direction - 1.0), 0.0, 0.0};
-            vel = {std::sin(fan) * p_speed, std::cos(fan) * p_speed, p_burst};
-            break;
-        }
-        }
+        // On the disk, leaving in the fan: the same angle places it and sends it.
+        const double angle = (direction * angle_rad) - (angle_rad / 2.0);
+        Vec3 vel{std::cos(angle) * p_speed, std::sin(angle) * p_speed, p_burst};
+        const double r_dist = s.hollow_ring ? s.spawn_radius : s.spawn_radius * radius;
+        Vec3 spawn{std::cos(angle) * r_dist, std::sin(angle) * r_dist, s.spawn_height * height};
 
         if (emit_rot_.x != 0 || emit_rot_.y != 0 || emit_rot_.z != 0) {
             spawn = apply_static_rotation(spawn, emit_rot_.x, emit_rot_.y, emit_rot_.z);

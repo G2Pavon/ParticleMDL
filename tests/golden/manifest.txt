@@ -7,8 +7,8 @@ campfire_sparks/.qc 251 f8fb9b3925f0b712
 campfire_sparks/_anim.smd 203429 82b3ba737b922c37
 campfire_sparks/_ref.smd 23370 c92b68acded6c4b3
 explosion/.bmp 5174 9796cd5b74f4efa4
-explosion/.qc 228 8584c912a3ecbebb
-explosion/_anim.smd 371369 3bf16f8ab821c15a
+explosion/.qc 227 802d0819820b56b3
+explosion/_anim.smd 371693 373832b2b81fcfc7
 explosion/_ref.smd 31208 e10f352e391ab6cb
 fire/.bmp 5174 b5972d5250fb454c
 fire/.qc 209 b07a6dd95e474279
@@ -31,8 +31,8 @@ smoke/.qc 212 e20ab552eb848611
 smoke/_anim.smd 382813 2435f0ee00bf6426
 smoke/_ref.smd 30808 10178570d6345b0f
 sparks/.bmp 5174 a1c7d5d2fc7c97a2
-sparks/.qc 220 a42e5adf71e3d1b1
-sparks/_anim.smd 185132 f627cefe968e88e3
+sparks/.qc 220 5e09d40ba3893678
+sparks/_anim.smd 184851 5bad18c37187e566
 sparks/_ref.smd 53935 7b69b5dce4b1e73d
 sun/.bmp 66614 a15b2d2bc52f4346
 sun/.qc 203 bae68786c9ae63a5

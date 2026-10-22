@@ -234,12 +234,12 @@ TEST_CASE("no visible quad of a one-shot effect with vertex bones travels farthe
             }
 }
 
-TEST_CASE("the Explosion preset is a one-shot sphere of vertex-bone particles")
+TEST_CASE("the Explosion preset is a one-shot burst of vertex-bone particles")
 {
     const Preset* explosion = find_preset("Explosion");
     REQUIRE(explosion);
     CHECK_FALSE(explosion->settings.loop);
-    CHECK(explosion->settings.emitter_shape == EmitterShape::Sphere);
+    CHECK(explosion->settings.emission_angle == 360.0);   // out all around
     CHECK(explosion->settings.scale_mode == ScaleMode::VertexBone);
     Settings s;
     apply_preset(s, *explosion);

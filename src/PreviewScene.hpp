@@ -32,14 +32,12 @@ struct SceneOptions {
     bool grid = true;
     bool axes = true;
     bool bounds = true;
-    bool emitter = true;   // where particles start and the directions they leave in
 };
 
 // Preview display list: draw the lines first, then the faces in order.
 struct Scene {
     std::vector<SceneLine> lines;     // behind the particles: grid, axes, bounds
     std::vector<SceneFace> faces;     // back to front (painter's algorithm)
-    std::vector<SceneLine> overlay;   // on top of the particles: emitter
 };
 
 // Corners of the fitted volume at loop time `time`: the box the motion was

@@ -210,7 +210,7 @@ TEST_CASE("the preview draws every copy")
     camera.set_focal_length(500);
     Scene scene;
     SceneOptions options;
-    options.grid = options.axes = options.bounds = options.emitter = false;
+    options.grid = options.axes = options.bounds = false;
     build_scene(sys, baked, camera, 0.5, {0, 0}, options, scene);
     // double sided: no face is dropped for facing away
     CHECK(scene.faces.size() == 6 * 4);

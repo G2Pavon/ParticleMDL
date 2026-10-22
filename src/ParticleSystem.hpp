@@ -128,7 +128,6 @@ public:
         return settings_.loop ? (frame % loop_steps_) * loop_duration() / loop_steps_
                               : frame * loop_duration() / loop_steps_;
     }
-    Vec3 emitter_rotation() const noexcept { return emit_rot_; }   // radians
     bool has_micro_rotation() const noexcept { return has_micro_rotation_; }
 
     // Z extent of the unscaled motion, and the scales that fit the motion
