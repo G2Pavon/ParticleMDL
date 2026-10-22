@@ -18,8 +18,8 @@ public:
     CompileJob(const CompileJob&) = delete;
     CompileJob& operator=(const CompileJob&) = delete;
 
-    void start(std::string compiler, std::string safe_name, std::filesystem::path work_dir = ".",
-               bool keep_sources = false);
+    // After a successful compile only the .mdl is left: the .qc, .smd and .bmp are deleted.
+    void start(std::string compiler, std::string safe_name, std::filesystem::path work_dir = ".");
     bool busy() const { return future_.valid(); }
     // The result on the first call after the compile finished, else nullopt.
     // Rethrows exceptions from the compile thread.
