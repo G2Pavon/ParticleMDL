@@ -856,7 +856,12 @@ void EditorApp::draw_middle_panel()
             camera_.zoom(wheel);
     }
 
+    // The sky covers the whole background, so its colour cannot be seen while the sky is shown.
+    ImGui::BeginDisabled(scene_options_.sky);
     ui::color_edit("Background Color", canvas_bg_, ImGuiColorEditFlags_NoInputs);
+    ImGui::EndDisabled();
+    if (scene_options_.sky)
+        ImGui::SetItemTooltip("Hidden behind the skybox: turn Skybox off to use a background colour");
     ImGui::SameLine();
     ImGui::Checkbox("Axes", &scene_options_.axes);
     ImGui::SameLine();
