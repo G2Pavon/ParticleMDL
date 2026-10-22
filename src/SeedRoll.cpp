@@ -29,9 +29,9 @@ void for_each_rolled(S& s, SeedSide side, F&& f)
         f(s.lifespan, 0.1, 1.0, always);
         f(s.lifespan_variance, 0.0, 0.9, optional);
         f(s.burst_window, 0.0, 1.0, always);
-        f(s.volume_width, 1.0, 1024.0, always);
-        f(s.volume_depth, 1.0, 1024.0, always);
-        f(s.volume_height, 1.0, 1024.0, always);
+        f(s.volume_width, 1.0, kMaxVolume, always);
+        f(s.volume_depth, 1.0, kMaxVolume, always);
+        f(s.volume_height, 1.0, kMaxVolume, always);
         for (auto* v : {&s.velocity.x, &s.velocity.y, &s.velocity.z})
             f(*v, -500.0, 500.0, optional);
         f(s.emission_angle, 1.0, 360.0, always);

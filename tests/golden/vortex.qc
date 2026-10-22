@@ -3,7 +3,7 @@ $cd "."
 $cdtexture "."
 $scale 1.0
 
-$bbox -257.00 -260.00 -20.00 270.00 259.00 20.00
+$bbox -136.00 -139.00 -20.00 145.00 136.00 20.00
 
 $texrendermode "vortex.bmp" additive
 

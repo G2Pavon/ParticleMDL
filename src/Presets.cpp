@@ -38,7 +38,7 @@ std::span<const Preset> builtin_presets()
             .particle_spin = {45, 45, 90}, .spin_spread = 90}},
         Preset{"Vortex", {
             .count = 25, .duration = 4.0, .lifespan = 1.0, .fps = 15, .end_behavior = EndBehavior::HideInCore,
-            .volume_width = 512, .volume_depth = 512, .volume_height = 512, .velocity = {0, 0, 0}, .spin = {0, 0, 0},
+            .volume_width = 256, .volume_depth = 256, .volume_height = 256, .velocity = {0, 0, 0}, .spin = {0, 0, 0},
             .emission_angle = 360, .spawn_radius = 300, .spawn_height = 0, .emitter_tilt = {0, 0, 0}, .hollow_ring = true,
             .speed = 0, .burst = 0, .spread = 0, .gravity = 0, .turbulence = 0, .vortex_spin = 180, .vortex_pull = 80,
             .texture = {.pattern = TexPattern::RadialOrb, .color_mode = ColorMode::Gradient, .core_color = {255, 255, 255}, .edge_color = {50, 0, 150}, .size = 64, .hardness = 0.5, .file = {}},
@@ -47,7 +47,7 @@ std::span<const Preset> builtin_presets()
             .particle_spin = {45, 45, 90}, .spin_spread = 90}},
         Preset{"Ambient Ash", {
             .count = 80, .duration = 4.0, .lifespan = 0.95, .fps = 15, .end_behavior = EndBehavior::EndlessLoop,
-            .volume_width = 512, .volume_depth = 512, .volume_height = 512, .velocity = {20, 10, -10}, .spin = {0, 0, 0},
+            .volume_width = 256, .volume_depth = 256, .volume_height = 256, .velocity = {20, 10, -10}, .spin = {0, 0, 0},
             .emission_angle = 360, .spawn_radius = 300, .spawn_height = 150, .emitter_tilt = {0, 0, 0}, .hollow_ring = false,
             .speed = 5, .burst = 10, .spread = 15, .gravity = 10, .turbulence = 80, .vortex_spin = 0, .vortex_pull = 0,
             .texture = {.pattern = TexPattern::SoftCloud, .color_mode = ColorMode::SolidColor, .core_color = {180, 180, 180}, .edge_color = {0, 0, 0}, .size = 64, .hardness = 0.8, .file = {}},
@@ -56,7 +56,7 @@ std::span<const Preset> builtin_presets()
             .particle_spin = {45, 45, 90}, .spin_spread = 90}},
         Preset{"Laser Burst", {
             .count = 80, .duration = 1.0, .lifespan = 1.0, .fps = 30, .end_behavior = EndBehavior::HideUnderground,
-            .volume_width = 512, .volume_depth = 512, .volume_height = 32, .velocity = {0, 0, 0}, .spin = {0, 0, 0},
+            .volume_width = 256, .volume_depth = 256, .volume_height = 32, .velocity = {0, 0, 0}, .spin = {0, 0, 0},
             .emission_angle = 1, .spawn_radius = 0, .spawn_height = 0, .emitter_tilt = {0, 0, 0}, .hollow_ring = false,
             .speed = 300, .burst = 0, .spread = 0, .gravity = 0, .turbulence = 0, .vortex_spin = 0, .vortex_pull = 0,
             .texture = {.pattern = TexPattern::RadialOrb, .color_mode = ColorMode::SolidColor, .core_color = {255, 20, 20}, .edge_color = {0, 0, 0}, .size = 128, .hardness = 2.0, .file = {}},

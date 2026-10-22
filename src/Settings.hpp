@@ -207,7 +207,7 @@ inline constexpr double kMaxBounce = 0.95;
 inline constexpr double kMaxFloorHeight = 2000.0;
 inline constexpr double kMinHardness = 0.05, kMaxHardness = 20.0;
 inline constexpr double kMaxScale = 100.0;
-inline constexpr double kMaxVolume = 65536;
+inline constexpr double kMaxVolume = 256;   // the volume the effect is fitted into, per axis
 inline constexpr double kMaxQuadSize = 4096;
 
 // Moves every field into its valid range (non-finite numbers fall back to the

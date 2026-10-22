@@ -3,7 +3,7 @@ $cd "."
 $cdtexture "."
 $scale 1.0
 
-$bbox -27.00 -281.00 -86.00 292.00 290.00 36.00
+$bbox -27.00 -158.00 -86.00 164.00 162.00 36.00
 
 $texrendermode "laser_burst.bmp" additive
 

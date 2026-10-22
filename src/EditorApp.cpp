@@ -647,9 +647,9 @@ void EditorApp::draw_left_panel()
     }
 
     group_label("Volume");
-    changed |= reset_slider("volume_width", "Width (X)", s.volume_width, 1, 1024, 128);
-    changed |= reset_slider("volume_depth", "Depth (Y)", s.volume_depth, 1, 1024, 128);
-    changed |= reset_slider("volume_height", "Height (Z)", s.volume_height, 1, 1024, 256);
+    changed |= reset_slider("volume_width", "Width (X)", s.volume_width, 1, kMaxVolume, 128);
+    changed |= reset_slider("volume_depth", "Depth (Y)", s.volume_depth, 1, kMaxVolume, 128);
+    changed |= reset_slider("volume_height", "Height (Z)", s.volume_height, 1, kMaxVolume, 256);
 
     group_label("Velocity");
     changed |= reset_slider("velocity.x", "X", s.velocity.x, -500, 500, 0);

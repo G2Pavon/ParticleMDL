@@ -61,8 +61,8 @@ struct Range {
 // The slider ranges of the values in system_values() and particle_values(), in the same order.
 std::vector<Range> system_ranges(const Settings& s)
 {
-    return {{1, double(max_particles(s.geometry, s.scale_mode))}, {0.5, 10}, {0.1, 1}, {0, 0.9}, {0, 1}, {1, 1024}, {1, 1024},
-            {1, 1024}, {-500, 500}, {-500, 500}, {-500, 500}, {1, 360},
+    return {{1, double(max_particles(s.geometry, s.scale_mode))}, {0.5, 10}, {0.1, 1}, {0, 0.9}, {0, 1}, {1, kMaxVolume}, {1, kMaxVolume},
+            {1, kMaxVolume}, {-500, 500}, {-500, 500}, {-500, 500}, {1, 360},
             {0, 500}, {0, 400}, {-180, 180}, {-180, 180}, {-180, 180}, {-200, 400}, {-300, 300}, {0, 150},
             {-600, 200}, {0, 5}, {0, 0.95}, {-300, 300}, {0, 200}, {-720, 720}, {-300, 300}};
 }

@@ -3,7 +3,7 @@ $cd "."
 $cdtexture "."
 $scale 1.0
 
-$bbox -199.00 -212.00 -187.00 259.00 260.00 332.00
+$bbox -101.00 -108.00 -95.00 131.00 132.00 168.00
 
 $texrendermode "ambient_ash.bmp" additive
 
