@@ -75,9 +75,15 @@ EditorApp::EditorApp()
       compiler_dialog_("Select Compiler", FileDialog::Mode::Open),
       export_dialog_("Export Folder", FileDialog::Mode::Directory),
       texture_dialog_("Choose Image", FileDialog::Mode::Open, {".png", ".jpg", ".jpeg", ".bmp", ".tga"}),
-      export_dir_(to_utf8(std::filesystem::current_path()))
+      config_path_(app_config_path()),
+      config_(read_app_config(config_path_)),
+      game_dialog_("Game Folder", FileDialog::Mode::Directory)
 {
-    set_export_dir(export_dir_);
+    refresh_export_dir_problem();
+    if (config_.game_folder.empty()) {   // the first start: exports need it
+        show_game_folder_ = true;
+        game_folder_edit_.clear();
+    }
     apply_preset(0);   // Fountain
 }
 
@@ -199,13 +205,23 @@ void EditorApp::load_system(const fs::path& path)
     }
 }
 
-void EditorApp::set_export_dir(std::string dir)
+void EditorApp::refresh_export_dir_problem()
 {
-    export_dir_ = std::move(dir);
-    std::error_code ec;
-    export_dir_problem_.reset();
-    if (!std::filesystem::is_directory(from_utf8(export_dir_), ec))
-        export_dir_problem_ = "Folder does not exist";
+    export_dir_problem_ = game_folder_problem(from_utf8(config_.game_folder));
+    if (!export_dir_problem_)
+        export_dir_problem_ = models_subfolder_problem(models_subfolder_);
+}
+
+void EditorApp::set_game_folder(std::string folder)
+{
+    config_.game_folder = std::move(folder);
+    refresh_export_dir_problem();
+    try {
+        write_app_config(config_path_, config_);
+        set_status("Game folder: " + config_.game_folder, StatusTone::Success);
+    } catch (const std::exception& e) {
+        set_status(std::string("The game folder is set for this session only: ") + e.what(), StatusTone::Warning);
+    }
 }
 
 void EditorApp::export_data()
@@ -216,17 +232,19 @@ void EditorApp::export_data()
         if (dirty_)
             rebuild();
         const ParticleSystem& sys = *system_;
-        const std::filesystem::path folder = from_utf8(export_dir_);
+        const std::filesystem::path folder = export_folder(from_utf8(config_.game_folder), models_subfolder_);
+        std::filesystem::create_directories(folder);   // models/ exists; a folder inside it is made when needed
         export_model(sys, baked_, table_, folder);
         const std::string safe = safe_model_name(sys.settings().model_name);
+        const std::string where = models_label(from_utf8(config_.game_folder)) + models_subfolder_;
 
         if (auto_compile_) {
-            set_status("Compiling .mdl in " + export_dir_ + "...", StatusTone::Warning);
+            set_status("Compiling .mdl in " + where + "...", StatusTone::Warning);
             compiling_.emplace(sys);
             compiling_mdl_ = folder / from_utf8(safe + ".mdl");
             compile_job_.start(compiler_path_, safe, folder);
         } else {
-            set_status("Success! Textures, SMDs, and " + safe + ".qc written to " + export_dir_ + ".", StatusTone::Success);
+            set_status("Success! Textures, SMDs, and " + safe + ".qc written to " + where + ".", StatusTone::Success);
         }
     } catch (const std::exception& e) {
         set_status(std::string("Error: ") + e.what(), StatusTone::Error);
@@ -337,6 +355,8 @@ native::Request EditorApp::request_for(DialogPurpose purpose)
 #endif
     case DialogPurpose::Texture:
         return {Kind::OpenFile, "Choose image", "", images, "Images (*.png, *.jpg, *.jpeg, *.bmp, *.tga)"};
+    case DialogPurpose::GameFolder:
+        return {Kind::SelectFolder, "Choose the game folder (such as Half-Life/valve or Half-Life/cstrike)", "", {}, ""};
     }
     return {};
 }
@@ -353,7 +373,13 @@ void EditorApp::open_dialog(DialogPurpose purpose)
     switch (purpose) {
     case DialogPurpose::Load: load_dialog_.open(); break;
     case DialogPurpose::Save: save_dialog_.open(); break;
-    case DialogPurpose::ExportFolder: export_dialog_.open_at(export_dir_); break;
+    case DialogPurpose::ExportFolder:
+        if (!game_folder_problem(from_utf8(config_.game_folder)))
+            export_dialog_.open_at(export_folder(from_utf8(config_.game_folder), ""));
+        else
+            export_dialog_.open();
+        break;
+    case DialogPurpose::GameFolder: game_dialog_.open(); break;
     case DialogPurpose::Compiler: compiler_dialog_.open(); break;
     case DialogPurpose::Texture: texture_dialog_.open(); break;
     }
@@ -366,7 +392,15 @@ void EditorApp::finish_dialog(DialogPurpose purpose, const std::optional<std::fi
     switch (purpose) {
     case DialogPurpose::Load: load_system(*path); break;
     case DialogPurpose::Save: save_system(*path); break;
-    case DialogPurpose::ExportFolder: set_export_dir(to_utf8(*path)); break;
+    case DialogPurpose::ExportFolder:
+        if (const auto sub = subfolder_within_models(from_utf8(config_.game_folder), *path)) {
+            models_subfolder_ = *sub;
+            refresh_export_dir_problem();
+        } else {
+            set_status("Choose a folder inside " + models_label(from_utf8(config_.game_folder)), StatusTone::Error);
+        }
+        break;
+    case DialogPurpose::GameFolder: game_folder_edit_ = to_utf8(*path); break;
     case DialogPurpose::Compiler: compiler_path_ = to_utf8(*path); break;
     case DialogPurpose::Texture:
         settings_.texture.file = to_utf8(*path);
@@ -439,7 +473,10 @@ void EditorApp::draw_frame(double delta)
         finish_dialog(DialogPurpose::ExportFolder, p);
     if (auto p = texture_dialog_.draw())
         finish_dialog(DialogPurpose::Texture, p);
+    if (auto p = game_dialog_.draw())
+        finish_dialog(DialogPurpose::GameFolder, p);
     draw_about_dialog();
+    draw_game_folder_window();
 
     ImGui::End();
 }
@@ -478,6 +515,13 @@ void EditorApp::draw_menu_bar()
         // Same action and conditions as the Export button in the middle panel.
         if (ImGui::MenuItem(auto_compile_ ? "Export .mdl" : "Export SMD/QC", "Ctrl+E", false, can_export()))
             export_data();
+        ImGui::EndMenu();
+    }
+    if (ImGui::BeginMenu("Settings")) {
+        if (ImGui::MenuItem("Game Folder...")) {
+            show_game_folder_ = true;
+            game_folder_edit_ = config_.game_folder;
+        }
         ImGui::EndMenu();
     }
     if (ImGui::BeginMenu("Help")) {
@@ -606,12 +650,51 @@ void EditorApp::draw_about_dialog()
     ImGui::BulletText("Ctrl+S  Save settings");
     ImGui::Dummy(ImVec2(0, ui::px(8)));
 
-    ImGui::TextWrapped("Exports write .qc, .smd and .bmp files; Compile .mdl then runs the studiomdl "
-                       "binary configured in the panel below the preview.");
+    ImGui::TextWrapped("Exports write .qc, .smd and .bmp files into the models folder of the game folder set in "
+                       "Settings > Game Folder, or a folder inside it; Compile .mdl then runs the studiomdl binary "
+                       "configured in the panel below the preview.");
     ImGui::Dummy(ImVec2(0, ui::px(12)));
     if (ImGui::Button("Close", ImVec2(ui::px(90), 0)))
         ImGui::CloseCurrentPopup();
     ImGui::EndPopup();
+}
+
+void EditorApp::draw_game_folder_window()
+{
+    if (!show_game_folder_)
+        return;
+    const ImGuiViewport* vp = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(vp->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(ui::px(560), 0), ImGuiCond_Appearing);
+    if (!ImGui::Begin("Game Folder", &show_game_folder_, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings |
+                                                             ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::End();
+        return;
+    }
+    ImGui::TextWrapped("The mod folder of the game, such as Half-Life/valve or Half-Life/cstrike. Exports go to its "
+                       "models folder, or a folder inside it.");
+    ImGui::Dummy(ImVec2(0, ui::px(4)));
+    ImGui::SetNextItemWidth(ui::px(440));
+    ImGui::InputTextWithHint("##game_folder", "e.g. C:/Games/Half-Life/cstrike", &game_folder_edit_);
+    ImGui::SameLine();
+    if (ImGui::Button("Browse##game", ImVec2(ui::px(70), 0)))
+        open_dialog(DialogPurpose::GameFolder);
+    const auto problem = game_folder_problem(from_utf8(game_folder_edit_));
+    if (problem)
+        wrapped_text(kError, *problem);
+    else
+        ImGui::TextColored(kMuted, "Exports go to %s", models_label(from_utf8(game_folder_edit_)).c_str());
+    ImGui::Dummy(ImVec2(0, ui::px(6)));
+    ImGui::BeginDisabled(problem.has_value());
+    if (ImGui::Button("Save", ImVec2(ui::px(90), 0))) {
+        set_game_folder(game_folder_edit_);
+        show_game_folder_ = false;
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel", ImVec2(ui::px(90), 0)))
+        show_game_folder_ = false;
+    ImGui::End();
 }
 
 void EditorApp::draw_left_panel()
@@ -755,9 +838,13 @@ void EditorApp::draw_middle_panel()
 
     ImGui::TextUnformatted("Export folder");
     ImGui::SetNextItemWidth(ui::px(-80));
-    std::string folder = export_dir_;
-    if (ImGui::InputText("##export_dir", &folder))
-        set_export_dir(folder);
+    // Empty is the models folder itself, which the placeholder names.
+    const std::string models = models_label(from_utf8(config_.game_folder));
+    if (ImGui::InputTextWithHint("##export_dir", models.c_str(), &models_subfolder_))
+        refresh_export_dir_problem();
+    ImGui::SetItemTooltip("A folder inside %s, such as mymodels (made when it does not exist).\nEmpty: %s itself.\n"
+                          "The game folder is set in Settings > Game Folder.",
+                          models.c_str(), models.c_str());
     ImGui::SameLine();
     if (ImGui::Button("Browse##export", ImVec2(ui::px(70), 0)))
         open_dialog(DialogPurpose::ExportFolder);

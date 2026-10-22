@@ -160,6 +160,7 @@ add_library(particles_editor_support STATIC
     src/OrbitCamera.cpp
     src/PreviewScene.cpp
     src/PathInput.cpp
+    src/GameFolder.cpp
     src/NativeDialog.cpp)
 target_link_libraries(particles_editor_support
     PUBLIC particles_core

@@ -10,6 +10,7 @@
 #include "CompileJob.hpp"
 #include "Exporter.hpp"
 #include "FileDialog.hpp"
+#include "GameFolder.hpp"
 #include "NativeDialog.hpp"
 #include "OrbitCamera.hpp"
 #include "ParticleSystem.hpp"
@@ -42,7 +43,7 @@ private:
     void save_system(const std::filesystem::path& path);
     void export_data();
     // The file dialogs: the operating system's own when available, else the editor's.
-    enum class DialogPurpose { Load, Save, ExportFolder, Compiler, Texture };
+    enum class DialogPurpose { Load, Save, ExportFolder, Compiler, Texture, GameFolder };
     static native::Request request_for(DialogPurpose purpose);
     void open_dialog(DialogPurpose purpose);
     void finish_dialog(DialogPurpose purpose, const std::optional<std::filesystem::path>& path);
@@ -110,9 +111,18 @@ private:
     std::optional<DialogPurpose> pending_dialog_;  // what the open native dialog is for
     TextureJob texture_job_;                       // makes an imported picture's texture off the UI thread
     std::optional<std::string> texture_problem_;   // why the imported image could not be used
-    std::string export_dir_;                        // where Export writes; per session, not saved with the effect
-    std::optional<std::string> export_dir_problem_;
-    void set_export_dir(std::string dir);
+    std::filesystem::path config_path_;   // where config_ is kept between sessions
+    AppConfig config_;                    // the game folder
+    FileDialog game_dialog_;
+    // Where Export writes: a folder inside <game>/models/ ("" is models/ itself). Per session.
+    std::string models_subfolder_;
+    std::optional<std::string> export_dir_problem_;   // why the game folder or that folder cannot be used
+    void refresh_export_dir_problem();
+    // Settings > Game Folder: a window of its own (not a popup, so a folder dialog can open over it).
+    bool show_game_folder_ = false;
+    std::string game_folder_edit_;
+    void draw_game_folder_window();
+    void set_game_folder(std::string folder);
     bool show_about_ = false;
 
     float bottom_height_ = 170.0f;   // measured each frame, used to size the canvas
