@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include <imgui.h>
 
 #include "TextureGenerator.hpp"
@@ -18,6 +20,9 @@ public:
     GlTexture& operator=(const GlTexture&) = delete;
 
     void upload(const RgbaImage& img);
+    // A texture as the game binds a model texture: every mipmap level given (the first the full size),
+    // trilinear filtering, and repeating at its edges.
+    void upload_mipmaps(const std::vector<RgbaImage>& levels);
     ImTextureID imgui_id() const;
 
 private:

@@ -23,14 +23,15 @@ public:
     void set_sky(const std::array<RgbaImage, 6>* sides);
     bool has_sky() const noexcept { return has_sky_; }
     // The exported texture, palettized exactly as written to the BMP.
-    ImTextureID swatch() const { return game_.imgui_id(); }
+    ImTextureID swatch() const { return swatch_.imgui_id(); }
 
     // Blends the faces additively, as GoldSrc draws "$texrendermode additive"
     // (full-bright; the game also applies map lighting).
     void draw(ImDrawList* dl, ImVec2 origin, ImVec2 size, Rgb background, const Scene& scene) const;
 
 private:
-    GlTexture game_;   // export texture: color premultiplied by intensity, palettized
+    GlTexture swatch_;   // the exported texture, palettized exactly as written to the BMP
+    GlTexture game_;     // the same as the game loads it: texture gamma, mipmaps, repeating
     std::array<GlTexture, 6> sky_;
     bool has_sky_ = false;
 };

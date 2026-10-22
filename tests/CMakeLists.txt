@@ -30,6 +30,7 @@ add_executable(particlemdl_tests
     test_whole_values.cpp
     test_game_folder.cpp
     test_skybox.cpp
+    test_engine_look.cpp
     test_clusters.cpp
     test_align.cpp
     test_bounce.cpp

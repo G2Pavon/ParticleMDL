@@ -124,6 +124,7 @@ add_library(particles_core STATIC
     src/SettingsJson.cpp
     src/Presets.cpp
     src/BoneLayout.cpp
+    src/EngineLook.cpp
     src/ParticleSystem.cpp
     src/SeedRoll.cpp
     src/Baking.cpp

@@ -2,6 +2,7 @@
 
 #include <GLFW/glfw3.h>   // pulls in the system GL header (blend state)
 
+#include "EngineLook.hpp"
 #include "TextureGenerator.hpp"
 #include "Widgets.hpp"
 
@@ -19,10 +20,11 @@ ImU32 to_imcol(Rgba8 c)
     return IM_COL32(c.r, c.g, c.b, c.a);
 }
 
-// GoldSrc draws additive model textures with glBlendFunc(GL_ONE, GL_ONE).
+// The engine adds an additive model texture times its vertex colour, times its alpha: glBlendFunc
+// GL_SRC_ALPHA, GL_ONE for an Additive entity, GL_ONE, GL_ONE for a Normal one, whose alpha is 255.
 void set_additive_blend(const ImDrawList*, const ImDrawCmd*)
 {
-    glBlendFunc(GL_ONE, GL_ONE);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 }
 
 } // namespace
@@ -34,7 +36,8 @@ void PreviewRenderer::update_textures(const TextureSettings& s)
 
 void PreviewRenderer::set_texture(const IndexedImage& image)
 {
-    game_.upload(to_rgba(expand(image)));
+    swatch_.upload(to_rgba(expand(image)));
+    game_.upload_mipmaps(engine_mipmaps(to_rgba(expand(with_texture_gamma(image)))));
 }
 
 void PreviewRenderer::set_sky(const std::array<RgbaImage, 6>* sides)
@@ -66,7 +69,7 @@ void PreviewRenderer::draw(ImDrawList* dl, ImVec2 origin, ImVec2 size, Rgb backg
     for (const SceneFace& f : scene.faces)
         dl->AddImageQuad(game_.imgui_id(), to_imvec(f.pts[0]), to_imvec(f.pts[1]), to_imvec(f.pts[2]),
                          to_imvec(f.pts[3]), to_imvec(f.uvs[0]), to_imvec(f.uvs[1]), to_imvec(f.uvs[2]),
-                         to_imvec(f.uvs[3]));
+                         to_imvec(f.uvs[3]), to_imcol(f.color));
     dl->AddCallback(ImDrawCallback_ResetRenderState, nullptr);
 
     dl->PopClipRect();

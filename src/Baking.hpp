@@ -46,7 +46,8 @@ public:
         return poses_[static_cast<std::size_t>(stored) * particles_ + particle];
     }
 
-    // The pose at `loop_time`: linear between the two baked frames around it.
+    // The pose at `loop_time`: linear between the two baked frames around it, as the engine plays
+    // them; a sequence that does not loop holds a thousandth of a frame before its end.
     SampledPose sample(int particle, double loop_time) const;
 
     // Largest distance a full-size, visible quad travels in one frame across a

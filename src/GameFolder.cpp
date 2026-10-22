@@ -1,5 +1,6 @@
 #include "GameFolder.hpp"
 
+#include <algorithm>
 #include <cstdlib>
 #include <fstream>
 #include <stdexcept>
@@ -136,6 +137,14 @@ AppConfig read_app_config(const fs::path& path)
         config.sky = it->get<bool>();
     if (const auto it = j.find("sky_name"); it != j.end() && it->is_string())
         config.sky_name = it->get<std::string>();
+    if (const auto it = j.find("render_mode"); it != j.end() && it->is_string())
+        config.lit = it->get<std::string>() == "normal";
+    if (const auto it = j.find("renderamt"); it != j.end() && it->is_number_integer())
+        config.renderamt = std::clamp(it->get<int>(), 0, 255);
+    if (const auto it = j.find("light"); it != j.end() && it->is_array() && it->size() == 3)
+        for (std::size_t i = 0; i < 3; ++i)
+            if ((*it)[i].is_number_integer())
+                config.light[i] = std::clamp((*it)[i].get<int>(), 0, 255);
     return config;
 }
 
@@ -144,7 +153,9 @@ void write_app_config(const fs::path& path, const AppConfig& config)
     if (path.empty())
         throw std::runtime_error("there is no place to keep the settings (no home folder)");
     fs::create_directories(path.parent_path());
-    const nlohmann::json j = {{"game_folder", config.game_folder}, {"sky", config.sky}, {"sky_name", config.sky_name}};
+    const nlohmann::json j = {{"game_folder", config.game_folder}, {"sky", config.sky}, {"sky_name", config.sky_name},
+                              {"render_mode", config.lit ? "normal" : "additive"}, {"renderamt", config.renderamt},
+                              {"light", config.light}};
     write_file_atomically(path, j.dump(2) + "\n");
 }
 

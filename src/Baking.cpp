@@ -165,7 +165,11 @@ SampledPose BakedPoses::sample(int particle, double loop_time) const
 {
     // In a loop the time wraps; a one-shot sequence stops at its ends.
     const double within = looping_ ? floor_mod(loop_time, loop_) : std::clamp(loop_time, 0.0, loop_);
-    const double f = within / loop_ * steps_;
+    double f = within / loop_ * steps_;
+    // The engine holds a sequence that does not loop a thousandth of a frame before its last frame
+    // (R_StudioEstimateFrame: numframes - 1.001), never on it.
+    if (!looping_)
+        f = std::min(f, steps_ - 0.001);
     const int i = std::min(static_cast<int>(f), steps_ - 1);
     const double t = f - i;
 

@@ -30,6 +30,7 @@ enum class StatusTone { Success, Warning, Error };
 class EditorApp {
 public:
     EditorApp();
+    ~EditorApp();   // keeps the settings of the session (game folder, sky, render mode) for the next
     EditorApp(const EditorApp&) = delete;
     EditorApp& operator=(const EditorApp&) = delete;
 
@@ -129,6 +130,7 @@ private:
     std::vector<std::string> skies_;
     void refresh_skies();
     void apply_sky();   // loads the chosen sky into the renderer, or takes it away
+    void apply_look();  // the entity's render mode from config_ into the preview
     bool show_about_ = false;
 
     float bottom_height_ = 170.0f;   // measured each frame, used to size the canvas
