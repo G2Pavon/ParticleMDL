@@ -53,7 +53,7 @@ TEST_CASE("a texture is loaded with its palette through the texture gamma")
 {
     IndexedImage image;
     image.width = image.height = 1;
-    image.indices = {0};
+    image.indices.assign(1, 0);   // not "= {0}": GCC 13 warns of a false out-of-bounds copy there (-Warray-bounds)
     image.palette = {{0, 64, 128}, {200, 255, 10}};
     const IndexedImage game = with_texture_gamma(image);
     CHECK(game.indices == image.indices);
