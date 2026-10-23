@@ -25,6 +25,7 @@ add_executable(particlemdl_tests
     test_bone_layout.cpp
     test_seed_roll.cpp
     test_orbit_camera.cpp
+    test_playback.cpp
     test_model_scale.cpp
     test_whole_values.cpp
     test_game_folder.cpp

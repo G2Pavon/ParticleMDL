@@ -171,6 +171,7 @@ target_link_libraries(particles_core
 # ---------------------------------------------------------------------------
 add_library(particles_editor_support STATIC
     src/OrbitCamera.cpp
+    src/Playback.cpp
     src/PreviewScene.cpp
     src/PathInput.cpp
     src/GameFolder.cpp
