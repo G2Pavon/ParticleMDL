@@ -263,6 +263,38 @@ void EditorApp::apply_sky()
     }
 }
 
+void EditorApp::export_frame()
+{
+    try {
+        if (dirty_)
+            rebuild();
+        const ParticleSystem& sys = *system_;
+        const int frame = playback_.frame(clip());
+        const std::filesystem::path folder = export_folder(from_utf8(config_.game_folder), models_subfolder_);
+        std::filesystem::create_directories(folder);
+        const std::string where = models_label(from_utf8(config_.game_folder)) + normalized_subfolder(models_subfolder_);
+        const CompiledModel model = export_frame_mdl(sys, baked_, frame, folder);
+        std::string summary = std::to_string(particles_on_frame(sys, baked_, frame)) + " particles";
+        try {
+            const MdlInfo info = read_mdl(model.mdl);
+            if (!info.models.empty())
+                summary += ", " + std::to_string(info.models.front().vertices) + " vertices";
+        } catch (const std::exception& e) {
+            summary += "; the model could not be read back: " + std::string(e.what());
+        }
+        std::string detail;
+        for (const std::string& warning : model.warnings)
+            detail += "studiomdl: " + warning + "\n";
+        set_status("Success! " + frame_model_name(sys.settings().model_name, frame) + ".mdl written to " + where +
+                       " (frame " + std::to_string(frame) + ": " + summary + ")",
+                   StatusTone::Success, std::move(detail));
+    } catch (const CompileFailed& e) {
+        set_status(std::string("Compile failed: ") + e.what(), StatusTone::Error);
+    } catch (const std::exception& e) {
+        set_status(std::string("Error: ") + e.what(), StatusTone::Error);
+    }
+}
+
 void EditorApp::export_data()
 {
     try {
@@ -590,6 +622,20 @@ bool EditorApp::can_export() const
     return !name_problem_ && !export_dir_problem_ && export_report_.blockers.empty();
 }
 
+std::optional<std::string> EditorApp::frame_export_problem() const
+{
+    if (!config_.playback)
+        return "Turn on Playback in the preview's options to pick the frame";
+    if (name_problem_)
+        return name_problem_;
+    if (export_dir_problem_)
+        return export_dir_problem_;
+    const int frame = playback_.frame(clip());
+    if (particles_on_frame(*system_, baked_, frame) == 0)
+        return "No particle is shown on frame " + std::to_string(frame);
+    return std::nullopt;
+}
+
 void EditorApp::draw_menu_bar()
 {
     // Shortcuts are ignored while a dialog is open, so typing in its name field
@@ -619,6 +665,8 @@ void EditorApp::draw_menu_bar()
         // Same action and conditions as the Export button in the middle panel.
         if (ImGui::MenuItem("Export .mdl", "Ctrl+E", false, can_export()))
             export_data();
+        if (ImGui::MenuItem("Export frame .mdl", nullptr, false, !frame_export_problem()))
+            export_frame();
         ImGui::EndMenu();
     }
     if (ImGui::BeginMenu("Settings")) {
@@ -1025,10 +1073,21 @@ void EditorApp::draw_middle_panel()
         case ExportBlocker::Kind::TooManyVertices: label = "Blocked: too many vertices###export"; break;
         case ExportBlocker::Kind::TooManyNormals: label = "Blocked: too many normals###export"; break;
         }
+    // The animated model, and a still of the frame the playback is on.
+    const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
     {
         ui::Locked lock(!can_export(), "Fix what the messages above say first");
-        if (ImGui::Button(label, ImVec2(-1, ui::px(40))))
+        if (ImGui::Button(label, ImVec2(half, ui::px(40))))
             export_data();
+    }
+    ImGui::SameLine();
+    {
+        const std::optional<std::string> problem = frame_export_problem();
+        ui::Locked lock(problem.has_value(), problem ? problem->c_str() : nullptr);
+        if (ImGui::Button("Export frame .mdl", ImVec2(-1, ui::px(40))))
+            export_frame();
+        ImGui::SetItemTooltip("A still model of the frame on show: the particles where they are on that frame, without\n"
+                              "animation, written as <name>_f<frame>.mdl beside the animated model.");
     }
 
     bottom_height_ = ImGui::GetCursorPosY() - bottom_start + ImGui::GetStyle().ItemSpacing.y;

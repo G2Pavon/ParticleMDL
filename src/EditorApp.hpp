@@ -43,12 +43,14 @@ private:
     void new_system();
     void save_system(const std::filesystem::path& path);
     void export_data();
+    void export_frame();   // a still of the frame the playback is on
     // The file dialogs: the operating system's own when available, else the editor's.
     enum class DialogPurpose { Load, Save, ExportFolder, Texture, GameFolder };
     static native::Request request_for(DialogPurpose purpose);
     void open_dialog(DialogPurpose purpose);
     void finish_dialog(DialogPurpose purpose, const std::optional<std::filesystem::path>& path);
     bool can_export() const;
+    std::optional<std::string> frame_export_problem() const;   // why there is no still to export
     void poll_texture();
     void advance_clock(double delta);
     Clip clip() const;   // the timing of the current effect, for playback_
