@@ -758,9 +758,12 @@ void EditorApp::draw_left_panel()
     const auto presets = builtin_presets();
     ImGui::SetNextItemWidth(ui::px(155));
     if (ImGui::BeginCombo("Preset", preset_label_.c_str())) {
-        for (int i = 0; i < static_cast<int>(presets.size()); ++i)
+        for (int i = 0; i < static_cast<int>(presets.size()); ++i) {
             if (ImGui::Selectable(presets[i].name.data(), i == preset_index_))
                 apply_preset(i);
+            if (i == preset_index_)
+                ImGui::SetItemDefaultFocus();   // the keyboard starts on the current one
+        }
         ImGui::EndCombo();
     }
 
@@ -890,12 +893,16 @@ void EditorApp::draw_middle_panel()
         if (ImGui::BeginCombo("##sky", config_.sky_name.c_str())) {
             if (ImGui::IsWindowAppearing())
                 refresh_skies();   // skies added to the game since
-            for (const std::string& name : skies_)
-                if (ImGui::Selectable(name.c_str(), name == config_.sky_name) && name != config_.sky_name) {
+            for (const std::string& name : skies_) {
+                const bool current = name == config_.sky_name;
+                if (ImGui::Selectable(name.c_str(), current) && !current) {
                     config_.sky_name = name;
                     apply_sky();
                     save_config();
                 }
+                if (current)
+                    ImGui::SetItemDefaultFocus();   // the keyboard starts on the current one
+            }
             ImGui::EndCombo();
         }
     }

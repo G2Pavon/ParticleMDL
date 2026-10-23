@@ -72,10 +72,13 @@ bool int_combo(const char* label, int& value, const std::array<int, N>& values)
     ImGui::SetNextItemWidth(field_width());
     if (ImGui::BeginCombo(label, text(value, buf))) {
         for (int v : values) {
-            if (ImGui::Selectable(text(v, buf), v == value)) {
+            const bool current = v == value;
+            if (ImGui::Selectable(text(v, buf), current)) {
                 value = v;
                 changed = true;
             }
+            if (current)
+                ImGui::SetItemDefaultFocus();   // the keyboard starts on the current one
         }
         ImGui::EndCombo();
     }

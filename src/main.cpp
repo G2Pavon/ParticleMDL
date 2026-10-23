@@ -93,6 +93,9 @@ public:
         ImGui::CreateContext();
         ImGuiIO& io = ImGui::GetIO();
         io.IniFilename = nullptr;
+        // The keyboard moves through the controls: Up and Down through the items of an open dropdown,
+        // Enter picks one, Escape closes it.
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
         gs::theme::apply(ImGui::GetStyle());
         ImGui::GetStyle().ScaleAllSizes(scale);
         // Rasterize the font at its real pixel size so it stays crisp.
