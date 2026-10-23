@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -33,6 +34,7 @@ struct MdlSequence {
     int flags = 0;
     int frames = 0;
     int blends = 0;
+    std::array<float, 3> bbmin{}, bbmax{};   // the box studiomdl computed around the sequence, in model space
     bool external = false;            // its animation is in another file ("name01.mdl"); not read
     std::size_t offset_bytes = 0;     // the table of channel offsets: 12 bytes for each bone
     std::size_t value_bytes = 0;      // the run-length coded values after it

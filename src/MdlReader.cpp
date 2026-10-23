@@ -33,8 +33,8 @@ constexpr std::size_t kOffNumBodyParts = 204, kOffBodyPartIndex = 208;
 constexpr std::size_t kPartNumModels = 64, kPartModelIndex = 72;
 constexpr std::size_t kModelNumVerts = 80, kModelNumNorms = 92;
 // Sequence description field offsets.
-constexpr std::size_t kSeqFps = 32, kSeqFlags = 36, kSeqNumFrames = 56, kSeqNumBlends = 120, kSeqAnimIndex = 124,
-                      kSeqGroup = 156;
+constexpr std::size_t kSeqFps = 32, kSeqFlags = 36, kSeqNumFrames = 56, kSeqBbMin = 96, kSeqBbMax = 108,
+                      kSeqNumBlends = 120, kSeqAnimIndex = 124, kSeqGroup = 156;
 
 // Limits that keep a damaged file from making the reader slow or large. Far above anything the
 // engine accepts (128 bones, 2048 frames).
@@ -130,6 +130,10 @@ MdlSequence read_sequence(const Bytes& in, std::size_t at, int bones, std::size_
     seq.flags = in.i32(at + kSeqFlags, "sequence flags");
     seq.frames = checked_count(in, at + kSeqNumFrames, kMaxFrames, "frames");
     seq.blends = checked_count(in, at + kSeqNumBlends, kMaxBlends, "blends");
+    for (std::size_t axis = 0; axis < 3; ++axis) {
+        seq.bbmin[axis] = in.f32(at + kSeqBbMin + 4 * axis, "sequence box");
+        seq.bbmax[axis] = in.f32(at + kSeqBbMax + 4 * axis, "sequence box");
+    }
     seq.external = in.i32(at + kSeqGroup, "sequence group") != 0;
     if (seq.external || seq.blends == 0)
         return seq;
