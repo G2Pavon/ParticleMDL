@@ -955,8 +955,10 @@ void EditorApp::draw_right_panel()
     changed |= enum_combo("Color Mode", s.texture.color_mode);
     ImGui::SetNextItemWidth(ui::field_width());
     changed |= color_edit("Core Color", s.texture.core_color);
-    ImGui::SetNextItemWidth(ui::field_width());
-    changed |= color_edit("Edge Color", s.texture.edge_color);
+    if (s.texture.color_mode == ColorMode::Gradient) {   // a solid colour has no edge colour
+        ImGui::SetNextItemWidth(ui::field_width());
+        changed |= color_edit("Edge Color", s.texture.edge_color);
+    }
     changed |= reset_slider("hardness", "Hardness", s.texture.hardness, kSliderHardness.lo, kSliderHardness.hi, 0.8, "%.2f");
     ImGui::EndDisabled();
     changed |= int_combo("Resolution", s.texture.size, kTextureSizes);
