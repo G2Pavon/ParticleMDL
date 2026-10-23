@@ -16,7 +16,7 @@ inline constexpr ImVec4 kWarning{0.98f, 0.80f, 0.28f, 1.0f};
 inline constexpr ImVec4 kError{0.96f, 0.40f, 0.40f, 1.0f};
 inline constexpr ImVec4 kLink{0.45f, 0.72f, 0.98f, 1.0f};          // file-type highlight
 // A locked control (ui::Locked) is drawn at this share of its opacity, fading it into the panel.
-inline constexpr float kDisabledAlpha = 0.60f;
+inline constexpr float kDisabledAlpha = 0.40f;
 
 // Applies the palette and metrics to Dear ImGui's style. Sizes are unscaled:
 // call ImGuiStyle::ScaleAllSizes afterwards for high-DPI screens.
