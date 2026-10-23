@@ -12,6 +12,7 @@ void apply(ImGuiStyle& style)
     style.IndentSpacing = 16;
     style.ScrollbarSize = 12;
     style.GrabMinSize = 10;
+    style.DisabledAlpha = kDisabledAlpha;
 
     style.WindowRounding = 4;
     style.ChildRounding = 4;

@@ -683,12 +683,13 @@ void EditorApp::draw_game_folder_window()
     else
         ImGui::TextColored(kMuted, "Exports go to %s", models_label(from_utf8(folder)).c_str());
     ImGui::Dummy(ImVec2(0, ui::px(6)));
-    ImGui::BeginDisabled(problem.has_value());
-    if (ImGui::Button("Save", ImVec2(ui::px(90), 0))) {
-        set_game_folder(folder);
-        show_game_folder_ = false;
+    {
+        ui::Locked lock(problem.has_value(), problem ? problem->c_str() : nullptr);
+        if (ImGui::Button("Save", ImVec2(ui::px(90), 0))) {
+            set_game_folder(folder);
+            show_game_folder_ = false;
+        }
     }
-    ImGui::EndDisabled();
     ImGui::SameLine();
     if (ImGui::Button("Cancel", ImVec2(ui::px(90), 0)))
         show_game_folder_ = false;
@@ -801,11 +802,10 @@ void EditorApp::draw_middle_panel()
     }
 
     // The sky covers the whole background, so its colour cannot be seen while the sky is shown.
-    ImGui::BeginDisabled(scene_options_.sky);
-    ui::color_edit("Background Color", canvas_bg_, ImGuiColorEditFlags_NoInputs);
-    ImGui::EndDisabled();
-    if (scene_options_.sky)
-        ImGui::SetItemTooltip("Hidden behind the skybox: turn Skybox off to use a background colour");
+    {
+        ui::Locked lock(scene_options_.sky, "Hidden behind the skybox: turn Skybox off to use a background colour");
+        ui::color_edit("Background Color", canvas_bg_, ImGuiColorEditFlags_NoInputs);
+    }
     ImGui::SameLine();
     ImGui::Checkbox("Axes", &scene_options_.axes);
     ImGui::SameLine();
@@ -814,20 +814,18 @@ void EditorApp::draw_middle_panel()
     ImGui::Checkbox("Bounds", &scene_options_.bounds);
     ImGui::SameLine();
     // The game's sky instead of the background colour, from the game folder's gfx/env.
-    ImGui::BeginDisabled(skies_.empty());
-    bool sky = config_.sky && !skies_.empty();
-    if (ImGui::Checkbox("Skybox", &sky)) {
-        config_.sky = sky;
-        apply_sky();
-        save_config();
-    }
-    ImGui::EndDisabled();
-    if (!skies_.empty())
+    {
+        ui::Locked lock(skies_.empty(), game_folder_problem(from_utf8(config_.game_folder))
+                                            ? "Set the game folder in Settings > Game Folder to show its skies"
+                                            : "The game folder has no sky in gfx/env (all six sides of one)");
+        bool sky = config_.sky && !skies_.empty();
+        if (ImGui::Checkbox("Skybox", &sky)) {
+            config_.sky = sky;
+            apply_sky();
+            save_config();
+        }
         ImGui::SetItemTooltip("The game's sky behind the effect, as the game shows it for an entity at yaw 0");
-    else if (game_folder_problem(from_utf8(config_.game_folder)))
-        ImGui::SetItemTooltip("Set the game folder in Settings > Game Folder to show its skies");
-    else
-        ImGui::SetItemTooltip("The game folder has no sky in gfx/env (all six sides of one)");
+    }
     if (config_.sky && !skies_.empty()) {
         ImGui::SameLine();
         ImGui::SetNextItemWidth(ui::px(140));
@@ -898,10 +896,11 @@ void EditorApp::draw_middle_panel()
         case ExportBlocker::Kind::TooManyVertices: label = "Blocked: too many vertices###export"; break;
         case ExportBlocker::Kind::TooManyNormals: label = "Blocked: too many normals###export"; break;
         }
-    ImGui::BeginDisabled(!can_export());
-    if (ImGui::Button(label, ImVec2(-1, ui::px(40))))
-        export_data();
-    ImGui::EndDisabled();
+    {
+        ui::Locked lock(!can_export(), "Fix what the messages above say first");
+        if (ImGui::Button(label, ImVec2(-1, ui::px(40))))
+            export_data();
+    }
 
     bottom_height_ = ImGui::GetCursorPosY() - bottom_start + ImGui::GetStyle().ItemSpacing.y;
 }
@@ -934,12 +933,13 @@ void EditorApp::draw_right_panel()
     if (ImGui::Button("Browse##texture", ImVec2(ui::px(70), 0)))
         open_dialog(DialogPurpose::Texture);
     ImGui::SameLine();
-    ImGui::BeginDisabled(s.texture.file.empty());
-    if (ImGui::Button("Clear##texture", ImVec2(ui::px(70), 0))) {
-        s.texture.file.clear();
-        changed = true;
+    {
+        ui::Locked lock(s.texture.file.empty(), "No image to clear: the texture is drawn from the pattern below");
+        if (ImGui::Button("Clear##texture", ImVec2(ui::px(70), 0))) {
+            s.texture.file.clear();
+            changed = true;
+        }
     }
-    ImGui::EndDisabled();
     if (texture_problem_)
         wrapped_text(kError, *texture_problem_);
     else if (texture_job_.busy() && !settings_.texture.file.empty())
@@ -950,17 +950,19 @@ void EditorApp::draw_right_panel()
     const bool imported = !s.texture.file.empty();
     if (imported)
         ImGui::TextColored(kMuted, "Pattern and colours are replaced by the image.");
-    ImGui::BeginDisabled(imported);
-    changed |= enum_combo("Pattern", s.texture.pattern);
-    changed |= enum_combo("Color Mode", s.texture.color_mode);
-    ImGui::SetNextItemWidth(ui::field_width());
-    changed |= color_edit("Core Color", s.texture.core_color);
-    ImGui::BeginDisabled(s.texture.color_mode != ColorMode::Gradient);   // a solid colour has no edge colour
-    ImGui::SetNextItemWidth(ui::field_width());
-    changed |= color_edit("Edge Color", s.texture.edge_color);
-    ImGui::EndDisabled();
-    changed |= reset_slider("hardness", "Hardness", s.texture.hardness, kSliderHardness.lo, kSliderHardness.hi, 0.8, "%.2f");
-    ImGui::EndDisabled();
+    {
+        Locked lock(imported, "Replaced by the imported image: Clear it to use the pattern");
+        changed |= enum_combo("Pattern", s.texture.pattern);
+        changed |= enum_combo("Color Mode", s.texture.color_mode);
+        ImGui::SetNextItemWidth(ui::field_width());
+        changed |= color_edit("Core Color", s.texture.core_color);
+        {
+            Locked solid(s.texture.color_mode != ColorMode::Gradient, "Used only with Color Mode: Gradient");
+            ImGui::SetNextItemWidth(ui::field_width());
+            changed |= color_edit("Edge Color", s.texture.edge_color);
+        }
+        changed |= reset_slider("hardness", "Hardness", s.texture.hardness, kSliderHardness.lo, kSliderHardness.hi, 0.8, "%.2f");
+    }
     changed |= int_combo("Resolution", s.texture.size, kTextureSizes);
 
     group_label("Scaling");
@@ -977,14 +979,16 @@ void EditorApp::draw_right_panel()
     changed |= reset_slider("size_variance", "Size Variance", s.size_variance, 0.0, 0.9, 0.0, "%.2f");
     ImGui::SetItemTooltip("Each particle is up to this fraction larger or smaller, at random");
     changed |= ImGui::Checkbox("Double Sided", &s.double_sided);
-    ImGui::BeginDisabled(s.scale_mode == ScaleMode::VertexBone);
-    changed |= reset_slider("cluster_size", "Cluster Size", s.cluster_size, 1, 16, 1, ImGuiSliderFlags_AlwaysClamp);
-    ImGui::SetItemTooltip("Copies of the geometry on each particle, spread at random inside the radius below and turned\n"
-                          "at random: many quads for one bone. studiomdl accepts 2048 vertices in a model.\n"
-                          "Needs Static scaling (vertex bones scale each quad on its own).");
-    if (s.cluster_size > 1)
-        changed |= whole_slider("cluster_radius", "Cluster Radius", s.cluster_radius, 0, 200, 20);
-    ImGui::EndDisabled();
+    {
+        Locked lock(s.scale_mode == ScaleMode::VertexBone,
+                    "Needs Static scaling: vertex bones scale each quad on its own");
+        changed |= reset_slider("cluster_size", "Cluster Size", s.cluster_size, 1, 16, 1, ImGuiSliderFlags_AlwaysClamp);
+        ImGui::SetItemTooltip("Copies of the geometry on each particle, spread at random inside the radius below and turned\n"
+                              "at random: many quads for one bone. studiomdl accepts 2048 vertices in a model.\n"
+                              "Needs Static scaling (vertex bones scale each quad on its own).");
+        if (s.cluster_size > 1)
+            changed |= whole_slider("cluster_radius", "Cluster Radius", s.cluster_radius, 0, 200, 20);
+    }
     changed |= whole_slider("mesh_rotation.x", "Rot X (Pitch)", s.mesh_rotation.x, -180, 180, 0);
     changed |= whole_slider("mesh_rotation.y", "Rot Y (Yaw)", s.mesh_rotation.y, -180, 180, 0);
     changed |= whole_slider("mesh_rotation.z", "Rot Z (Roll)", s.mesh_rotation.z, -180, 180, 0);

@@ -44,6 +44,22 @@ bool whole_slider(const char* id, const char* label, double& v, double vmin, dou
 // with no label (the tooltip says which seed it is). `id` keeps two of them apart.
 bool seed_input(const char* id, int& seed, const char* tooltip);
 
+// Greys out and locks the controls drawn while it is in scope, when `locked` is true: they are
+// faded (theme::kDisabledAlpha) and take no input. With a reason, hovering any of them shows it
+// in place of their own tooltip. The reason must stay valid until the end of the scope.
+//     { ui::Locked lock(solid, "Only used with Color Mode: Gradient"); color_edit(...); }
+class [[nodiscard]] Locked {
+public:
+    explicit Locked(bool locked, const char* reason = nullptr);
+    ~Locked();
+    Locked(const Locked&) = delete;
+    Locked& operator=(const Locked&) = delete;
+
+private:
+    bool locked_;
+    const char* reason_;
+};
+
 // Edits a 0..255 color. Does not set the item width.
 bool color_edit(const char* label, Rgb& c, ImGuiColorEditFlags flags = 0);
 

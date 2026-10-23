@@ -104,6 +104,21 @@ bool seed_input(const char* id, int& seed, const char* tooltip)
     return changed;
 }
 
+Locked::Locked(bool locked, const char* reason) : locked_(locked), reason_(reason)
+{
+    // A group makes the locked controls one item, so a single hover test covers all of them.
+    ImGui::BeginGroup();
+    ImGui::BeginDisabled(locked_);
+}
+
+Locked::~Locked()
+{
+    ImGui::EndDisabled();
+    ImGui::EndGroup();
+    if (locked_ && reason_ && ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip | ImGuiHoveredFlags_AllowWhenDisabled))
+        ImGui::SetTooltip("%s", reason_);
+}
+
 bool color_edit(const char* label, Rgb& c, ImGuiColorEditFlags flags)
 {
     float f[3] = {c.r / 255.f, c.g / 255.f, c.b / 255.f};
