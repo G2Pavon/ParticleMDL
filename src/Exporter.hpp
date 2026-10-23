@@ -133,6 +133,18 @@ struct ExportFiles {
 ExportFiles export_files(const ParticleSystem& sys, const BakedPoses& baked, const AnimationTable& table);
 // The same, baking `sys` first.
 ExportFiles export_files(const ParticleSystem& sys);
+// A still model of one frame: every particle shown on exported frame `frame` of `sys`, where the
+// preview shows it on that frame, all on one bone, with a sequence of that one frame.
+
+// Its name: <safe model name>_f<frame>, the safe name shortened when both would be too long.
+std::string frame_model_name(const std::string& model_name, int frame);
+// The particles shown on exported frame `frame`.
+int particles_on_frame(const ParticleSystem& sys, const BakedPoses& baked, int frame);
+// Its files, named frame_model_name(). `baked` must be that of `sys`. Throws std::invalid_argument
+// for an unusable model name, a frame the animation does not have, or a frame on which no
+// particle is shown.
+ExportFiles export_frame_files(const ParticleSystem& sys, const BakedPoses& baked, int frame);
+
 // The files without the check of studiomdl's limits, for testing that the compiler refuses
 // what is over them.
 ExportFiles export_files_over_limits(const ParticleSystem& sys, const BakedPoses& baked, const AnimationTable& table);

@@ -1,6 +1,8 @@
 // The built-in compiler (studiomdl++, under third_party/studiomdl) on exports of this program.
 #include <doctest/doctest.h>
 
+#include <algorithm>
+#include <array>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -124,4 +126,110 @@ TEST_CASE("a refused export throws CompileFailed with the compiler's message")
         CHECK(message.find("_anim") != std::string::npos);
         CHECK_FALSE(message.ends_with("\n"));
     }
+}
+
+// ---------------------------------------------------------------------------
+// A still of one frame
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// A wide and shallow effect, so a still turned by 90 degrees would not fit the box of the preview.
+Settings wide_effect()
+{
+    Settings s;
+    s.model_name = "wide";
+    s.volume_width = 240;
+    s.volume_depth = 30;
+    s.count = 30;
+    s.duration = 2.0;
+    s.fps = 10;
+    return s;
+}
+
+// The box of every particle face shown on `frame`, as the preview places them.
+std::array<Vec3, 2> preview_box(const ParticleSystem& sys, const BakedPoses& baked, int frame)
+{
+    Vec3 lo{1e9, 1e9, 1e9}, hi{-1e9, -1e9, -1e9};
+    for (int i = 0; i < sys.num_particles(); ++i) {
+        const SampledPose pose = baked.sample(i, sys.frame_time(frame));
+        if (!pose.visible || pose.scale <= 0.0)
+            continue;
+        for (const Quad& q : sys.quads_of(i))
+            for (const QuadVertex& v : q) {
+                const Vec3 p = pose.pos + rotate(pose.rot, v.pos * pose.scale);
+                lo = {std::min(lo.x, p.x), std::min(lo.y, p.y), std::min(lo.z, p.z)};
+                hi = {std::max(hi.x, p.x), std::max(hi.y, p.y), std::max(hi.z, p.z)};
+            }
+    }
+    return {lo, hi};
+}
+
+} // namespace
+
+TEST_CASE("a frame compiles into a still model of one bone and one frame")
+{
+    const ParticleSystem sys(wide_effect());
+    const BakedPoses baked = bake(sys);
+    const CompiledModel model = compile_model(export_frame_files(sys, baked, 12));
+    CHECK(model.warnings.empty());
+    const MdlInfo info = read_mdl(model.mdl);
+    CHECK(info.name == "wide_f12.mdl");
+    REQUIRE(info.bones.size() == 1);
+    REQUIRE(info.sequences.size() == 1);
+    CHECK(info.sequences[0].frames == 1);
+    CHECK((info.sequences[0].flags & kMdlSequenceLooping) == 0);
+    REQUIRE(info.textures.size() == 1);
+    CHECK((info.textures[0].flags & kMdlTextureAdditive) != 0);
+    // Static crossed quads: each particle shown keeps its own vertices.
+    REQUIRE(info.models.size() == 1);
+    CHECK(info.models[0].vertices == sys.vertex_count() / sys.num_particles() * particles_on_frame(sys, baked, 12));
+}
+
+TEST_CASE("the still stands where the preview shows that frame")
+{
+    // studiomdl measures the box of the sequence from the compiled vertices: it must be the box
+    // of the faces in the preview, not turned and not moved.
+    for (double scale : {1.0, 2.0}) {
+        CAPTURE(scale);
+        Settings s = wide_effect();
+        s.model_scale = scale;
+        const ParticleSystem sys(s);
+        const BakedPoses baked = bake(sys);
+        for (int frame : {0, 7, 15}) {
+            CAPTURE(frame);
+            const MdlInfo info = read_mdl(compile_model(export_frame_files(sys, baked, frame)).mdl);
+            const auto [lo, hi] = preview_box(sys, baked, frame);
+            const MdlSequence& seq = info.sequences.at(0);
+            CHECK(seq.bbmin[0] == doctest::Approx(lo.x * scale).epsilon(0.002));
+            CHECK(seq.bbmin[1] == doctest::Approx(lo.y * scale).epsilon(0.002));
+            CHECK(seq.bbmin[2] == doctest::Approx(lo.z * scale).epsilon(0.002));
+            CHECK(seq.bbmax[0] == doctest::Approx(hi.x * scale).epsilon(0.002));
+            CHECK(seq.bbmax[1] == doctest::Approx(hi.y * scale).epsilon(0.002));
+            CHECK(seq.bbmax[2] == doctest::Approx(hi.z * scale).epsilon(0.002));
+        }
+    }
+}
+
+TEST_CASE("a frame with no particle shown, or that the animation does not have, is refused")
+{
+    Settings s = wide_effect();
+    s.loop = false;
+    s.lifespan = 0.5;   // played once: every particle has died by the last frame
+    const ParticleSystem sys(s);
+    const BakedPoses baked = bake(sys);
+    REQUIRE(particles_on_frame(sys, baked, 20) == 0);
+    CHECK_THROWS_AS(export_frame_files(sys, baked, 20), std::invalid_argument);
+    CHECK_THROWS_AS(export_frame_files(sys, baked, 21), std::invalid_argument);
+    CHECK_THROWS_AS(export_frame_files(sys, baked, -1), std::invalid_argument);
+    CHECK_NOTHROW(export_frame_files(sys, baked, 0));
+}
+
+TEST_CASE("the still's name gives up the end of a long model name to its frame number")
+{
+    CHECK(frame_model_name("Fire Ball", 40) == safe_model_name("Fire Ball") + "_f40");
+    const std::string longest(kMaxModelNameLength, 'a');
+    const std::string name = frame_model_name(longest, 1234);
+    CHECK(name.size() == static_cast<std::size_t>(kMaxModelNameLength));
+    CHECK(name.ends_with("_f1234"));
 }

@@ -32,20 +32,39 @@ CompiledModel compile_model(const ExportFiles& files)
     return out;
 }
 
-CompiledModel export_mdl(const ParticleSystem& sys, const BakedPoses& baked, const AnimationTable& table,
-                         const std::filesystem::path& out_dir)
+namespace {
+
+void require_folder(const ParticleSystem& sys, const std::filesystem::path& out_dir)
 {
     if (const auto problem = model_name_problem(sys.settings().model_name))
         throw std::invalid_argument(*problem);
     std::error_code ec;
     if (!std::filesystem::is_directory(out_dir, ec))
         throw std::runtime_error("export folder does not exist: " + to_utf8(out_dir));
+}
 
-    const ExportFiles files = export_files(sys, baked, table);
+CompiledModel compile_and_write(const ExportFiles& files, const std::filesystem::path& out_dir)
+{
     CompiledModel model = compile_model(files);
     write_file_atomically(out_dir / from_utf8(files.safe_name + ".mdl"),
                           {reinterpret_cast<const char*>(model.mdl.data()), model.mdl.size()});
     return model;
+}
+
+} // namespace
+
+CompiledModel export_mdl(const ParticleSystem& sys, const BakedPoses& baked, const AnimationTable& table,
+                         const std::filesystem::path& out_dir)
+{
+    require_folder(sys, out_dir);
+    return compile_and_write(export_files(sys, baked, table), out_dir);
+}
+
+CompiledModel export_frame_mdl(const ParticleSystem& sys, const BakedPoses& baked, int frame,
+                               const std::filesystem::path& out_dir)
+{
+    require_folder(sys, out_dir);
+    return compile_and_write(export_frame_files(sys, baked, frame), out_dir);
 }
 
 CompiledModel export_mdl(const ParticleSystem& sys, const std::filesystem::path& out_dir)

@@ -38,4 +38,11 @@ CompiledModel export_mdl(const ParticleSystem& sys, const BakedPoses& baked, con
 // The same, baking `sys` first.
 CompiledModel export_mdl(const ParticleSystem& sys, const std::filesystem::path& out_dir);
 
+// Compiles a still of exported frame `frame` (see export_frame_files) and writes it as
+// frame_model_name().mdl into `out_dir`, like export_mdl. Throws std::invalid_argument for an
+// unusable model name, a frame the animation does not have or a frame showing no particle,
+// CompileFailed, and std::runtime_error when `out_dir` does not exist or the model cannot be written.
+CompiledModel export_frame_mdl(const ParticleSystem& sys, const BakedPoses& baked, int frame,
+                               const std::filesystem::path& out_dir);
+
 } // namespace gs

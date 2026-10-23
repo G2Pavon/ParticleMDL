@@ -1,11 +1,13 @@
 #include "Exporter.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cctype>
 #include <charconv>
 #include <format>
 #include <iterator>
+#include <limits>
 #include <span>
 #include <utility>
 #include <stdexcept>
@@ -131,6 +133,88 @@ std::string make_anim_smd(const ParticleSystem& sys, const AnimationTable& table
         for (int bone = 0; bone < table.bones; ++bone) {
             const auto& v = table.at(frame, bone);
             emit(out, "    {} {:.6f} {:.6f} {:.6f} {:.6f} {:.6f} {:.6f}\n", bone, v[0], v[1], v[2], v[3], v[4], v[5]);
+        }
+    }
+    out += "end\n";
+    return out;
+}
+
+// --- A still of one frame ---------------------------------------------------
+
+// A face of the still: its corners where the preview draws them on that frame, in model space.
+struct StillVertex {
+    Vec3 pos, normal;
+    int u, v;
+};
+using StillQuad = std::array<StillVertex, 4>;
+
+std::vector<StillQuad> still_quads(const ParticleSystem& sys, const BakedPoses& baked, int frame)
+{
+    std::vector<StillQuad> out;
+    const double time = sys.frame_time(frame);
+    for (int i = 0; i < sys.num_particles(); ++i) {
+        const SampledPose pose = baked.sample(i, time);
+        if (!pose.visible || pose.scale <= 0.0)   // hidden, or a vertex-bone quad of no size
+            continue;
+        for (const Quad& q : sys.quads_of(i)) {
+            StillQuad still{};
+            for (int k = 0; k < 4; ++k)
+                still[static_cast<std::size_t>(k)] = {pose.pos + rotate(pose.rot, q[k].pos * pose.scale),
+                                                      rotate(pose.rot, q[k].normal), q[k].u, q[k].v};
+            out.push_back(still);
+        }
+    }
+    return out;
+}
+
+const char kStillNodes[] = "version 1\nnodes\n  0 \"particles\" -1\nend\nskeleton\n  time 0\n"
+                           "    0 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000\nend\n";
+
+std::string make_still_qc(const ParticleSystem& sys, const std::vector<StillQuad>& quads, const std::string& stem,
+                          const std::string& tex_ref)
+{
+    constexpr double inf = std::numeric_limits<double>::infinity();
+    Vec3 lo{inf, inf, inf}, hi{-inf, -inf, -inf};
+    for (const StillQuad& q : quads)
+        for (const StillVertex& v : q) {
+            lo = {std::min(lo.x, v.pos.x), std::min(lo.y, v.pos.y), std::min(lo.z, v.pos.z)};
+            hi = {std::max(hi.x, v.pos.x), std::max(hi.y, v.pos.y), std::max(hi.z, v.pos.z)};
+        }
+    const double scale = sys.settings().model_scale;
+    lo = lo * scale;
+    hi = hi * scale;
+
+    std::string out;
+    emit(out, "$modelname \"{}.mdl\"\n$cd \".\"\n$cdtexture \".\"\n$scale {}\n\n", stem, qc_number(scale));
+    emit(out, "$bbox {:.2f} {:.2f} {:.2f} {:.2f} {:.2f} {:.2f}\n\n", std::floor(lo.x) - 1, std::floor(lo.y) - 1,
+         std::floor(lo.z) - 1, std::ceil(hi.x) + 1, std::ceil(hi.y) + 1, std::ceil(hi.z) + 1);
+    emit(out, "$texrendermode \"{}\" additive\n\n", tex_ref);
+    emit(out, "$body \"studio\" \"{}_ref\"\n\n", stem);
+    emit(out, "$sequence \"idle\" \"{}_anim\" fps 1\n", stem);
+    return out;
+}
+
+std::string make_still_ref_smd(const ParticleSystem& sys, const std::vector<StillQuad>& quads, const std::string& tex_ref)
+{
+    std::string out;
+    out.reserve(quads.size() * 4 * (tex_ref.size() + 1 + 3 * 80) + 256);
+    out += kStillNodes;
+    out += "triangles\n";
+    // Pre-rotated by -90 deg around Z like the animated export, to cancel studiomdl's +90 deg.
+    auto write_tri = [&](const StillVertex& a, const StillVertex& b, const StillVertex& c) {
+        out += tex_ref;
+        out += '\n';
+        for (const StillVertex* v : {&a, &b, &c})
+            emit(out, "  0 {:.6f} {:.6f} {:.6f} {:.6f} {:.6f} {:.6f} {} {}\n", v->pos.y, -v->pos.x, v->pos.z, v->normal.y,
+                 -v->normal.x, v->normal.z, v->u, v->v);
+    };
+    const bool back_faces = sys.settings().double_sided && sys.settings().geometry != Geometry::VolumetricBox;
+    for (const StillQuad& q : quads) {
+        write_tri(q[0], q[1], q[2]);
+        write_tri(q[0], q[2], q[3]);
+        if (back_faces) {
+            write_tri(q[2], q[1], q[0]);
+            write_tri(q[3], q[2], q[0]);
         }
     }
     out += "end\n";
@@ -548,6 +632,52 @@ const std::string& ExportFiles::bytes_of(std::string_view suffix) const
             file.name.ends_with(suffix))
             return file.bytes;
     throw std::out_of_range("the export has no " + safe_name + std::string(suffix));
+}
+
+std::string frame_model_name(const std::string& model_name, int frame)
+{
+    const std::string suffix = "_f" + std::to_string(frame);
+    std::string safe = safe_model_name(model_name);
+    const auto room = static_cast<std::size_t>(kMaxModelNameLength) - suffix.size();
+    if (safe.size() > room)
+        safe.resize(room);
+    return safe + suffix;
+}
+
+int particles_on_frame(const ParticleSystem& sys, const BakedPoses& baked, int frame)
+{
+    int shown = 0;
+    for (int i = 0; i < sys.num_particles(); ++i) {
+        const SampledPose pose = baked.sample(i, sys.frame_time(frame));
+        if (pose.visible && pose.scale > 0.0)
+            ++shown;
+    }
+    return shown;
+}
+
+ExportFiles export_frame_files(const ParticleSystem& sys, const BakedPoses& baked, int frame)
+{
+    if (const auto problem = model_name_problem(sys.settings().model_name))
+        throw std::invalid_argument(*problem);
+    const int last = sys.looping() ? sys.loop_steps() - 1 : sys.loop_steps();
+    if (frame < 0 || frame > last)
+        throw std::invalid_argument("there is no frame " + std::to_string(frame) + " (the frames are 0 to " +
+                                    std::to_string(last) + ")");
+    if (baked.particles() != sys.num_particles() || baked.steps() != sys.loop_steps() || baked.looping() != sys.looping())
+        throw std::invalid_argument("the baked frames were not built from this particle system");
+    const std::vector<StillQuad> quads = still_quads(sys, baked, frame);
+    if (quads.empty())
+        throw std::invalid_argument("no particle is shown on frame " + std::to_string(frame));
+
+    const std::string stem = frame_model_name(sys.settings().model_name, frame);
+    const std::string tex_ref = stem + ".bmp";
+    const std::vector<std::uint8_t> bmp = encode_indexed_bmp(export_texture(sys.settings().texture));
+    ExportFiles out{stem, {}};
+    out.files.push_back({tex_ref, std::string(bmp.begin(), bmp.end())});
+    out.files.push_back({stem + ".qc", make_still_qc(sys, quads, stem, tex_ref)});
+    out.files.push_back({stem + "_ref.smd", make_still_ref_smd(sys, quads, tex_ref)});
+    out.files.push_back({stem + "_anim.smd", std::string(kStillNodes)});
+    return out;
 }
 
 } // namespace gs
