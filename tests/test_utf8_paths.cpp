@@ -12,6 +12,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "Compiler.hpp"
 #include "Exporter.hpp"
 #include "ImageImport.hpp"
 #include "PathInput.hpp"
@@ -125,18 +126,16 @@ TEST_CASE("an unreadable settings file reports its path as UTF-8")
 TEST_CASE("an export goes to a folder with non-ASCII characters in its name")
 {
     const TempDir dir(kJose + "_" + kJapanese + "_export");
-    export_model(ParticleSystem{Settings{}}, dir.path);
+    export_mdl(ParticleSystem{Settings{}}, dir.path);
 
     std::vector<std::string> names;
     for (const auto& entry : fs::directory_iterator(dir.path))
         names.push_back(to_utf8(entry.path().filename()));
-    std::ranges::sort(names);
-    CHECK(names == std::vector<std::string>{"custom_particles.bmp", "custom_particles.qc", "custom_particles_anim.smd",
-                                            "custom_particles_ref.smd"});
+    CHECK(names == std::vector<std::string>{"custom_particles.mdl"});
 
     // A failure names the folder as UTF-8 text.
     try {
-        export_model(ParticleSystem{Settings{}}, dir.path / from_utf8(kEmoji));
+        export_mdl(ParticleSystem{Settings{}}, dir.path / from_utf8(kEmoji));
         FAIL("exporting into a missing folder should throw");
     } catch (const std::runtime_error& e) {
         CHECK(std::string(e.what()).find(kEmoji) != std::string::npos);

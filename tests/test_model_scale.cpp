@@ -1,9 +1,6 @@
 #include <doctest/doctest.h>
 
 #include <cstdio>
-#include <filesystem>
-#include <fstream>
-#include <sstream>
 #include <string>
 
 #include <nlohmann/json.hpp>
@@ -13,22 +10,12 @@
 #include "SettingsJson.hpp"
 
 using namespace gs;
-namespace fs = std::filesystem;
 
 namespace {
 
 std::string qc_of(const Settings& s)
 {
-    const fs::path dir = fs::temp_directory_path() / "particlemdl_model_scale";
-    fs::remove_all(dir);
-    fs::create_directories(dir);
-    export_model(ParticleSystem(s), dir);
-    std::ifstream in(dir / (s.model_name + ".qc"));
-    std::stringstream text;
-    text << in.rdbuf();
-    in.close();   // Windows does not delete a file that is open
-    fs::remove_all(dir);
-    return text.str();
+    return export_files(ParticleSystem(s)).bytes_of(".qc");
 }
 
 struct Box {

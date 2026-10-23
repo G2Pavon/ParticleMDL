@@ -2,8 +2,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <filesystem>
-#include <fstream>
 #include <set>
 #include <sstream>
 
@@ -14,7 +12,6 @@
 #include "SettingsJson.hpp"
 
 using namespace gs;
-namespace fs = std::filesystem;
 
 namespace {
 
@@ -154,12 +151,7 @@ TEST_CASE("the reference mesh holds every copy on its particle's bone")
 {
     const Settings s = clustered(4, 3, 25);
     const ParticleSystem sys(s);
-    const fs::path dir = fs::temp_directory_path() / "particlemdl_cluster_mesh";
-    fs::remove_all(dir);
-    fs::create_directories(dir);
-    export_model(sys, dir);
-
-    std::ifstream in(dir / "custom_particles_ref.smd");
+    std::istringstream in(export_files(sys).bytes_of("_ref.smd"));
     std::string line;
     bool triangles = false;
     std::vector<int> per_bone(5, 0);
@@ -175,8 +167,6 @@ TEST_CASE("the reference mesh holds every copy on its particle's bone")
             ++vertex_lines;
         }
     }
-    in.close();   // Windows does not delete a file that is open
-    fs::remove_all(dir);
 
     // 4 particles x 3 copies x 1 quad x 4 triangles (double sided) x 3 vertex lines
     CHECK(vertex_lines == 4 * 3 * 4 * 3);
@@ -239,13 +229,8 @@ TEST_CASE("too many vertices is a blocker, exactly above 2048, and says what to 
     CHECK(no_cluster.vertices == 1512);
     CHECK(no_cluster.blockers.empty());
 
-    // export_model refuses it
-    const fs::path dir = fs::temp_directory_path() / "particlemdl_cluster_blocked";
-    fs::remove_all(dir);
-    fs::create_directories(dir);
-    CHECK_THROWS_AS(export_model(ParticleSystem(clustered(65, 8, 30)), dir), ExportBlocked);
-    CHECK(std::distance(fs::directory_iterator(dir), fs::directory_iterator{}) == 0);
-    fs::remove_all(dir);
+    // the export refuses it
+    CHECK_THROWS_AS(export_files(ParticleSystem(clustered(65, 8, 30))), ExportBlocked);
 }
 
 TEST_CASE("the cluster settings are saved and old files have none")

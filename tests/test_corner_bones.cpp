@@ -2,9 +2,8 @@
 
 #include <algorithm>
 #include <cctype>
-#include <filesystem>
-#include <fstream>
 #include <set>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -112,12 +111,7 @@ TEST_CASE("the exported animation moves a shared corner by the same offset for e
 TEST_CASE("the reference mesh of a box names the shared corner bones, and no bone is left unused")
 {
     const ParticleSystem sys(with(Geometry::VolumetricBox));
-    const std::filesystem::path dir = std::filesystem::temp_directory_path() / "particlemdl_corner_bones";
-    std::filesystem::remove_all(dir);
-    std::filesystem::create_directories(dir);
-    export_model(sys, dir);
-
-    std::ifstream in(dir / "custom_particles_ref.smd");
+    std::istringstream in(export_files(sys).bytes_of("_ref.smd"));
     std::string line;
     std::set<int> bones_in_triangles;
     bool in_triangles = false;
@@ -132,8 +126,6 @@ TEST_CASE("the reference mesh of a box names the shared corner bones, and no bon
             bones_in_triangles.insert(std::stoi(line.substr(2)));
         }
     }
-    in.close();   // Windows does not delete a file that is open
-    std::filesystem::remove_all(dir);
 
     // 3 particles x 8 corners; the particle bones themselves hold no vertex with vertex bones.
     CHECK(bones_in_triangles.size() == 3 * 8);

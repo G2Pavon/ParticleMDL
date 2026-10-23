@@ -5,7 +5,6 @@
 #include <cctype>
 #include <charconv>
 #include <format>
-#include <fstream>
 #include <iterator>
 #include <span>
 #include <utility>
@@ -13,15 +12,11 @@
 #include <vector>
 
 #include "Baking.hpp"
-#include "PathUtil.hpp"
-#include "StagedFiles.hpp"
 #include "TextureGenerator.hpp"
 
 namespace gs {
 
 namespace {
-
-namespace fs = std::filesystem;
 
 template <typename... Args>
 void emit(std::string& out, std::format_string<Args...> fmt, Args&&... args)
@@ -511,12 +506,6 @@ std::vector<std::string> compare_with_export(const MdlInfo& mdl, const ParticleS
     return problems;
 }
 
-void export_model(const ParticleSystem& sys, const fs::path& out_dir)
-{
-    const BakedPoses baked = bake(sys);
-    export_model(sys, baked, animation_table(sys, baked), out_dir);
-}
-
 ExportFiles export_files(const ParticleSystem& sys)
 {
     const BakedPoses baked = bake(sys);
@@ -552,18 +541,13 @@ ExportFiles export_files_over_limits(const ParticleSystem& sys, const BakedPoses
     return out;
 }
 
-void export_model(const ParticleSystem& sys, const BakedPoses& baked, const AnimationTable& table, const fs::path& out_dir)
+const std::string& ExportFiles::bytes_of(std::string_view suffix) const
 {
-    if (const auto problem = model_name_problem(sys.settings().model_name))
-        throw std::invalid_argument(*problem);
-    std::error_code ec;
-    if (!fs::is_directory(out_dir, ec))
-        throw std::runtime_error("export folder does not exist: " + to_utf8(out_dir));
-
-    StagedFiles staged(out_dir);
-    for (const ExportFile& file : export_files(sys, baked, table).files)
-        staged.add(from_utf8(file.name), file.bytes);
-    staged.commit();
+    for (const ExportFile& file : files)
+        if (file.name.size() == safe_name.size() + suffix.size() && file.name.starts_with(safe_name) &&
+            file.name.ends_with(suffix))
+            return file.bytes;
+    throw std::out_of_range("the export has no " + safe_name + std::string(suffix));
 }
 
 } // namespace gs

@@ -17,20 +17,15 @@ run_cli(2 --bogus)                               # unknown option
 run_cli(2 --settings ${SETTINGS})                # --out missing
 run_cli(1 --settings ${OUT}/missing.json --out ${OUT}/x)   # unreadable settings
 
-# A real export; the output folder does not exist yet.
+# A real export; the output folder does not exist yet. Only the .mdl is written.
 run_cli(0 --settings ${SETTINGS} --out ${OUT}/nested/folder)
-foreach(file smoke.qc smoke_ref.smd smoke_anim.smd smoke.bmp)
-    if(NOT EXISTS ${OUT}/nested/folder/${file})
-        message(FATAL_ERROR "particlemdl_cli did not write ${file}")
-    endif()
-    file(SIZE ${OUT}/nested/folder/${file} size)
-    if(size EQUAL 0)
-        message(FATAL_ERROR "${file} is empty")
-    endif()
-endforeach()
-file(READ ${OUT}/nested/folder/smoke.qc qc)
-if(NOT qc MATCHES "\\$modelname \"smoke\\.mdl\"")
-    message(FATAL_ERROR "smoke.qc has no $modelname line:\n${qc}")
+file(GLOB written RELATIVE ${OUT}/nested/folder ${OUT}/nested/folder/*)
+if(NOT written STREQUAL "smoke.mdl")
+    message(FATAL_ERROR "particlemdl_cli wrote '${written}', not just smoke.mdl")
+endif()
+file(READ ${OUT}/nested/folder/smoke.mdl magic LIMIT 4 HEX)
+if(NOT magic STREQUAL "49445354")   # "IDST"
+    message(FATAL_ERROR "smoke.mdl does not start like a studio model")
 endif()
 
 # An effect over studiomdl's limits is refused before anything is written.
@@ -40,16 +35,6 @@ if(EXISTS ${OUT}/over_limit)
     message(FATAL_ERROR "particlemdl_cli created a folder for an export it refused")
 endif()
 
-# --compile writes the .mdl and nothing else.
-run_cli(0 --settings ${SETTINGS} --out ${OUT}/compiled --compile)
-file(GLOB written RELATIVE ${OUT}/compiled ${OUT}/compiled/*)
-if(NOT written STREQUAL "smoke.mdl")
-    message(FATAL_ERROR "particlemdl_cli --compile wrote '${written}', not just smoke.mdl")
-endif()
-file(READ ${OUT}/compiled/smoke.mdl magic LIMIT 4 HEX)
-if(NOT magic STREQUAL "49445354")   # "IDST"
-    message(FATAL_ERROR "smoke.mdl does not start like a studio model")
-endif()
-run_cli(2 --settings ${SETTINGS} --out ${OUT}/x --compile studiomdl.exe)   # it takes no compiler any more
+run_cli(2 --settings ${SETTINGS} --out ${OUT}/x --compile)   # compiling is not an option any more
 
 file(REMOVE_RECURSE ${OUT})

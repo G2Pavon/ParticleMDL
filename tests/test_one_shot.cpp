@@ -2,9 +2,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <filesystem>
-#include <fstream>
-#include <sstream>
 
 #include <nlohmann/json.hpp>
 
@@ -13,7 +10,6 @@
 #include "SettingsJson.hpp"
 
 using namespace gs;
-namespace fs = std::filesystem;
 
 namespace {
 
@@ -140,16 +136,7 @@ TEST_CASE("an unborn vertex-bone particle is collapsed")
 TEST_CASE("the sequence of a one-shot effect has no loop flag, a loop has")
 {
     auto qc_of = [](const Settings& s) {
-        const fs::path dir = fs::temp_directory_path() / "particlemdl_one_shot_qc";
-        fs::remove_all(dir);
-        fs::create_directories(dir);
-        export_model(ParticleSystem(s), dir);
-        std::ifstream in(dir / "custom_particles.qc");
-        std::stringstream text;
-        text << in.rdbuf();
-        in.close();   // Windows does not delete a file that is open
-        fs::remove_all(dir);
-        return text.str();
+        return export_files(ParticleSystem(s)).bytes_of(".qc");
     };
     const std::string shot = qc_of(one_shot());
     CHECK(shot.find("$sequence \"idle\" \"custom_particles_anim\" fps 10") != std::string::npos);

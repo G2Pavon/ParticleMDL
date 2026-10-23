@@ -275,16 +275,8 @@ void EditorApp::export_data()
         std::filesystem::create_directories(folder);   // models/ exists; a folder inside it is made when needed
         const std::string safe = safe_model_name(sys.settings().model_name);
         const std::string where = models_label(from_utf8(config_.game_folder)) + normalized_subfolder(models_subfolder_);
-        if (!auto_compile_) {
-            export_model(sys, baked_, table_, folder);
-            set_status("Success! Textures, SMDs, and " + safe + ".qc written to " + where + ".", StatusTone::Success);
-            return;
-        }
-
         // The built-in compiler takes the files in memory: only the .mdl reaches the folder.
-        const CompiledModel model = compile_model(export_files(sys, baked_, table_));
-        write_file_atomically(folder / from_utf8(safe + ".mdl"),
-                              {reinterpret_cast<const char*>(model.mdl.data()), model.mdl.size()});
+        const CompiledModel model = export_mdl(sys, baked_, table_, folder);
         // Read the model back: what the compiler made, and whether it is what was exported.
         std::string summary;
         std::vector<std::string> problems;
@@ -519,7 +511,7 @@ void EditorApp::draw_menu_bar()
             open_dialog(DialogPurpose::Save);
         ImGui::Separator();
         // Same action and conditions as the Export button in the middle panel.
-        if (ImGui::MenuItem(auto_compile_ ? "Export .mdl" : "Export SMD/QC", "Ctrl+E", false, can_export()))
+        if (ImGui::MenuItem("Export .mdl", "Ctrl+E", false, can_export()))
             export_data();
         ImGui::EndMenu();
     }
@@ -656,9 +648,8 @@ void EditorApp::draw_about_dialog()
     ImGui::BulletText("Ctrl+S  Save settings");
     ImGui::Dummy(ImVec2(0, ui::px(8)));
 
-    ImGui::TextWrapped("Exports write .qc, .smd and .bmp files into the models folder of the game folder set in "
-                       "Settings > Game Folder, or a folder inside it; Compile .mdl then runs the studiomdl binary "
-                       "configured in the panel below the preview.");
+    ImGui::TextWrapped("Export .mdl compiles the effect with the built-in studiomdl and writes the .mdl into the "
+                       "models folder of the game folder set in Settings > Game Folder, or a folder inside it.");
     ImGui::Dummy(ImVec2(0, ui::px(12)));
     if (ImGui::Button("Close", ImVec2(ui::px(90), 0)))
         ImGui::CloseCurrentPopup();
@@ -897,12 +888,9 @@ void EditorApp::draw_middle_panel()
     if (export_dir_problem_)
         wrapped_text(kError, *export_dir_problem_);
 
-    ImGui::Checkbox("Compile .mdl", &auto_compile_);
-    ImGui::SetItemTooltip("Compile the export with the built-in studiomdl and write only the .mdl.\n"
-                          "Off: write the .qc, the .smd files and the .bmp instead.");
     ImGui::Dummy(ImVec2(0, ui::px(5)));
 
-    const char* label = auto_compile_ ? "Export .mdl###export" : "Export SMD/QC###export";
+    const char* label = "Export .mdl###export";
     if (!export_report_.blockers.empty())
         switch (export_report_.blockers.front().kind) {
         case ExportBlocker::Kind::TooManyFrames: label = "Blocked: too many frames###export"; break;

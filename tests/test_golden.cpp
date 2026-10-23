@@ -1,5 +1,5 @@
 // Golden-file tests: every built-in preset is exported and compared with a
-// snapshot, so any change to the simulation, the SMD/QC writer or the texture
+// snapshot, so any change to the simulation, the QC and SMD writer or the texture
 // pipeline shows up as a diff.
 //
 // tests/golden/<preset>.qc holds the QC in full (small and readable). The SMDs
@@ -78,15 +78,10 @@ Export export_preset(const Preset& preset)
     s.model_name = slug(preset.name);
     const ParticleSystem sys(s);
 
-    const fs::path dir = fs::temp_directory_path() / ("particlemdl_golden_" + s.model_name);
-    fs::remove_all(dir);
-    fs::create_directories(dir);
-    export_model(sys, dir);
-
+    const ExportFiles files = export_files(sys);
     Export out;
     for (const char* suffix : {".qc", "_ref.smd", "_anim.smd", ".bmp"})
-        out[suffix] = read_file(dir / (s.model_name + suffix));
-    fs::remove_all(dir);
+        out[suffix] = files.bytes_of(suffix);
     return out;
 }
 

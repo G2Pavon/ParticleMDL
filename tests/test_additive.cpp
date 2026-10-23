@@ -6,7 +6,6 @@
 #include <filesystem>
 #include <fstream>
 #include <set>
-#include <sstream>
 
 #include <nlohmann/json.hpp>
 
@@ -107,12 +106,7 @@ fs::path write_png(const TempDir& dir, const char* name, const RgbaImage& img)
 
 std::string qc_of(const Settings& s)
 {
-    const TempDir dir("particlemdl_additive_qc");
-    export_model(ParticleSystem(s), dir.path);
-    std::ifstream in(dir.path / "custom_particles.qc");
-    std::stringstream text;
-    text << in.rdbuf();
-    return text.str();
+    return export_files(ParticleSystem(s)).bytes_of(".qc");
 }
 
 } // namespace
@@ -209,9 +203,7 @@ TEST_CASE("every texture size exports a BMP of the right size")
     for (const int size : kTextureSizes) {
         Settings s;
         s.texture.size = size;
-        const TempDir dir("particlemdl_additive_export");
-        export_model(ParticleSystem(s), dir.path);
-        CHECK(fs::file_size(dir.path / "custom_particles.bmp") ==
-              static_cast<std::uintmax_t>(14 + 40 + 1024 + size * size));
+        CHECK(export_files(ParticleSystem(s)).bytes_of(".bmp").size() ==
+              static_cast<std::size_t>(14 + 40 + 1024 + size * size));
     }
 }

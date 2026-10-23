@@ -3,8 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
-#include <filesystem>
-#include <fstream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -266,11 +265,7 @@ TEST_CASE("the mesh of a static quad is drawn at the size of its particle")
     s.size_variance = 0.5;
     const ParticleSystem sys(s);
 
-    const std::filesystem::path dir = std::filesystem::temp_directory_path() / "particlemdl_size_mesh";
-    std::filesystem::remove_all(dir);
-    std::filesystem::create_directories(dir);
-    export_model(sys, dir);
-    std::ifstream in(dir / "custom_particles_ref.smd");
+    std::istringstream in(export_files(sys).bytes_of("_ref.smd"));
     std::string line;
     std::vector<double> extent(7, 0.0);   // largest |coordinate| of each bone's vertices
     bool triangles = false;
@@ -284,8 +279,6 @@ TEST_CASE("the mesh of a static quad is drawn at the size of its particle")
         if (triangles && std::sscanf(line.c_str(), " %d %lf %lf %lf", &bone, &x, &y, &z) == 4)
             extent[static_cast<std::size_t>(bone)] = std::max({extent[static_cast<std::size_t>(bone)], std::abs(x), std::abs(z)});
     }
-    in.close();   // Windows does not delete a file that is open
-    std::filesystem::remove_all(dir);
     for (std::size_t i = 0; i < sys.particles().size(); ++i)
         CHECK(extent[i + 1] == doctest::Approx(5.0 * sys.particles()[i].size).epsilon(1e-5));
 }

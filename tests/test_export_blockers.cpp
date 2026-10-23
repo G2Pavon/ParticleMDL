@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 
+#include "Compiler.hpp"
 #include "Exporter.hpp"
 #include "Presets.hpp"
 
@@ -158,20 +159,20 @@ TEST_CASE("the Hide in Core warning remains advisory")
     CHECK(analyze_export(ParticleSystem(s)).warnings.empty());
 }
 
-TEST_CASE("export_model refuses a blocked export and writes nothing")
+TEST_CASE("export_mdl refuses a blocked export and writes nothing")
 {
     const TempDir dir("particlemdl_blocked_test");
 
     for (const Settings& s : {straight_quads(1, 60.0, 60), straight_quads(126, 10.0, 30)}) {
         const ParticleSystem sys(s);
-        CHECK_THROWS_AS(export_model(sys, dir.path), ExportBlocked);
-        CHECK_THROWS_AS(export_model(sys, dir.path), std::runtime_error);   // callers that catch the base class
+        CHECK_THROWS_AS(export_mdl(sys, dir.path), ExportBlocked);
+        CHECK_THROWS_AS(export_mdl(sys, dir.path), std::runtime_error);   // callers that catch the base class
         CHECK(dir.file_count() == 0);
     }
 
     try {
-        export_model(ParticleSystem(straight_quads(126, 60.0, 60)), dir.path);
-        FAIL("export_model should have thrown");
+        export_mdl(ParticleSystem(straight_quads(126, 60.0, 60)), dir.path);
+        FAIL("export_mdl should have thrown");
     } catch (const ExportBlocked& e) {
         REQUIRE(e.blockers().size() == 2);
         CHECK(e.blockers()[0].kind == ExportBlocker::Kind::TooManyFrames);
@@ -180,13 +181,13 @@ TEST_CASE("export_model refuses a blocked export and writes nothing")
     CHECK(dir.file_count() == 0);
 }
 
-TEST_CASE("export_model replaces nothing when it refuses")
+TEST_CASE("export_mdl replaces nothing when it refuses")
 {
     const TempDir dir("particlemdl_blocked_keep_test");
-    const fs::path existing = dir.path / "custom_particles.qc";
+    const fs::path existing = dir.path / "custom_particles.mdl";
     std::ofstream(existing) << "keep me";
 
-    CHECK_THROWS_AS(export_model(ParticleSystem(straight_quads(1, 60.0, 60)), dir.path), ExportBlocked);
+    CHECK_THROWS_AS(export_mdl(ParticleSystem(straight_quads(1, 60.0, 60)), dir.path), ExportBlocked);
 
     std::ifstream in(existing);
     std::string text;
@@ -195,29 +196,26 @@ TEST_CASE("export_model replaces nothing when it refuses")
     CHECK(dir.file_count() == 1);
 }
 
-TEST_CASE("export_model still writes an export that is inside the limits")
+TEST_CASE("export_mdl writes only the model of an export that is inside the limits")
 {
     const TempDir dir("particlemdl_unblocked_test");
-    export_model(ParticleSystem{Settings{}}, dir.path);
-    CHECK(dir.file_count() == 4);
+    export_mdl(ParticleSystem{Settings{}}, dir.path);
+    CHECK(dir.file_count() == 1);
+    CHECK(fs::exists(dir.path / "custom_particles.mdl"));
 }
 
-TEST_CASE("exporting with the baked frames and animation already at hand writes the same files")
+TEST_CASE("exporting with the baked frames and animation already at hand gives the same files")
 {
     const ParticleSystem sys{Settings{}};
-    const TempDir plain("particlemdl_export_plain"), reused("particlemdl_export_reused");
-    export_model(sys, plain.path);
-
+    const ExportFiles plain = export_files(sys);
     const BakedPoses baked = bake(sys);
-    export_model(sys, baked, animation_table(sys, baked), reused.path);
+    const ExportFiles reused = export_files(sys, baked, animation_table(sys, baked));
 
-    for (const auto& entry : fs::directory_iterator(plain.path)) {
-        const fs::path other = reused.path / entry.path().filename();
-        REQUIRE(fs::exists(other));
-        std::ifstream a(entry.path(), std::ios::binary), b(other, std::ios::binary);
-        CHECK(std::string(std::istreambuf_iterator<char>(a), {}) == std::string(std::istreambuf_iterator<char>(b), {}));
+    REQUIRE(plain.files.size() == reused.files.size());
+    for (std::size_t i = 0; i < plain.files.size(); ++i) {
+        CHECK(plain.files[i].name == reused.files[i].name);
+        CHECK(plain.files[i].bytes == reused.files[i].bytes);
     }
-    CHECK(plain.file_count() == reused.file_count());
 
     // The limits are checked on this path too.
     Settings over;
@@ -227,7 +225,7 @@ TEST_CASE("exporting with the baked frames and animation already at hand writes 
     over.geometry = Geometry::SingleQuad;
     const ParticleSystem big(over);
     const BakedPoses big_baked = bake(big);
-    CHECK_THROWS_AS(export_model(big, big_baked, animation_table(big, big_baked), reused.path), ExportBlocked);
+    CHECK_THROWS_AS(export_files(big, big_baked, animation_table(big, big_baked)), ExportBlocked);
 }
 
 TEST_CASE("frames and a table built from another system are refused")
@@ -247,8 +245,7 @@ TEST_CASE("frames and a table built from another system are refused")
     CHECK_THROWS_AS(analyze_export(slower, table, baked), std::invalid_argument);
     const BakedPoses other_baked = bake(other);
     CHECK_THROWS_AS(analyze_export(sys, table, other_baked), std::invalid_argument);
-    const TempDir dir("particlemdl_export_mismatch");
-    CHECK_THROWS_AS(export_model(other, baked, table, dir.path), std::invalid_argument);
-    CHECK(dir.file_count() == 0);
+    CHECK_THROWS_AS(export_files(other, baked, table), std::invalid_argument);
+    CHECK_THROWS_AS(export_files_over_limits(other, baked, table), std::invalid_argument);
     CHECK_NOTHROW(analyze_export(sys, table, baked));
 }

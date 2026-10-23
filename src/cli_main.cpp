@@ -1,5 +1,4 @@
-// particlemdl_cli - export (and optionally compile) a particle system without
-// opening the editor.
+// particlemdl_cli - compile a particle system into a .mdl without opening the editor.
 
 #include <cstdio>
 #include <exception>
@@ -23,7 +22,6 @@
 #include "ParticleSystem.hpp"
 #include "PathUtil.hpp"
 #include "SettingsJson.hpp"
-#include "StagedFiles.hpp"
 
 namespace {
 
@@ -32,12 +30,10 @@ namespace fs = std::filesystem;
 enum ExitCode { kOk = 0, kError = 1, kUsage = 2, kLimits = 3, kCompileFailed = 4 };
 
 constexpr const char* kUsageText =
-    "Usage: particlemdl_cli --settings <file.json> --out <folder> [--compile]\n"
+    "Usage: particlemdl_cli --settings <file.json> --out <folder>\n"
     "\n"
     "  --settings <file>   settings file saved by the editor\n"
-    "  --out <folder>      folder for the .qc, .smd and .bmp files (created if missing)\n"
-    "  --compile           compile them with the built-in studiomdl and write only\n"
-    "                      the .mdl to --out\n"
+    "  --out <folder>      folder for the .mdl (created if missing)\n"
     "  --help, --version\n"
     "\n"
     "Exit status: 0 done, 1 error, 2 bad arguments, 3 over the engine limits,\n"
@@ -45,7 +41,7 @@ constexpr const char* kUsageText =
 
 struct Args {
     std::string settings, out;
-    bool help = false, version = false, compile = false;
+    bool help = false, version = false;
 };
 
 // The arguments as UTF-8. Windows gives main() the ANSI code page, so there they are
@@ -84,10 +80,6 @@ bool parse_args(const std::vector<std::string>& argv, Args& args, std::string& e
         }
         if (arg == "--version") {
             args.version = true;
-            continue;
-        }
-        if (arg == "--compile") {
-            args.compile = true;
             continue;
         }
 
@@ -143,26 +135,16 @@ int run(const Args& args)
 
     const fs::path out = gs::from_utf8(args.out);
     fs::create_directories(out);
-    const std::string safe = gs::safe_model_name(loaded.settings.model_name);
-
-    if (!args.compile) {
-        gs::export_model(sys, out);
-        std::printf("Wrote %s.qc, %s_ref.smd, %s_anim.smd and %s.bmp to %s\n", safe.c_str(), safe.c_str(),
-                    safe.c_str(), safe.c_str(), gs::to_utf8(out).c_str());
-        return kOk;
-    }
-
     gs::CompiledModel model;
     try {
-        model = gs::compile_model(gs::export_files(sys));
+        model = gs::export_mdl(sys, out);
     } catch (const gs::CompileFailed& e) {
         std::fprintf(stderr, "error: the compiler refused the export: %s\n", e.what());
         return kCompileFailed;
     }
     for (const std::string& w : model.warnings)
         std::fprintf(stderr, "warning: studiomdl: %s\n", w.c_str());
-    const fs::path mdl = out / gs::from_utf8(safe + ".mdl");
-    gs::write_file_atomically(mdl, {reinterpret_cast<const char*>(model.mdl.data()), model.mdl.size()});
+    const fs::path mdl = out / gs::from_utf8(gs::safe_model_name(loaded.settings.model_name) + ".mdl");
     std::printf("Wrote %s\n", gs::to_utf8(mdl).c_str());
     // Read the model back: what the compiler made, and whether it is what was exported.
     try {

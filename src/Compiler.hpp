@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -26,5 +27,15 @@ public:
 // third_party/studiomdl), all in memory: nothing is read from or written to disk. Throws
 // CompileFailed when the compiler refuses the files.
 CompiledModel compile_model(const ExportFiles& files);
+
+// Exports `sys`, compiles it and writes <safe name>.mdl into `out_dir`; an older model there is
+// replaced only by a complete new one. `baked` and `table` must be those of `sys` (see
+// export_files). Throws std::invalid_argument for an unusable model name, ExportBlocked for an
+// export over studiomdl's limits, CompileFailed, and std::runtime_error when `out_dir` does not
+// exist or the model cannot be written.
+CompiledModel export_mdl(const ParticleSystem& sys, const BakedPoses& baked, const AnimationTable& table,
+                         const std::filesystem::path& out_dir);
+// The same, baking `sys` first.
+CompiledModel export_mdl(const ParticleSystem& sys, const std::filesystem::path& out_dir);
 
 } // namespace gs

@@ -91,8 +91,6 @@ private:
     PreviewRenderer renderer_;
     Rgb canvas_bg_{0, 0, 0};
 
-    bool auto_compile_ = false;
-
     std::string status_;
     std::string status_detail_;   // the warnings, differences or compiler notes behind the status
     StatusTone status_tone_ = StatusTone::Success;

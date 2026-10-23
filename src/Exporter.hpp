@@ -2,7 +2,6 @@
 
 #include <array>
 #include <cstddef>
-#include <filesystem>
 #include <optional>
 #include <span>
 #include <stdexcept>
@@ -95,7 +94,7 @@ ExportReport analyze_export(const ParticleSystem& sys);
 // if their shape shows they were built from another system.
 ExportReport analyze_export(const ParticleSystem& sys, const AnimationTable& table, const BakedPoses& baked);
 
-// Thrown by export_model() when the export has blockers. Nothing is written.
+// Thrown by export_files() when the export has blockers. Nothing is written.
 class ExportBlocked : public std::runtime_error {
 public:
     explicit ExportBlocked(std::vector<ExportBlocker> blockers);
@@ -120,10 +119,16 @@ struct ExportFile {
 struct ExportFiles {
     std::string safe_name;           // safe_model_name() of the model name: <safe_name>.qc and .mdl
     std::vector<ExportFile> files;   // <safe>.bmp, <safe>.qc, <safe>_ref.smd and <safe>_anim.smd
+
+    // The contents of <safe_name><suffix> (".qc", "_ref.smd", ...). Throws std::out_of_range when
+    // there is no such file.
+    const std::string& bytes_of(std::string_view suffix) const;
 };
 
-// The files of an export, in memory: the texture, the QC and the two SMDs. `baked` and `table`
-// must be those of `sys` (see export_model). Throws std::invalid_argument for an unusable model
+// The files of an export, in memory: the texture, the QC and the two SMDs, for the compiler.
+// Geometry and animation are pre-rotated by -90 deg around Z to cancel the +90 deg studiomdl
+// applies on import. `baked` and `table` must be those of `sys` (the editor builds them for every
+// change of a setting); std::invalid_argument is thrown when their shape shows they are not. Throws std::invalid_argument for an unusable model
 // name and ExportBlocked for an export over studiomdl's limits.
 ExportFiles export_files(const ParticleSystem& sys, const BakedPoses& baked, const AnimationTable& table);
 // The same, baking `sys` first.
@@ -131,18 +136,5 @@ ExportFiles export_files(const ParticleSystem& sys);
 // The files without the check of studiomdl's limits, for testing that the compiler refuses
 // what is over them.
 ExportFiles export_files_over_limits(const ParticleSystem& sys, const BakedPoses& baked, const AnimationTable& table);
-
-// Writes <safe>.bmp, <safe>.qc, <safe>_ref.smd and <safe>_anim.smd into
-// out_dir. Geometry and animation are pre-rotated by -90 deg around Z to cancel
-// the +90 deg studiomdl applies on import. Throws std::invalid_argument for an
-// unusable model name, ExportBlocked for an export over studiomdl's limits and
-// std::runtime_error on I/O errors. Files are staged
-// and renamed into place together: a failed export leaves no partial files.
-void export_model(const ParticleSystem& sys, const std::filesystem::path& out_dir = ".");
-// The same for a caller that has the baked frames and the animation of `sys` already (the
-// editor builds them for every change of a setting): they must be the ones of this `sys`, and
-// std::invalid_argument is thrown when their shape shows they are not.
-void export_model(const ParticleSystem& sys, const BakedPoses& baked, const AnimationTable& table,
-                  const std::filesystem::path& out_dir);
 
 } // namespace gs
