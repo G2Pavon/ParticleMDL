@@ -11,7 +11,7 @@ namespace gs {
 enum class Geometry { SingleQuad, CrossedQuads, TriPlanarQuads, VolumetricBox };
 enum class EndBehavior { DropThroughFloor, HideUnderground, HideInCore, StopAndStay, EndlessLoop };
 enum class TexPattern { RadialOrb, HollowRing, SharpStar, SoftCloud, FlowerPetals, Snowflake, RainDrop };
-enum class ColorMode { SolidColor, Gradient };
+enum class ColorMode { Solid, Gradient };
 enum class ScaleMode { Static, VertexBone };
 
 // An enum value with its id in settings files and its label in the editor.
@@ -63,7 +63,7 @@ struct EnumTable<TexPattern> {
 template <>
 struct EnumTable<ColorMode> {
     static constexpr std::array names{
-        EnumName<ColorMode>{ColorMode::SolidColor, "solid", "Solid Color"},
+        EnumName<ColorMode>{ColorMode::Solid, "solid", "Solid"},
         EnumName<ColorMode>{ColorMode::Gradient, "gradient", "Gradient"},
     };
 };

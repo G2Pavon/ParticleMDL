@@ -27,7 +27,7 @@ struct Rgb {
 // so comparing them tells whether a texture has to be made again.
 struct TextureSettings {
     TexPattern pattern = TexPattern::RadialOrb;
-    ColorMode color_mode = ColorMode::SolidColor;
+    ColorMode color_mode = ColorMode::Solid;
     Rgb core_color{255, 170, 85};
     Rgb edge_color{0, 0, 0};
     int size = 64;
