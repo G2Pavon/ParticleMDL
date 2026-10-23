@@ -88,8 +88,10 @@ bool whole_slider(const char* id, const char* label, double& v, double vmin, dou
 bool seed_input(const char* id, int& seed, const char* tooltip)
 {
     ImGui::PushID(id);
+    // The field and the button take half the panel's width.
     const float button = px(60);
-    ImGui::SetNextItemWidth(-(button + ImGui::GetStyle().ItemSpacing.x));
+    const float row = ImGui::GetContentRegionAvail().x * 0.5f;
+    ImGui::SetNextItemWidth(std::max(px(40), row - button - ImGui::GetStyle().ItemSpacing.x));
     bool changed = ImGui::InputInt("##seed", &seed, 0, 0);
     ImGui::SetItemTooltip("%s", tooltip);
     ImGui::SameLine();

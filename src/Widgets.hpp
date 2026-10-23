@@ -40,8 +40,8 @@ bool reset_slider(const char* id, const char* label, double& v, double vmin, dou
 // a typed value is rounded.
 bool whole_slider(const char* id, const char* label, double& v, double vmin, double vmax, double def);
 
-// A random seed: typed in, or a new one from the "Seed" button beside it, across the panel with no
-// label (the tooltip says which seed it is). `id` keeps two of them apart.
+// A random seed: typed in, or a new one from the "Seed" button beside it, across half the panel
+// with no label (the tooltip says which seed it is). `id` keeps two of them apart.
 bool seed_input(const char* id, int& seed, const char* tooltip);
 
 // Edits a 0..255 color. Does not set the item width.
