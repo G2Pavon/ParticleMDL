@@ -64,6 +64,17 @@ bool reset_slider(const char* id, const char* label, double& v, double vmin, dou
     return changed;
 }
 
+bool dropdown_item(const char* label, bool current)
+{
+    bool picked = ImGui::Selectable(label, current);
+    if (current)
+        ImGui::SetItemDefaultFocus();   // the keyboard starts on the current one
+    // The keyboard moved onto it (the mouse does not move the keyboard's item).
+    else if (ImGui::IsItemFocused())
+        picked = true;
+    return picked;
+}
+
 bool whole_slider(const char* id, const char* label, double& v, double vmin, double vmax, double def)
 {
     bool changed = reset_slider(id, label, v, vmin, vmax, def, "%.0f");

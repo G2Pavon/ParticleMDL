@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <charconv>
@@ -46,17 +47,28 @@ bool seed_input(const char* id, int& seed, const char* tooltip);
 // Edits a 0..255 color. Does not set the item width.
 bool color_edit(const char* label, Rgb& c, ImGuiColorEditFlags flags = 0);
 
+// One item of an open dropdown's list. True when it becomes the value: clicked, or reached with the
+// arrow keys, so what the value changes (the preview) follows the keyboard without Enter. The list
+// opens with the keyboard on the current item.
+bool dropdown_item(const char* label, bool current);
+
 // Labels come from the enum's table.
 template <typename E>
 bool enum_combo(const char* label, E& value)
 {
-    int idx = static_cast<int>(value);
-    constexpr auto getter = [](void*, int i) { return enum_names<E>()[static_cast<std::size_t>(i)].label; };
+    const auto& names = enum_names<E>();
+    const auto shown = std::ranges::find(names, value, &EnumName<E>::value);
+    bool changed = false;
     ImGui::SetNextItemWidth(field_width());
-    if (!ImGui::Combo(label, &idx, getter, nullptr, static_cast<int>(enum_names<E>().size())))
-        return false;
-    value = static_cast<E>(idx);
-    return true;
+    if (ImGui::BeginCombo(label, shown != names.end() ? shown->label : "")) {
+        for (const auto& name : names)
+            if (dropdown_item(name.label, name.value == value) && name.value != value) {
+                value = name.value;
+                changed = true;
+            }
+        ImGui::EndCombo();
+    }
+    return changed;
 }
 
 // Formats into a stack buffer: no allocation per frame.
@@ -71,15 +83,11 @@ bool int_combo(const char* label, int& value, const std::array<int, N>& values)
     bool changed = false;
     ImGui::SetNextItemWidth(field_width());
     if (ImGui::BeginCombo(label, text(value, buf))) {
-        for (int v : values) {
-            const bool current = v == value;
-            if (ImGui::Selectable(text(v, buf), current)) {
+        for (int v : values)
+            if (dropdown_item(text(v, buf), v == value) && v != value) {
                 value = v;
                 changed = true;
             }
-            if (current)
-                ImGui::SetItemDefaultFocus();   // the keyboard starts on the current one
-        }
         ImGui::EndCombo();
     }
     return changed;
