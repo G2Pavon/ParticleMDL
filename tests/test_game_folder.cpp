@@ -83,11 +83,13 @@ TEST_CASE("the app config keeps the game folder, and a missing or broken file gi
 
     CHECK(read_app_config(file).game_folder.empty());
     CHECK_FALSE(read_app_config(file).sky);
-    write_app_config(file, AppConfig{"/games/Half-Life/cstrike ñ", true, "desert"});   // makes its folder
+    CHECK_FALSE(read_app_config(file).playback);
+    write_app_config(file, AppConfig{"/games/Half-Life/cstrike ñ", true, "desert", true});   // makes its folder
     const AppConfig back = read_app_config(file);
     CHECK(back.game_folder == "/games/Half-Life/cstrike ñ");
     CHECK(back.sky);
     CHECK(back.sky_name == "desert");
+    CHECK(back.playback);
 
 
     std::ofstream(file) << "{ not json";

@@ -42,6 +42,7 @@ struct AppConfig {
     std::string game_folder;   // UTF-8; empty until it is set
     bool sky = false;          // the preview shows a sky of the game instead of the background colour
     std::string sky_name;      // which one ("desert"); empty: none chosen yet
+    bool playback = false;     // the preview shows its playback controls
 };
 
 // The folder of the running program, or empty if the system does not say.

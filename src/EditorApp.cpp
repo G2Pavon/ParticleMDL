@@ -137,7 +137,7 @@ void EditorApp::apply_preset(int index)
     system_base_.reset();
     particle_base_.reset();
     rebuild();
-    preview_time_ = 0.0;
+    playback_.rewind();
 }
 
 void EditorApp::new_system()
@@ -153,7 +153,7 @@ void EditorApp::new_system()
     camera_.reset();
     set_status({}, StatusTone::Success);
     rebuild();
-    preview_time_ = 0.0;
+    playback_.rewind();
 }
 
 void EditorApp::set_seed(SeedSide side, int seed)
@@ -185,7 +185,7 @@ void EditorApp::load_system(const fs::path& path)
         particle_base_.reset();
         preset_index_ = -1;
         rebuild();
-        preview_time_ = 0.0;
+        playback_.rewind();
         if (loaded.warnings.empty()) {
             set_status("Loaded: " + to_utf8(path.filename()), StatusTone::Success);
         } else {
@@ -320,10 +320,116 @@ void EditorApp::refresh_preset_label()
 
 void EditorApp::advance_clock(double delta)
 {
-    const double loop = system_->loop_duration();
-    preview_time_ += delta;
-    if (preview_time_ > loop)
-        preview_time_ = floor_mod(preview_time_, loop);
+    if (config_.playback) {
+        playback_.advance(delta, clip());
+        return;
+    }
+    // Without the controls the preview plays on and round, an effect played once included.
+    Clip around = clip();
+    around.looping = true;
+    playback_.advance(delta, around);
+}
+
+Clip EditorApp::clip() const
+{
+    return {system_->loop_duration(), system_->loop_steps(), system_->looping()};
+}
+
+void EditorApp::draw_playback_bar()
+{
+    using ui::TransportIcon;
+    const Clip c = clip();
+    ImGui::Dummy(ImVec2(0, ui::px(2)));
+
+    {
+        ui::Locked lock(playback_.at_start(), "Already on the first frame");
+        if (ui::transport_button("##first", TransportIcon::First, "First frame"))
+            playback_.to_start();
+    }
+    ImGui::SameLine();
+    {
+        ui::Locked lock(!c.looping && playback_.at_start(), "Already on the first frame");
+        if (ui::transport_button("##back", TransportIcon::StepBack, "One frame back (Left arrow; hold to repeat)", true))
+            playback_.step(-1, c);
+    }
+    ImGui::SameLine();
+    if (playback_.playing()) {
+        if (ui::transport_button("##pause", TransportIcon::Pause, "Pause (Space)"))
+            playback_.pause();
+    } else if (ui::transport_button("##play", TransportIcon::Play, "Play (Space)")) {
+        playback_.play(c);
+    }
+    ImGui::SameLine();
+    {
+        ui::Locked lock(!c.looping && playback_.at_end(c), "Already on the last frame");
+        if (ui::transport_button("##forward", TransportIcon::StepForward, "One frame forward (Right arrow; hold to repeat)",
+                                 true))
+            playback_.step(1, c);
+    }
+    ImGui::SameLine();
+    {
+        ui::Locked lock(playback_.at_end(c), "Already on the last frame");
+        if (ui::transport_button("##last", TransportIcon::Last, "Last frame"))
+            playback_.to_end(c);
+    }
+
+    // The frame on show, out of the frames there are, then the speed; the timeline takes the rest.
+    char frame[48];
+    std::snprintf(frame, sizeof frame, "frame %d / %d", playback_.frame(c), c.last_frame());
+    char speed[16];
+    std::snprintf(speed, sizeof speed, "%gx", playback_.speed());
+    const ImGuiStyle& style = ImGui::GetStyle();
+    // Room for the widest readout of this effect, so the timeline does not move as the frame changes.
+    char widest[48];
+    std::snprintf(widest, sizeof widest, "frame %d / %d", c.last_frame(), c.last_frame());
+    const float frame_width = ImGui::CalcTextSize(widest).x;
+    const float speed_width = ui::px(64);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(std::max(ui::px(60), ImGui::GetContentRegionAvail().x - frame_width - speed_width -
+                                                     2 * style.ItemSpacing.x));
+    double time = playback_.time();
+    const double start = 0.0;
+    if (ImGui::SliderScalar("##timeline", ImGuiDataType_Double, &time, &start, &c.duration, "%.2f s"))
+        playback_.seek(time, c);
+    if (ImGui::IsItemActivated()) {   // dragging freezes the preview, and lets it play on after
+        resume_after_scrub_ = playback_.playing();
+        playback_.pause();
+    }
+    if (ImGui::IsItemDeactivated() && resume_after_scrub_) {
+        resume_after_scrub_ = false;
+        playback_.play(c);
+    }
+    ImGui::SetItemTooltip("Drag to move through the effect");
+    ImGui::SameLine();
+    ImGui::TextUnformatted(frame);
+    ImGui::SetItemTooltip("The exported frame on show (the game blends towards the next one) and the last frame");
+    ImGui::SameLine(0, style.ItemSpacing.x + frame_width - ImGui::CalcTextSize(frame).x);   // the combo stays put
+    ImGui::SetNextItemWidth(speed_width);
+    if (ImGui::BeginCombo("##speed", speed)) {
+        for (const double v : Playback::kSpeeds) {
+            char label[16];
+            std::snprintf(label, sizeof label, "%gx", v);
+            if (ui::dropdown_item(label, v == playback_.speed()))
+                playback_.set_speed(v);
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::SetItemTooltip("Playback speed; the exported model always plays at its FPS");
+}
+
+void EditorApp::playback_keys()
+{
+    // Space and the arrows work while the mouse is over the preview, unless a field takes the keys.
+    if (!ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) || ImGui::GetIO().WantTextInput ||
+        ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup))
+        return;
+    const Clip c = clip();
+    if (ImGui::IsKeyPressed(ImGuiKey_Space, false))
+        playback_.toggle(c);
+    if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow))
+        playback_.step(-1, c);
+    if (ImGui::IsKeyPressed(ImGuiKey_RightArrow))
+        playback_.step(1, c);
 }
 
 void EditorApp::set_status(std::string text, StatusTone tone, std::string detail)
@@ -806,13 +912,21 @@ void EditorApp::draw_middle_panel()
         ui::Locked lock(scene_options_.sky, "Hidden behind the skybox: turn Skybox off to use a background colour");
         ui::color_edit("Background Color", canvas_bg_, ImGuiColorEditFlags_NoInputs);
     }
-    ImGui::SameLine();
+    // The options go on one line while it has room, and wrap onto the next when the panel is narrow.
+    auto next_option = [](const char* label) {
+        const ImGuiStyle& style = ImGui::GetStyle();
+        const float width = ImGui::GetFrameHeight() + style.ItemInnerSpacing.x + ImGui::CalcTextSize(label).x;
+        ImGui::SameLine();
+        if (ImGui::GetContentRegionAvail().x < width)
+            ImGui::NewLine();
+    };
+    next_option("Axes");
     ImGui::Checkbox("Axes", &scene_options_.axes);
-    ImGui::SameLine();
+    next_option("Grid");
     ImGui::Checkbox("Grid", &scene_options_.grid);
-    ImGui::SameLine();
+    next_option("Bounds");
     ImGui::Checkbox("Bounds", &scene_options_.bounds);
-    ImGui::SameLine();
+    next_option("Skybox");
     // The game's sky instead of the background colour, from the game folder's gfx/env.
     {
         ui::Locked lock(skies_.empty(), game_folder_problem(from_utf8(config_.game_folder))
@@ -828,6 +942,8 @@ void EditorApp::draw_middle_panel()
     }
     if (config_.sky && !skies_.empty()) {
         ImGui::SameLine();
+        if (ImGui::GetContentRegionAvail().x < ui::px(140))
+            ImGui::NewLine();
         ImGui::SetNextItemWidth(ui::px(140));
         if (ImGui::BeginCombo("##sky", config_.sky_name.c_str())) {
             if (ImGui::IsWindowAppearing())
@@ -842,11 +958,24 @@ void EditorApp::draw_middle_panel()
         }
     }
 
+    next_option("Playback");
+    if (ImGui::Checkbox("Playback", &config_.playback)) {
+        if (!config_.playback)
+            playback_.play_freely();
+        save_config();
+    }
+    ImGui::SetItemTooltip("Controls under the preview to pause it, step through the exported frames and play it\n"
+                          "slower or faster. An effect played once then holds its last frame, as in the game.");
+
     const ImVec2 avail = ImGui::GetContentRegionAvail();
     draw_canvas(ImVec2(std::max(avail.x, 10.0f), std::max(avail.y - bottom_height_, 10.0f)));
 
     // --- Bottom controls (height measured for next frame's canvas size) ---
     const float bottom_start = ImGui::GetCursorPosY();
+    if (config_.playback) {
+        draw_playback_bar();
+        playback_keys();
+    }
     ImGui::Dummy(ImVec2(0, ui::px(5)));
     ImGui::Separator();
 
@@ -1019,7 +1148,7 @@ void EditorApp::draw_canvas(ImVec2 size)
 
     camera_.set_focal_length(OrbitCamera::kFocalLength * static_cast<double>(ui::scale()));
     const Point2 center{origin.x + size.x / 2, origin.y + size.y / 2};
-    build_scene(*system_, baked_, camera_, preview_time_, center, scene_options_, scene_);
+    build_scene(*system_, baked_, camera_, playback_.time(), center, scene_options_, scene_);
     renderer_.draw(ImGui::GetWindowDrawList(), origin, size, canvas_bg_, scene_);
 }
 

@@ -60,6 +60,13 @@ private:
     const char* reason_;
 };
 
+// The icons of the playback buttons, drawn as shapes (the editor's font has no such glyphs).
+enum class TransportIcon { First, StepBack, Play, Pause, StepForward, Last };
+
+// A playback button with `icon` on it. True when it is clicked; with `repeat`, also again and
+// again while it is held.
+bool transport_button(const char* id, TransportIcon icon, const char* tooltip, bool repeat = false);
+
 // Edits a 0..255 color. Does not set the item width.
 bool color_edit(const char* label, Rgb& c, ImGuiColorEditFlags flags = 0);
 

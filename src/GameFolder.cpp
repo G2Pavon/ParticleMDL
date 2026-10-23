@@ -186,6 +186,8 @@ AppConfig read_app_config(const fs::path& path)
         config.sky = it->get<bool>();
     if (const auto it = j.find("sky_name"); it != j.end() && it->is_string())
         config.sky_name = it->get<std::string>();
+    if (const auto it = j.find("playback"); it != j.end() && it->is_boolean())
+        config.playback = it->get<bool>();
     return config;
 }
 
@@ -194,7 +196,8 @@ void write_app_config(const fs::path& path, const AppConfig& config)
     if (path.empty())
         throw std::runtime_error("there is no place to keep the settings (the program's folder is unknown)");
     fs::create_directories(path.parent_path());
-    const nlohmann::json j = {{"game_folder", config.game_folder}, {"sky", config.sky}, {"sky_name", config.sky_name}};
+    const nlohmann::json j = {{"game_folder", config.game_folder}, {"sky", config.sky}, {"sky_name", config.sky_name},
+                              {"playback", config.playback}};
     write_file_atomically(path, j.dump(2) + "\n");
 }
 

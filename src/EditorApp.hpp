@@ -13,6 +13,7 @@
 #include "Skybox.hpp"
 #include "NativeDialog.hpp"
 #include "OrbitCamera.hpp"
+#include "Playback.hpp"
 #include "ParticleSystem.hpp"
 #include "PreviewRenderer.hpp"
 #include "PreviewScene.hpp"
@@ -50,6 +51,7 @@ private:
     bool can_export() const;
     void poll_texture();
     void advance_clock(double delta);
+    Clip clip() const;   // the timing of the current effect, for playback_
     void refresh_preset_label();
     // `detail`, when given, is shown in the status bar's tooltip: the whole of what one line cannot hold.
     void set_status(std::string text, StatusTone tone, std::string detail = {});
@@ -65,6 +67,8 @@ private:
     void draw_middle_panel();
     void draw_right_panel();
     void draw_canvas(ImVec2 size);
+    void draw_playback_bar();
+    void playback_keys();
 
     Settings settings_;
     // What each panel's values were before its seed drew them, for seed 0 to bring back. Forgotten
@@ -84,7 +88,8 @@ private:
     ExportReport export_report_;                  // limits, sequence size and warnings of the current settings
     std::optional<std::string> name_problem_;
 
-    double preview_time_ = 0.0;
+    Playback playback_;
+    bool resume_after_scrub_ = false;   // dragging the timeline paused the preview, which played
     OrbitCamera camera_;
     SceneOptions scene_options_;
     Scene scene_;

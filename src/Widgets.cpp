@@ -119,6 +119,52 @@ Locked::~Locked()
         ImGui::SetTooltip("%s", reason_);
 }
 
+bool transport_button(const char* id, TransportIcon icon, const char* tooltip, bool repeat)
+{
+    const float height = ImGui::GetFrameHeight();
+    ImGui::PushItemFlag(ImGuiItemFlags_ButtonRepeat, repeat);
+    const bool pressed = ImGui::Button(id, ImVec2(height * 1.5f, height));
+    ImGui::PopItemFlag();
+    ImGui::SetItemTooltip("%s", tooltip);
+
+    // The icon, left to right: bars and triangles, centred in the button. The text colour follows
+    // the style's alpha, so a locked button fades with its frame.
+    enum Part { Bar, Left, Right, Big };
+    std::array<Part, 3> parts{};
+    std::size_t count = 0;
+    switch (icon) {
+    case TransportIcon::First: parts = {Bar, Left, Left}; count = 3; break;
+    case TransportIcon::StepBack: parts = {Bar, Left}; count = 2; break;
+    case TransportIcon::Play: parts = {Big}; count = 1; break;
+    case TransportIcon::Pause: parts = {Bar, Bar}; count = 2; break;
+    case TransportIcon::StepForward: parts = {Right, Bar}; count = 2; break;
+    case TransportIcon::Last: parts = {Right, Right, Bar}; count = 3; break;
+    }
+    const float s = std::round(height * 0.45f);   // the icon's height
+    const float gap = icon == TransportIcon::Pause ? s * 0.25f : s * 0.08f;
+    auto width = [&](Part p) { return p == Bar ? s * 0.25f : p == Big ? s * 0.85f : s * 0.6f; };
+    float total = gap * static_cast<float>(count - 1);
+    for (std::size_t i = 0; i < count; ++i)
+        total += width(parts[i]);
+
+    const ImVec2 lo = ImGui::GetItemRectMin(), hi = ImGui::GetItemRectMax();
+    const float top = std::round((lo.y + hi.y - s) * 0.5f), bottom = top + s, middle = (top + bottom) * 0.5f;
+    float x = std::round((lo.x + hi.x - total) * 0.5f);
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+    const ImU32 color = ImGui::GetColorU32(ImGuiCol_Text);
+    for (std::size_t i = 0; i < count; ++i) {
+        const float w = width(parts[i]);
+        switch (parts[i]) {
+        case Bar: draw->AddRectFilled(ImVec2(x, top), ImVec2(x + w, bottom), color); break;
+        case Left: draw->AddTriangleFilled(ImVec2(x + w, top), ImVec2(x, middle), ImVec2(x + w, bottom), color); break;
+        case Right:
+        case Big: draw->AddTriangleFilled(ImVec2(x, top), ImVec2(x + w, middle), ImVec2(x, bottom), color); break;
+        }
+        x += w + gap;
+    }
+    return pressed;
+}
+
 bool color_edit(const char* label, Rgb& c, ImGuiColorEditFlags flags)
 {
     float f[3] = {c.r / 255.f, c.g / 255.f, c.b / 255.f};
