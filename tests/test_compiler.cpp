@@ -1,363 +1,127 @@
+// The built-in compiler (studiomdl++, under third_party/studiomdl) on exports of this program.
 #include <doctest/doctest.h>
 
-#include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <string>
-#include <thread>
+#include <vector>
 
 #include "Compiler.hpp"
-#include "PathUtil.hpp"
-
-#ifndef _WIN32
-#include <unistd.h>
-#endif
+#include "Exporter.hpp"
+#include "MdlReader.hpp"
+#include "Presets.hpp"
+#include "SeedRoll.hpp"
+#include "SettingsJson.hpp"
 
 using namespace gs;
-using namespace std::chrono_literals;
 namespace fs = std::filesystem;
-using Status = CompileResult::Status;
+
+#ifndef GS_ROLLED_SEEDS
+#define GS_ROLLED_SEEDS 3
+#endif
 
 namespace {
 
-// The test executable is the fake compiler; see fake_studiomdl.hpp.
-std::string self_path;
+const fs::path kFixtures = fs::path(GS_FIXTURE_DIR) / "real_mdl";
 
-struct Folder {
-    fs::path path;
-
-    explicit Folder(const char* name) : path(fs::temp_directory_path() / from_utf8(name))
-    {
-        fs::remove_all(path);
-        fs::create_directories(path);
-    }
-    ~Folder() { fs::remove_all(path); }
-
-    // Writes "<name>.qc" whose first line is the behavior.
-    void qc(const std::string& name, const std::string& mode) const { std::ofstream(path / (name + ".qc")) << mode << '\n'; }
-    bool has(const std::string& file) const { return fs::exists(path / file); }
-};
-
-std::string trimmed(std::string s)
+std::vector<std::uint8_t> file_bytes(const fs::path& path)
 {
-    while (!s.empty() && (s.back() == '\n' || s.back() == '\r'))
-        s.pop_back();
-    return s;
+    std::ifstream in(path, std::ios::binary);
+    REQUIRE(in);
+    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
 }
 
-CompileOptions in(const Folder& f)
+ParticleSystem fixture_system(const char* name)
 {
-    CompileOptions o;
-    o.work_dir = f.path;
-    return o;
+    return ParticleSystem(read_settings_file(kFixtures / (std::string(name) + ".json"), Settings{}).settings);
 }
 
 } // namespace
 
-// main.cpp sets this before the tests run.
-void set_self_path(const std::string& path)
+TEST_CASE("every preset compiles into the model that was exported")
 {
-    self_path = fs::absolute(path).string();
+    for (const Preset& preset : builtin_presets()) {
+        CAPTURE(preset.name);
+        Settings s;
+        apply_preset(s, preset);
+        s.model_name = "preset";
+        const ParticleSystem sys(s);
+        const CompiledModel model = compile_model(export_files(sys));
+        CHECK(model.warnings.empty());
+        CHECK(compare_with_export(read_mdl(model.mdl), sys).empty());
+    }
 }
 
-TEST_CASE("quote_windows_argument leaves plain arguments alone")
+TEST_CASE("rolled settings compile into the model that was exported")
 {
-    CHECK(quote_windows_argument(L"studiomdl.exe") == L"studiomdl.exe");
-    CHECK(quote_windows_argument(L"C:\\tools\\studiomdl.exe") == L"C:\\tools\\studiomdl.exe");
-    CHECK(quote_windows_argument(L"model.qc") == L"model.qc");
+    // Seeds turn clusters, mesh rotation, spin and size variance on at random, which is where the
+    // vertices and normals the compiler merges differ from one effect to the next.
+    constexpr int kSeeds = GS_ROLLED_SEEDS;
+    for (Geometry geometry : {Geometry::SingleQuad, Geometry::CrossedQuads, Geometry::TriPlanarQuads, Geometry::VolumetricBox})
+        for (int seed = 1; seed <= kSeeds; ++seed) {
+            CAPTURE(static_cast<int>(geometry));
+            CAPTURE(seed);
+            Settings s;
+            s.model_name = "rolled";
+            s.geometry = geometry;
+            roll_settings(s, Settings(s), SeedSide::System, seed);
+            roll_settings(s, Settings(s), SeedSide::Particle, seed * 7919);
+            const ParticleSystem sys(s);
+            CHECK(compare_with_export(read_mdl(compile_model(export_files(sys)).mdl), sys).empty());
+        }
 }
 
-TEST_CASE("quote_windows_argument quotes what needs it")
+TEST_CASE("the built-in compiler makes the models Sven Co-op's studiomdl made")
 {
-    CHECK(quote_windows_argument(L"") == L"\"\"");
-    CHECK(quote_windows_argument(L"a b") == L"\"a b\"");
-    CHECK(quote_windows_argument(L"a\tb") == L"\"a\tb\"");
-    CHECK(quote_windows_argument(L"C:\\Program Files\\x.exe") == L"\"C:\\Program Files\\x.exe\"");
+    // The fixtures were compiled by "StudioMDL SC (Nov 30 2018)". The built-in compiler's models
+    // have the same size and the same contents; a few animation values round one unit apart and
+    // some padding is zero where Sven Co-op's leaves what was in memory.
+    for (const char* name : {"box_vertex_bones", "crossed_static", "one_shot", "vertex_bones"}) {
+        CAPTURE(name);
+        const ParticleSystem sys = fixture_system(name);
+        const CompiledModel model = compile_model(export_files(sys));
+        const std::vector<std::uint8_t> sven = file_bytes(kFixtures / (std::string(name) + ".mdl"));
+        CHECK(model.mdl.size() == sven.size());
+        CHECK(describe_mdl(read_mdl(model.mdl)) == describe_mdl(read_mdl(sven)));
+        CHECK(compare_with_export(read_mdl(model.mdl), sys).empty());
+    }
 }
 
-TEST_CASE("quote_windows_argument escapes quotes and the backslashes before them")
+TEST_CASE("a compile gives the same bytes every time")
 {
-    CHECK(quote_windows_argument(L"say \"hi\"") == L"\"say \\\"hi\\\"\"");
-    CHECK(quote_windows_argument(L"x\"y") == L"\"x\\\"y\"");
-    // A trailing backslash must not escape the closing quote.
-    CHECK(quote_windows_argument(L"C:\\my dir\\") == L"\"C:\\my dir\\\\\"");
-    // Backslashes before a quote are doubled, then the quote escaped.
-    CHECK(quote_windows_argument(L"a\\\"b") == L"\"a\\\\\\\"b\"");
-    CHECK(quote_windows_argument(L"a\\\\\"b") == L"\"a\\\\\\\\\\\"b\"");
-    // Backslashes elsewhere stay as they are.
-    CHECK(quote_windows_argument(L"a\\b c") == L"\"a\\b c\"");
+    const ExportFiles files = export_files(fixture_system("one_shot"));
+    CHECK(compile_model(files).mdl == compile_model(files).mdl);
 }
 
-TEST_CASE("compile_model reports success and removes the intermediate files")
+TEST_CASE("looping sequences that hung studiomdl++ under Wine compile")
 {
-    const Folder dir("particlemdl_compile_ok");
-    dir.qc("fx", "ok");
-    for (const char* f : {"fx_ref.smd", "fx_anim.smd", "fx.bmp"})
-        std::ofstream(dir.path / f) << "x";
-
-    const CompileResult r = compile_model(self_path, "fx", in(dir));
-    CHECK(r.status == Status::Ok);
-    CHECK(dir.has("fx.mdl"));
-    CHECK_FALSE(dir.has("fx.qc"));
-    CHECK_FALSE(dir.has("fx_ref.smd"));
-    CHECK_FALSE(dir.has("fx_anim.smd"));
-    CHECK_FALSE(dir.has("fx.bmp"));
+    // With 10 particles at 30 fps, the Windows build of studiomdl++ never finished 55 to 70 steps.
+    for (int steps = 50; steps <= 80; steps += 3) {
+        CAPTURE(steps);
+        Settings s;
+        s.model_name = "loop";
+        s.count = 10;
+        s.fps = 30;
+        s.duration = steps / 30.0;
+        s.loop = true;
+        const ParticleSystem sys(s);
+        REQUIRE(sys.looping());
+        CHECK(compare_with_export(read_mdl(compile_model(export_files(sys)).mdl), sys).empty());
+    }
 }
 
-TEST_CASE("compile_model collects stdout and stderr together")
+TEST_CASE("a refused export throws CompileFailed with the compiler's message")
 {
-    const Folder dir("particlemdl_compile_output");
-    dir.qc("fx", "ok");
-    const CompileResult r = compile_model(self_path, "fx", in(dir));
-    CHECK(r.output.find("compiled fx.qc") != std::string::npos);
-    CHECK(r.output.find("a note on stderr") != std::string::npos);
-}
-
-TEST_CASE("compile_model reports a compiler that fails and keeps the files")
-{
-    const Folder dir("particlemdl_compile_fail");
-    dir.qc("fx", "fail");
-    const CompileResult r = compile_model(self_path, "fx", in(dir));
-    CHECK(r.status == Status::Failed);
-    CHECK(r.output.find("ERROR: bad qc") != std::string::npos);
-    CHECK(dir.has("fx.qc"));
-    CHECK_FALSE(dir.has("fx.mdl"));
-}
-
-TEST_CASE("compile_model needs the .mdl, not just exit status 0")
-{
-    const Folder dir("particlemdl_compile_nomdl");
-    dir.qc("fx", "nomdl");
-    CHECK(compile_model(self_path, "fx", in(dir)).status == Status::Failed);
-    CHECK(dir.has("fx.qc"));
-}
-
-TEST_CASE("compile_model runs the compiler inside the work folder")
-{
-    const Folder dir("particlemdl_compile_cwd");
-    dir.qc("fx", "cwd");
-    const CompileResult r = compile_model(self_path, "fx", in(dir));
-    REQUIRE(r.status == Status::Failed);   // it writes no .mdl; the output is what matters
-    std::error_code ec;
-    CHECK(fs::equivalent(fs::path(trimmed(r.output)), dir.path, ec));
-}
-
-TEST_CASE("compile_model works in a folder other than the current one, with spaces in its name")
-{
-    const Folder dir("particlemdl compile spaced dir");
-    dir.qc("fx", "ok");
-    CHECK(fs::current_path() != dir.path);
-    CHECK(compile_model(self_path, "fx", in(dir)).status == Status::Ok);
-}
-
-TEST_CASE("compile_model starts a compiler whose path has spaces")
-{
-    const Folder tools("particlemdl compile my tools");
-    const fs::path copy = tools.path / fs::path(self_path).filename();
-    fs::copy_file(self_path, copy);
-
-    const Folder dir("particlemdl_compile_spaced_tool");
-    dir.qc("fx", "ok");
-    CHECK(compile_model(copy.string(), "fx", in(dir)).status == Status::Ok);
-}
-
-TEST_CASE("compile_model reports a compiler that does not exist")
-{
-    const Folder dir("particlemdl_compile_missing");
-    dir.qc("fx", "ok");
-    CHECK(compile_model("no-such-compiler-particlemdl", "fx", in(dir)).status == Status::CompilerNotFound);
-    CHECK(compile_model((dir.path / "missing" / "studiomdl").string(), "fx", in(dir)).status == Status::CompilerNotFound);
-    CHECK(dir.has("fx.qc"));
-}
-
-TEST_CASE("compile_model gives the compiler an empty stdin")
-{
-    const Folder dir("particlemdl_compile_stdin");
-    dir.qc("fx", "stdin");
-    CompileOptions options = in(dir);
-    options.timeout = 8s;   // a compiler left waiting on our stdin is reported as timed out
-
-#ifndef _WIN32
-    // Make our own stdin a pipe that never ends, which a compiler that inherited it would wait on.
-    int pipe_fds[2];
-    REQUIRE(pipe(pipe_fds) == 0);
-    const int saved_stdin = dup(STDIN_FILENO);
-    dup2(pipe_fds[0], STDIN_FILENO);
-#endif
-    const CompileResult r = compile_model(self_path, "fx", options);
-#ifndef _WIN32
-    dup2(saved_stdin, STDIN_FILENO);
-    close(saved_stdin);
-    close(pipe_fds[0]);
-    close(pipe_fds[1]);
-#endif
-
-    CHECK(r.status != Status::TimedOut);
-    CHECK(r.output == "stdin: 0 bytes");
-}
-
-TEST_CASE("compile_model reads a lot of output without stalling")
-{
-    const Folder dir("particlemdl_compile_lots");
-    dir.qc("fx", "lots");
-    const CompileResult r = compile_model(self_path, "fx", in(dir));
-    CHECK(r.output.size() > 1500000);
-    CHECK(r.output.find("line 19999:") != std::string::npos);
-}
-
-TEST_CASE("compile_model keeps the start and the end of output past its limit")
-{
-    const Folder dir("particlemdl_compile_bounded");
-    dir.qc("fx", "lots");
-    CompileOptions options = in(dir);
-    options.max_output_bytes = 100000;
-    const CompileResult r = compile_model(self_path, "fx", options);
-    CHECK(r.output.size() < 100200);
-    CHECK(r.output.starts_with("line 00000:"));
-    CHECK(r.output.find("line 19999:") != std::string::npos);
-    CHECK(r.output.find("line 10000:") == std::string::npos);
-    constexpr std::string_view end_of_note = " bytes of output left out ...]";
-    const std::size_t note = r.output.find(end_of_note);
-    REQUIRE(note != std::string::npos);
-    // The note says how much is missing: all of it but the 100000 bytes kept.
-    const std::size_t open = r.output.rfind("[... ", note);
-    REQUIRE(open != std::string::npos);
-    const std::size_t dropped = std::stoul(r.output.substr(open + 5, note - open - 5));
-    const std::size_t note_size = note + end_of_note.size() - open;
-    const std::size_t kept = r.output.size() - note_size - 2;   // without the note and its two line breaks
-    CHECK(kept == 100000);
-    CHECK(dropped > 1500000);
-}
-
-TEST_CASE("compile_model kills a compiler that runs past the time limit")
-{
-    const Folder dir("particlemdl_compile_timeout");
-    dir.qc("fx", "sleep");
-    CompileOptions options = in(dir);
-    options.timeout = 400ms;
-
-    const auto start = std::chrono::steady_clock::now();
-    const CompileResult r = compile_model(self_path, "fx", options);
-    const auto took = std::chrono::steady_clock::now() - start;
-
-    CHECK(r.status == Status::TimedOut);
-    CHECK(r.output.find("started") != std::string::npos);   // what it had written is kept
-    CHECK(took < 10s);
-    CHECK_FALSE(dir.has("fx.mdl"));
-}
-
-TEST_CASE("compile_model stops a compiler when asked to")
-{
-    const Folder dir("particlemdl_compile_cancel");
-    dir.qc("fx", "sleep");
-    std::stop_source source;
-    CompileOptions options = in(dir);
-    options.stop = source.get_token();
-
-    std::thread canceller([&] {
-        std::this_thread::sleep_for(300ms);
-        source.request_stop();
-    });
-    const auto start = std::chrono::steady_clock::now();
-    const CompileResult r = compile_model(self_path, "fx", options);
-    const auto took = std::chrono::steady_clock::now() - start;
-    canceller.join();
-
-    CHECK(r.status == Status::Cancelled);
-    CHECK(took < 10s);
-}
-
-// "Jos" + e-acute and "tools" with an o-circumflex, as UTF-8 bytes.
-TEST_CASE("compile_model works in a folder with non-ASCII characters in its name")
-{
-    const Folder dir(("particlemdl_compile_Jos\xC3\xA9_\xE6\x97\xA5\xE6\x9C\xAC"));
-    dir.qc("fx", "ok");
-    CHECK(compile_model(self_path, "fx", in(dir)).status == Status::Ok);
-    CHECK(dir.has("fx.mdl"));
-}
-
-TEST_CASE("compile_model starts a compiler whose path has non-ASCII characters")
-{
-    const Folder tools("particlemdl_t\xC3\xB4ols_\xE6\x97\xA5\xE6\x9C\xAC");
-    const fs::path copy = tools.path / fs::path(self_path).filename();
-    fs::copy_file(self_path, copy);
-
-    const Folder dir("particlemdl_compile_non_ascii_tool");
-    dir.qc("fx", "ok");
-    // The compiler is given as UTF-8 text, the way the editor keeps it.
-    CHECK(compile_model(to_utf8(copy), "fx", in(dir)).status == Status::Ok);
-}
-
-TEST_CASE("compile_model does not take an old .mdl for the result of a compile that wrote none")
-{
-    const Folder dir("particlemdl_compile_stale");
-    dir.qc("fx", "nomdl");
-    const fs::path mdl = dir.path / "fx.mdl";
-    std::ofstream(mdl) << "old model";
-    fs::last_write_time(mdl, fs::file_time_type::clock::now() - 1h);
-
-    const CompileResult r = compile_model(self_path, "fx", in(dir));
-    CHECK(r.status == Status::Failed);
-    CHECK(dir.has("fx.mdl"));   // the old model is left alone
-    CHECK(dir.has("fx.qc"));
-}
-
-TEST_CASE("compile_model accepts a .mdl written over an old one")
-{
-    const Folder dir("particlemdl_compile_replace");
-    dir.qc("fx", "ok");
-    const fs::path mdl = dir.path / "fx.mdl";
-    std::ofstream(mdl) << "old model with more text";
-    fs::last_write_time(mdl, fs::file_time_type::clock::now() - 1h);
-
-    CHECK(compile_model(self_path, "fx", in(dir)).status == Status::Ok);
-    std::ifstream in_file(mdl);
-    std::string text;
-    std::getline(in_file, text);
-    CHECK(text == "IDST");
-}
-
-TEST_CASE("compile_model keeps the source files when asked to")
-{
-    const Folder dir("particlemdl_compile_keep");
-    dir.qc("fx", "ok");
-    for (const char* f : {"fx_ref.smd", "fx_anim.smd", "fx.bmp"})
-        std::ofstream(dir.path / f) << "x";
-    CompileOptions options = in(dir);
-    options.keep_sources = true;
-
-    CHECK(compile_model(self_path, "fx", options).status == Status::Ok);
-    CHECK(dir.has("fx.mdl"));
-    for (const char* f : {"fx.qc", "fx_ref.smd", "fx_anim.smd", "fx.bmp"})
-        CHECK(dir.has(f));
-}
-
-TEST_CASE("a timeout names the hang of studiomdl++ for looping sequences only")
-{
-    const std::string looping = timeout_message(std::chrono::minutes(2), true);
-    CHECK(looping.find("within 120 s") != std::string::npos);
-    CHECK(looping.find("studiomdl++") != std::string::npos);
-    CHECK(looping.find("Loop") != std::string::npos);
-
-    const std::string once = timeout_message(std::chrono::seconds(30), false);
-    CHECK(once.find("within 30 s") != std::string::npos);
-    CHECK(once.find("studiomdl++") == std::string::npos);
-}
-
-TEST_CASE("compiler_error finds studiomdl's error message, or else the last line")
-{
-    const std::string sven = "Processing \"a.qc\"\r\nGrabbing reference: a_ref.smd\r\n\r\n"
-                             "************ ERROR ************\r\ntoo many normals in model: \"n2049_ref\"\r\n";
-    CHECK(compiler_error(sven) == "too many normals in model: \"n2049_ref\"");
-    CHECK(compiler_error("line one\nunexpected end of file   \n\n") == "unexpected end of file");
-    CHECK(compiler_error("") == "");
-    CHECK(compiler_error("\n \n") == "");
-}
-
-TEST_CASE("last_lines keeps the end of a long output")
-{
-    CHECK(last_lines("a\nb\nc\nd\n", 2) == "c\nd\n");
-    CHECK(last_lines("a\nb\nc\nd", 2) == "c\nd");
-    CHECK(last_lines("a\nb", 5) == "a\nb");
-    CHECK(last_lines("", 3) == "");
+    ExportFiles files = export_files(fixture_system("crossed_static"));
+    std::erase_if(files.files, [](const ExportFile& f) { return f.name.ends_with("_anim.smd"); });
+    try {
+        compile_model(files);
+        FAIL("the compile did not fail");
+    } catch (const CompileFailed& e) {
+        const std::string message = e.what();
+        CHECK(message.find("ERROR") != std::string::npos);
+        CHECK(message.find("_anim") != std::string::npos);
+        CHECK_FALSE(message.ends_with("\n"));
+    }
 }

@@ -7,7 +7,6 @@
 
 #include <imgui.h>
 
-#include "CompileJob.hpp"
 #include "Exporter.hpp"
 #include "FileDialog.hpp"
 #include "GameFolder.hpp"
@@ -44,12 +43,11 @@ private:
     void save_system(const std::filesystem::path& path);
     void export_data();
     // The file dialogs: the operating system's own when available, else the editor's.
-    enum class DialogPurpose { Load, Save, ExportFolder, Compiler, Texture, GameFolder };
+    enum class DialogPurpose { Load, Save, ExportFolder, Texture, GameFolder };
     static native::Request request_for(DialogPurpose purpose);
     void open_dialog(DialogPurpose purpose);
     void finish_dialog(DialogPurpose purpose, const std::optional<std::filesystem::path>& path);
     bool can_export() const;
-    void poll_compile();
     void poll_texture();
     void advance_clock(double delta);
     void refresh_preset_label();
@@ -94,18 +92,13 @@ private:
     Rgb canvas_bg_{0, 0, 0};
 
     bool auto_compile_ = false;
-    std::string compiler_path_;
-    CompileJob compile_job_;
-    std::optional<ParticleSystem> compiling_;   // the export being compiled, to check the model against
-    std::filesystem::path compiling_mdl_;
 
     std::string status_;
-    std::string status_detail_;   // the warnings, differences or compiler output behind the status
+    std::string status_detail_;   // the warnings, differences or compiler notes behind the status
     StatusTone status_tone_ = StatusTone::Success;
 
     FileDialog save_dialog_;
     FileDialog load_dialog_;
-    FileDialog compiler_dialog_;
     FileDialog export_dialog_;
     FileDialog texture_dialog_;
     native::DialogJob native_job_;                 // the operating system's dialog, when there is one

@@ -119,6 +119,7 @@ endif()
 # ---------------------------------------------------------------------------
 # studiomdl++ (G2Pavon/studiomdlPlusPlus, lib branch, commit 73bee88; Half-Life 1
 # SDK license): compiles the exported QC, SMDs and texture into the .mdl in memory.
+# Changed here: the normal lookup in src/studiomdl.cpp (marked "ParticleMDL").
 # ---------------------------------------------------------------------------
 set(STUDIOMDL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/studiomdl)
 add_library(studiomdl STATIC
@@ -140,7 +141,7 @@ elseif(MSVC)
 endif()
 
 # ---------------------------------------------------------------------------
-# Core: settings, simulation, textures, export and compiler (no GUI dependencies)
+# Core: settings, simulation, textures, export and compile (no GUI dependencies)
 # ---------------------------------------------------------------------------
 add_library(particles_core STATIC
     src/Settings.cpp
@@ -157,24 +158,12 @@ add_library(particles_core STATIC
     src/StagedFiles.cpp
     src/MdlReader.cpp
     src/Exporter.cpp
-    src/Compiler.cpp
-    src/CompileJob.cpp
-    src/WinProcess.cpp)
+    src/Compiler.cpp)
 target_include_directories(particles_core PUBLIC src)
 find_package(Threads REQUIRED)
 target_link_libraries(particles_core
     PUBLIC nlohmann_json::nlohmann_json Threads::Threads
-    PRIVATE stb gs_flags)
-
-# posix_spawn_file_actions_addchdir_np (glibc 2.29+, macOS 10.15+) lets the
-# compiler run inside the export folder without changing our own directory.
-include(CheckSymbolExists)
-set(CMAKE_REQUIRED_DEFINITIONS -D_GNU_SOURCE)
-check_symbol_exists(posix_spawn_file_actions_addchdir_np "spawn.h" GS_HAVE_SPAWN_ADDCHDIR)
-unset(CMAKE_REQUIRED_DEFINITIONS)
-if(GS_HAVE_SPAWN_ADDCHDIR)
-    target_compile_definitions(particles_core PRIVATE GS_HAVE_SPAWN_ADDCHDIR)
-endif()
+    PRIVATE stb studiomdl gs_flags)
 
 # ---------------------------------------------------------------------------
 # Editor support: preview camera and scene, path input, native dialogs. No

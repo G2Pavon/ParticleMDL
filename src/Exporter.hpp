@@ -126,6 +126,11 @@ struct ExportFiles {
 // must be those of `sys` (see export_model). Throws std::invalid_argument for an unusable model
 // name and ExportBlocked for an export over studiomdl's limits.
 ExportFiles export_files(const ParticleSystem& sys, const BakedPoses& baked, const AnimationTable& table);
+// The same, baking `sys` first.
+ExportFiles export_files(const ParticleSystem& sys);
+// The files without the check of studiomdl's limits, for testing that the compiler refuses
+// what is over them.
+ExportFiles export_files_over_limits(const ParticleSystem& sys, const BakedPoses& baked, const AnimationTable& table);
 
 // Writes <safe>.bmp, <safe>.qc, <safe>_ref.smd and <safe>_anim.smd into
 // out_dir. Geometry and animation are pre-rotated by -90 deg around Z to cancel

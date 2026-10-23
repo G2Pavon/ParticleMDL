@@ -8,6 +8,7 @@
 #include <imgui_stdlib.h>
 #include <nlohmann/json.hpp>
 
+#include "Compiler.hpp"
 #include "Exporter.hpp"
 #include "PathUtil.hpp"
 #include "StagedFiles.hpp"
@@ -65,15 +66,8 @@ void wrapped_text(ImVec4 color, const std::string& text)
 } // namespace
 
 EditorApp::EditorApp()
-    :
-#ifdef _WIN32
-      compiler_path_("studiomdl.exe"),
-#else
-      compiler_path_("./studiomdlplusplus"),
-#endif
-      save_dialog_("Save System", FileDialog::Mode::Save, {".json"}, "particle_system.json"),
+    : save_dialog_("Save System", FileDialog::Mode::Save, {".json"}, "particle_system.json"),
       load_dialog_("Load System", FileDialog::Mode::Open, {".json"}),
-      compiler_dialog_("Select Compiler", FileDialog::Mode::Open),
       export_dialog_("Export Folder", FileDialog::Mode::Directory),
       texture_dialog_("Choose Image", FileDialog::Mode::Open, {".png", ".jpg", ".jpeg", ".bmp", ".tga"}),
       config_path_(app_config_path()),
@@ -279,71 +273,41 @@ void EditorApp::export_data()
         const ParticleSystem& sys = *system_;
         const std::filesystem::path folder = export_folder(from_utf8(config_.game_folder), models_subfolder_);
         std::filesystem::create_directories(folder);   // models/ exists; a folder inside it is made when needed
-        export_model(sys, baked_, table_, folder);
         const std::string safe = safe_model_name(sys.settings().model_name);
         const std::string where = models_label(from_utf8(config_.game_folder)) + normalized_subfolder(models_subfolder_);
-
-        if (auto_compile_) {
-            set_status("Compiling .mdl in " + where + "...", StatusTone::Warning);
-            compiling_.emplace(sys);
-            compiling_mdl_ = folder / from_utf8(safe + ".mdl");
-            compile_job_.start(compiler_path_, safe, folder);
-        } else {
+        if (!auto_compile_) {
+            export_model(sys, baked_, table_, folder);
             set_status("Success! Textures, SMDs, and " + safe + ".qc written to " + where + ".", StatusTone::Success);
-        }
-    } catch (const std::exception& e) {
-        set_status(std::string("Error: ") + e.what(), StatusTone::Error);
-    }
-}
-
-void EditorApp::poll_compile()
-{
-    try {
-        const auto result = compile_job_.poll();
-        if (!result)
             return;
-        switch (result->status) {
-        case CompileResult::Status::Ok: {
-            // Read the model back: what the compiler made, and whether it is what was exported.
-            std::string summary;
-            std::vector<std::string> problems;
-            try {
-                const MdlInfo model = read_mdl_file(compiling_mdl_);
-                summary = describe_mdl(model);
-                if (compiling_)
-                    problems = compare_with_export(model, *compiling_);
-            } catch (const std::exception& e) {
-                problems.push_back(std::string("the compiled model could not be read: ") + e.what());
-            }
-            if (problems.empty()) {
-                set_status("Success! " + compile_job_.model_name() + ".mdl (" + summary + ")", StatusTone::Success);
-            } else {
-                std::string all;
-                for (const std::string& problem : problems)
-                    all += problem + "\n";
-                set_status("Compiled " + compile_job_.model_name() + ".mdl, but it differs from the export: " + problems.front(),
-                           StatusTone::Warning, std::move(all));
-            }
-            break;
         }
-        case CompileResult::Status::CompilerNotFound:
-            set_status("Compiler not found: " + compiler_path_, StatusTone::Error);
-            break;
-        case CompileResult::Status::Failed: {
-            const std::string reason = compiler_error(result->output);
-            set_status(reason.empty() ? "Compile failed, without any output from the compiler." : "Compile failed: " + reason,
-                       StatusTone::Error, last_lines(result->output, 30));
-            break;
+
+        // The built-in compiler takes the files in memory: only the .mdl reaches the folder.
+        const CompiledModel model = compile_model(export_files(sys, baked_, table_));
+        write_file_atomically(folder / from_utf8(safe + ".mdl"),
+                              {reinterpret_cast<const char*>(model.mdl.data()), model.mdl.size()});
+        // Read the model back: what the compiler made, and whether it is what was exported.
+        std::string summary;
+        std::vector<std::string> problems;
+        try {
+            const MdlInfo info = read_mdl(model.mdl);
+            summary = describe_mdl(info);
+            problems = compare_with_export(info, sys);
+        } catch (const std::exception& e) {
+            problems.push_back(std::string("the compiled model could not be read: ") + e.what());
         }
-        case CompileResult::Status::TimedOut:
-            set_status("Compile timed out.", StatusTone::Error,
-                       timeout_message(CompileOptions{}.timeout, settings_.loop) +
-                           (result->output.empty() ? "" : "\n\n" + last_lines(result->output, 30)));
-            break;
-        case CompileResult::Status::Cancelled:
-            set_status("Compile cancelled.", StatusTone::Warning);
-            break;
-        }
+        std::string detail;
+        for (const std::string& problem : problems)
+            detail += problem + "\n";
+        for (const std::string& warning : model.warnings)
+            detail += "studiomdl: " + warning + "\n";
+        if (problems.empty())
+            set_status("Success! " + safe + ".mdl written to " + where + " (" + summary + ")", StatusTone::Success,
+                       std::move(detail));
+        else
+            set_status("Compiled " + safe + ".mdl, but it differs from the export: " + problems.front(), StatusTone::Warning,
+                       std::move(detail));
+    } catch (const CompileFailed& e) {
+        set_status(std::string("Compile failed: ") + e.what(), StatusTone::Error);
     } catch (const std::exception& e) {
         set_status(std::string("Error: ") + e.what(), StatusTone::Error);
     }
@@ -392,12 +356,6 @@ native::Request EditorApp::request_for(DialogPurpose purpose)
         return {Kind::SaveFile, "Save settings", "particle_system.json", {"*.json"}, "Particle settings (*.json)", {}};
     case DialogPurpose::ExportFolder:
         return {Kind::SelectFolder, "Choose export folder", "", {}, "", {}};
-    case DialogPurpose::Compiler:
-#ifdef _WIN32
-        return {Kind::OpenFile, "Choose studiomdl", "", {"*.exe"}, "Programs (*.exe)", {}};
-#else
-        return {Kind::OpenFile, "Choose studiomdl", "", {}, "", {}};
-#endif
     case DialogPurpose::Texture:
         return {Kind::OpenFile, "Choose image", "", images, "Images (*.png, *.jpg, *.jpeg, *.bmp, *.tga)", {}};
     case DialogPurpose::GameFolder:
@@ -433,7 +391,6 @@ void EditorApp::open_dialog(DialogPurpose purpose)
     case DialogPurpose::Save: save_dialog_.open(); break;
     case DialogPurpose::ExportFolder: start.empty() ? export_dialog_.open() : export_dialog_.open_at(start); break;
     case DialogPurpose::GameFolder: start.empty() ? game_dialog_.open() : game_dialog_.open_at(start); break;
-    case DialogPurpose::Compiler: compiler_dialog_.open(); break;
     case DialogPurpose::Texture: texture_dialog_.open(); break;
     }
 }
@@ -454,7 +411,6 @@ void EditorApp::finish_dialog(DialogPurpose purpose, const std::optional<std::fi
         }
         break;
     case DialogPurpose::GameFolder: game_folder_edit_ = to_utf8(*path); break;
-    case DialogPurpose::Compiler: compiler_path_ = to_utf8(*path); break;
     case DialogPurpose::Texture:
         settings_.texture.file = to_utf8(*path);
         dirty_ = true;
@@ -465,7 +421,6 @@ void EditorApp::finish_dialog(DialogPurpose purpose, const std::optional<std::fi
 
 void EditorApp::draw_frame(double delta)
 {
-    poll_compile();
     poll_texture();
     if (dirty_)
         rebuild();
@@ -520,8 +475,6 @@ void EditorApp::draw_frame(double delta)
         finish_dialog(DialogPurpose::Save, p);
     if (auto p = load_dialog_.draw())
         finish_dialog(DialogPurpose::Load, p);
-    if (auto p = compiler_dialog_.draw())
-        finish_dialog(DialogPurpose::Compiler, p);
     if (auto p = export_dialog_.draw())
         finish_dialog(DialogPurpose::ExportFolder, p);
     if (auto p = texture_dialog_.draw())
@@ -536,7 +489,7 @@ void EditorApp::draw_frame(double delta)
 
 bool EditorApp::can_export() const
 {
-    return !compile_job_.busy() && !name_problem_ && !export_dir_problem_ && export_report_.blockers.empty();
+    return !name_problem_ && !export_dir_problem_ && export_report_.blockers.empty();
 }
 
 void EditorApp::draw_menu_bar()
@@ -945,14 +898,8 @@ void EditorApp::draw_middle_panel()
         wrapped_text(kError, *export_dir_problem_);
 
     ImGui::Checkbox("Compile .mdl", &auto_compile_);
-    if (auto_compile_) {
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(ui::px(-80));
-        ImGui::InputText("##compiler_path", &compiler_path_);
-        ImGui::SameLine();
-        if (ImGui::Button("Browse", ImVec2(ui::px(70), 0)))
-            open_dialog(DialogPurpose::Compiler);
-    }
+    ImGui::SetItemTooltip("Compile the export with the built-in studiomdl and write only the .mdl.\n"
+                          "Off: write the .qc, the .smd files and the .bmp instead.");
     ImGui::Dummy(ImVec2(0, ui::px(5)));
 
     const char* label = auto_compile_ ? "Export .mdl###export" : "Export SMD/QC###export";

@@ -1,6 +1,5 @@
 add_executable(particlemdl_tests
     main.cpp
-    fake_studiomdl.cpp
     test_compiler.cpp
     test_math.cpp
     test_life_cycle.cpp

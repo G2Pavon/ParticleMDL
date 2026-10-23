@@ -517,18 +517,31 @@ void export_model(const ParticleSystem& sys, const fs::path& out_dir)
     export_model(sys, baked, animation_table(sys, baked), out_dir);
 }
 
+ExportFiles export_files(const ParticleSystem& sys)
+{
+    const BakedPoses baked = bake(sys);
+    return export_files(sys, baked, animation_table(sys, baked));
+}
+
 ExportFiles export_files(const ParticleSystem& sys, const BakedPoses& baked, const AnimationTable& table)
+{
+    if (const auto problem = model_name_problem(sys.settings().model_name))
+        throw std::invalid_argument(*problem);
+    if (ExportReport report = analyze_export(sys, table, baked); !report.blockers.empty())
+        throw ExportBlocked(std::move(report.blockers));
+    return export_files_over_limits(sys, baked, table);
+}
+
+ExportFiles export_files_over_limits(const ParticleSystem& sys, const BakedPoses& baked, const AnimationTable& table)
 {
     const std::string& model_name = sys.settings().model_name;
     if (const auto problem = model_name_problem(model_name))
         throw std::invalid_argument(*problem);
+    require_built_from(sys, baked, table);
     // Every file, the texture included, uses the sanitized name, so the QC, the SMDs and the
     // .mdl all agree.
     const std::string safe = safe_model_name(model_name);
     const std::string tex_ref = safe + ".bmp";
-
-    if (ExportReport report = analyze_export(sys, table, baked); !report.blockers.empty())
-        throw ExportBlocked(std::move(report.blockers));
 
     const std::vector<std::uint8_t> bmp = encode_indexed_bmp(export_texture(sys.settings().texture));
     ExportFiles out{safe, {}};

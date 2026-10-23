@@ -8,9 +8,15 @@
 #include <doctest/doctest.h>
 
 #include <algorithm>
+#include <charconv>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 
+#include "Compiler.hpp"
 #include "Exporter.hpp"
 #include "SettingsJson.hpp"
 
@@ -284,4 +290,102 @@ TEST_CASE("the normal blocker names the normals over the limit")
     REQUIRE(it != report.blockers.end());
     CHECK(it->message.find(std::to_string(sys.normal_count()) + " normals") != std::string::npos);
     CHECK(it->message.find("Cluster Size") != std::string::npos);
+}
+
+// ---------------------------------------------------------------------------
+// The built-in compiler (studiomdl++) on the same models: it accepts and refuses the ones
+// Sven Co-op's studiomdl did, and counts the same bytes, frames, vertices and normals.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+ParticleSystem system_of(const char* settings)
+{
+    return ParticleSystem(settings_from_json(nlohmann::json::parse(settings), Settings{}).settings);
+}
+
+struct Outcome {
+    bool accepted = false;
+    std::vector<std::string> notes;   // the compiler's report, when it accepted the model
+    std::string error;                // its message, when it refused it
+};
+
+// Compiles past this program's own limit checks, to see what the compiler does.
+Outcome compile_unchecked(const ParticleSystem& sys)
+{
+    const BakedPoses baked = bake(sys);
+    try {
+        return {true, compile_model(export_files_over_limits(sys, baked, animation_table(sys, baked))).notes, {}};
+    } catch (const CompileFailed& e) {
+        return {false, {}, e.what()};
+    }
+}
+
+// The number after `marker` in the note that starts with `line`: the report line
+// "sequences   4176 bytes (31 frames) [0:02]" gives 4176 after "sequences" and 31 after "(".
+std::optional<long> reported(const Outcome& o, std::string_view line, std::string_view marker)
+{
+    for (std::string_view note : o.notes) {
+        if (!note.starts_with(line))
+            continue;
+        std::size_t at = note.find(marker);
+        if (at == std::string_view::npos)
+            return std::nullopt;
+        at += marker.size();
+        while (at < note.size() && note[at] == ' ')
+            ++at;
+        long value = 0;
+        if (std::from_chars(note.data() + at, note.data() + note.size(), value).ec != std::errc{})
+            return std::nullopt;
+        return value;
+    }
+    return std::nullopt;
+}
+
+} // namespace
+
+TEST_CASE("the built-in compiler measures sequences like the real studiomdl")
+{
+    for (const Verdict& v : kVerdicts) {
+        CAPTURE(v.name);
+        const Outcome o = compile_unchecked(system_of(v.settings));
+        CHECK(o.accepted == v.accepted);
+        if (v.accepted)
+            CHECK(reported(o, "sequences", "sequences").value_or(-1) == static_cast<long>(v.compiler_total));
+        else
+            CHECK(o.error.find("greate than 64K") != std::string::npos);   // its spelling
+    }
+}
+
+TEST_CASE("the built-in compiler cuts a sequence at 2048 frames like the real studiomdl")
+{
+    for (const FrameVerdict& v : kFrameVerdicts) {
+        CAPTURE(v.frames);
+        const Outcome o = compile_unchecked(system_of(v.settings));
+        REQUIRE(o.accepted);
+        CHECK(reported(o, "sequences", "(").value_or(-1) == v.compiler_frames);
+    }
+}
+
+TEST_CASE("the built-in compiler counts vertices like the real studiomdl")
+{
+    for (const VertexVerdict& v : kVertexVerdicts) {
+        CAPTURE(v.name);
+        const Outcome o = compile_unchecked(system_of(v.settings));
+        CHECK(o.accepted == v.accepted);
+        if (v.accepted)
+            CHECK(reported(o, "vertices", "(").value_or(-1) == v.vertices);
+        else
+            CHECK(o.error.find("too many vertices") != std::string::npos);
+    }
+}
+
+TEST_CASE("the built-in compiler counts normals like the real studiomdl")
+{
+    for (const NormalVerdict& v : kNormalVerdicts) {
+        CAPTURE(v.name);
+        const Outcome o = compile_unchecked(system_of(v.settings));
+        REQUIRE(o.accepted);
+        CHECK(reported(o, "vertices", "vertices, ").value_or(-1) == v.normals);
+    }
 }

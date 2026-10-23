@@ -40,7 +40,16 @@ if(EXISTS ${OUT}/over_limit)
     message(FATAL_ERROR "particlemdl_cli created a folder for an export it refused")
 endif()
 
-# A compiler that does not exist is reported, not ignored.
-run_cli(4 --settings ${SETTINGS} --out ${OUT}/nocompiler --compile ${OUT}/no-such-studiomdl)
+# --compile writes the .mdl and nothing else.
+run_cli(0 --settings ${SETTINGS} --out ${OUT}/compiled --compile)
+file(GLOB written RELATIVE ${OUT}/compiled ${OUT}/compiled/*)
+if(NOT written STREQUAL "smoke.mdl")
+    message(FATAL_ERROR "particlemdl_cli --compile wrote '${written}', not just smoke.mdl")
+endif()
+file(READ ${OUT}/compiled/smoke.mdl magic LIMIT 4 HEX)
+if(NOT magic STREQUAL "49445354")   # "IDST"
+    message(FATAL_ERROR "smoke.mdl does not start like a studio model")
+endif()
+run_cli(2 --settings ${SETTINGS} --out ${OUT}/x --compile studiomdl.exe)   # it takes no compiler any more
 
 file(REMOVE_RECURSE ${OUT})
