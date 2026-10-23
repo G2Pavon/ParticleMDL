@@ -165,9 +165,11 @@ TEST_CASE("validate snaps the texture size to a supported one")
     CHECK(snapped(64) == 64);
     CHECK(snapped(128) == 128);
     CHECK(snapped(256) == 256);
+    CHECK(snapped(512) == 512);
     CHECK(snapped(100) == 128);
     CHECK(snapped(96) == 64);     // a tie goes to the smaller size
-    CHECK(snapped(1000) == 256);
+    CHECK(snapped(384) == 256);
+    CHECK(snapped(1000) == 512);
     CHECK(snapped(-5) == 64);
     CHECK(snapped(0) == 64);
 }

@@ -7,7 +7,7 @@
 
 namespace gs {
 
-// Larger pictures are refused: a texture is at most 256 x 256, and decoding a huge
+// Larger pictures are refused: a texture is at most 512 x 512, and decoding a huge
 // one would only use memory. A 4096 x 4096 picture is 64 MB once decoded.
 inline constexpr int kMaxImageDimension = 4096;
 inline constexpr std::uintmax_t kMaxImageFileBytes = 64u << 20;

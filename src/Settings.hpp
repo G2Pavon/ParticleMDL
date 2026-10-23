@@ -11,7 +11,7 @@
 
 namespace gs {
 
-inline constexpr std::array<int, 3> kTextureSizes = {64, 128, 256};
+inline constexpr std::array<int, 4> kTextureSizes = {64, 128, 256, 512};
 
 // studiomdl refuses a model with MAXSTUDIOBONES (128) bones, so 127 at most:
 // the root plus 126 particle bones.
