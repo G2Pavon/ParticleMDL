@@ -1,0 +1,86 @@
+#include "cmdlib.hpp"
+
+#include "studiomdl/studiomdl.hpp"
+
+#include <algorithm>
+#include <cstdarg>
+#include <iostream>
+#include <stdexcept>
+
+
+void error(const std::string &message)
+{
+    std::string text = message;
+    while (!text.empty() && (text.back() == '\n' || text.back() == '\r'))
+        text.pop_back();
+    throw studiomdl::CompileError(text);
+}
+
+std::unique_ptr<std::ofstream> safe_open_write(const std::filesystem::path &filename)
+{
+    auto file = std::make_unique<std::ofstream>(filename, std::ios::binary);
+    if (!file || !file->is_open())
+        error("Error opening " + filename.string());
+    return file;
+}
+
+void safe_write(std::ofstream &file, const void *buffer, std::size_t count)
+{
+    if (!file.write(reinterpret_cast<const char *>(buffer), count))
+        error("File write failure");
+}
+
+std::string strip_extension(const std::string &filename)
+{
+    return std::filesystem::path(filename).stem().string();
+}
+
+bool case_insensitive_compare(const std::string &str1, const std::string &str2)
+{
+    if (str1.size() != str2.size())
+    {
+        return false;
+    }
+    return std::equal(str1.begin(), str1.end(), str2.begin(),
+                      [](char c1, char c2)
+                      {
+                          return std::tolower(static_cast<unsigned char>(c1)) == std::tolower(static_cast<unsigned char>(c2));
+                      });
+}
+
+bool case_insensitive_n_compare(const std::string &str1, const std::string &str2, size_t n)
+{
+    if (str1.size() < n || str2.size() < n)
+    {
+        return false;
+    }
+    return std::equal(str1.begin(), str1.begin() + n, str2.begin(),
+                      [](char c1, char c2)
+                      {
+                          return std::tolower(static_cast<unsigned char>(c1)) == std::tolower(static_cast<unsigned char>(c2));
+                      });
+}
+
+std::string to_lowercase(const std::string &str)
+{
+    std::string result = str;
+    std::transform(result.begin(), result.end(), result.begin(),
+                   [](unsigned char c)
+                   { return std::tolower(c); });
+    return result;
+}
+
+std::string extension_to_lowercase(const std::string &filename)
+{
+    size_t dot_pos = filename.find_last_of('.');
+    if (dot_pos == std::string::npos)
+    {
+        return filename;
+    }
+
+    std::string extension = filename.substr(dot_pos);
+    std::string name = filename.substr(0, dot_pos);
+    extension = to_lowercase(extension);
+
+    return name + extension;
+}

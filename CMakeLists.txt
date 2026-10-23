@@ -117,6 +117,29 @@ if(WIN32)
 endif()
 
 # ---------------------------------------------------------------------------
+# studiomdl++ (G2Pavon/studiomdlPlusPlus, lib branch, commit 73bee88; Half-Life 1
+# SDK license): compiles the exported QC, SMDs and texture into the .mdl in memory.
+# ---------------------------------------------------------------------------
+set(STUDIOMDL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/studiomdl)
+add_library(studiomdl STATIC
+    ${STUDIOMDL_DIR}/src/utils/cmdlib.cpp
+    ${STUDIOMDL_DIR}/src/utils/mathlib.cpp
+    ${STUDIOMDL_DIR}/src/utils/stripification.cpp
+    ${STUDIOMDL_DIR}/src/format/image/bmpread.cpp
+    ${STUDIOMDL_DIR}/src/filesystem.cpp
+    ${STUDIOMDL_DIR}/src/format/qc.cpp
+    ${STUDIOMDL_DIR}/src/studiomdl.cpp
+    ${STUDIOMDL_DIR}/src/writemdl.cpp)
+target_include_directories(studiomdl SYSTEM PUBLIC ${STUDIOMDL_DIR}/include)
+target_include_directories(studiomdl PRIVATE ${STUDIOMDL_DIR}/src)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    # Third-party code, kept as is; no fused multiply-add, so the .mdl is the same on every architecture.
+    target_compile_options(studiomdl PRIVATE -w -ffp-contract=off)
+elseif(MSVC)
+    target_compile_options(studiomdl PRIVATE /W0 /fp:precise /utf-8)
+endif()
+
+# ---------------------------------------------------------------------------
 # Core: settings, simulation, textures, export and compiler (no GUI dependencies)
 # ---------------------------------------------------------------------------
 add_library(particles_core STATIC
@@ -218,6 +241,8 @@ endif()
 include(GNUInstallDirs)
 install(TARGETS particlemdl particlemdl_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES LICENSE README.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
+# The built-in compiler is Half-Life 1 SDK code, whose license must go with it.
+install(FILES third_party/studiomdl/LICENSE DESTINATION ${CMAKE_INSTALL_DOCDIR} RENAME LICENSE.studiomdl)
 
 if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
     set(CPACK_PACKAGE_NAME "particlemdl")
