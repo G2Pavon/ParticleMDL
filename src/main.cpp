@@ -13,6 +13,7 @@
 #include <string_view>
 
 #include <imgui.h>
+#include <imgui_internal.h>   // the open popups, to tell a dropdown's list from other popups
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 #include <GLFW/glfw3.h>
@@ -22,6 +23,15 @@
 #include "Widgets.hpp"
 
 namespace {
+
+// Whether a dropdown's list (the popup ImGui opens for a combo, named "##Combo_<depth>") is open.
+bool dropdown_open()
+{
+    for (const ImGuiPopupData& popup : GImGui->OpenPopupStack)
+        if (popup.Window && std::string_view(popup.Window->Name).starts_with("##Combo_"))
+            return true;
+    return false;
+}
 
 void glfw_error(int code, const char* desc)
 {
@@ -93,9 +103,6 @@ public:
         ImGui::CreateContext();
         ImGuiIO& io = ImGui::GetIO();
         io.IniFilename = nullptr;
-        // The keyboard moves through the controls: Up and Down through the items of an open dropdown,
-        // Enter picks one, Escape closes it.
-        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
         gs::theme::apply(ImGui::GetStyle());
         ImGui::GetStyle().ScaleAllSizes(scale);
         // Rasterize the font at its real pixel size so it stays crisp.
@@ -168,6 +175,14 @@ int run_gui()
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
+        // The arrow keys move through the items of an open dropdown (Enter picks one, Escape closes
+        // it) and nowhere else: keyboard navigation is on only while a dropdown is open. Tab still
+        // moves between the fields either way.
+        ImGuiIO& io = ImGui::GetIO();
+        if (dropdown_open())
+            io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+        else
+            io.ConfigFlags &= ~ImGuiConfigFlags_NavEnableKeyboard;
         ImGui::NewFrame();
         app.draw_frame(delta);
         ImGui::Render();
