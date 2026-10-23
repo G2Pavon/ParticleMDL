@@ -111,6 +111,22 @@ private:
 // the animation size also says the 64 KB check may be off for this compiler.
 std::vector<std::string> compare_with_export(const MdlInfo& mdl, const ParticleSystem& sys);
 
+// One file of an export.
+struct ExportFile {
+    std::string name;    // UTF-8, without a folder
+    std::string bytes;
+};
+
+struct ExportFiles {
+    std::string safe_name;           // safe_model_name() of the model name: <safe_name>.qc and .mdl
+    std::vector<ExportFile> files;   // <safe>.bmp, <safe>.qc, <safe>_ref.smd and <safe>_anim.smd
+};
+
+// The files of an export, in memory: the texture, the QC and the two SMDs. `baked` and `table`
+// must be those of `sys` (see export_model). Throws std::invalid_argument for an unusable model
+// name and ExportBlocked for an export over studiomdl's limits.
+ExportFiles export_files(const ParticleSystem& sys, const BakedPoses& baked, const AnimationTable& table);
+
 // Writes <safe>.bmp, <safe>.qc, <safe>_ref.smd and <safe>_anim.smd into
 // out_dir. Geometry and animation are pre-rotated by -90 deg around Z to cancel
 // the +90 deg studiomdl applies on import. Throws std::invalid_argument for an

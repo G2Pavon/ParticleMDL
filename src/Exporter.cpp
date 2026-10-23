@@ -23,11 +23,6 @@ namespace {
 
 namespace fs = std::filesystem;
 
-std::span<const char> as_chars(const std::vector<std::uint8_t>& bytes)
-{
-    return {reinterpret_cast<const char*>(bytes.data()), bytes.size()};
-}
-
 template <typename... Args>
 void emit(std::string& out, std::format_string<Args...> fmt, Args&&... args)
 {
@@ -522,29 +517,40 @@ void export_model(const ParticleSystem& sys, const fs::path& out_dir)
     export_model(sys, baked, animation_table(sys, baked), out_dir);
 }
 
-void export_model(const ParticleSystem& sys, const BakedPoses& baked, const AnimationTable& table, const fs::path& out_dir)
+ExportFiles export_files(const ParticleSystem& sys, const BakedPoses& baked, const AnimationTable& table)
 {
     const std::string& model_name = sys.settings().model_name;
     if (const auto problem = model_name_problem(model_name))
         throw std::invalid_argument(*problem);
-    // Every file, the texture included, uses the sanitized name, so the QC,
-    // the SMDs and the cleanup after compiling all agree.
+    // Every file, the texture included, uses the sanitized name, so the QC, the SMDs and the
+    // .mdl all agree.
     const std::string safe = safe_model_name(model_name);
     const std::string tex_ref = safe + ".bmp";
-
-    std::error_code ec;
-    if (!fs::is_directory(out_dir, ec))
-        throw std::runtime_error("export folder does not exist: " + to_utf8(out_dir));
 
     if (ExportReport report = analyze_export(sys, table, baked); !report.blockers.empty())
         throw ExportBlocked(std::move(report.blockers));
 
-    StagedFiles files(out_dir);
-    files.add(from_utf8(tex_ref), as_chars(encode_indexed_bmp(export_texture(sys.settings().texture))));
-    files.add(from_utf8(safe + ".qc"), make_qc(sys, baked, safe, tex_ref));
-    files.add(from_utf8(safe + "_ref.smd"), make_ref_smd(sys, tex_ref));
-    files.add(from_utf8(safe + "_anim.smd"), make_anim_smd(sys, table));
-    files.commit();
+    const std::vector<std::uint8_t> bmp = encode_indexed_bmp(export_texture(sys.settings().texture));
+    ExportFiles out{safe, {}};
+    out.files.push_back({tex_ref, std::string(bmp.begin(), bmp.end())});
+    out.files.push_back({safe + ".qc", make_qc(sys, baked, safe, tex_ref)});
+    out.files.push_back({safe + "_ref.smd", make_ref_smd(sys, tex_ref)});
+    out.files.push_back({safe + "_anim.smd", make_anim_smd(sys, table)});
+    return out;
+}
+
+void export_model(const ParticleSystem& sys, const BakedPoses& baked, const AnimationTable& table, const fs::path& out_dir)
+{
+    if (const auto problem = model_name_problem(sys.settings().model_name))
+        throw std::invalid_argument(*problem);
+    std::error_code ec;
+    if (!fs::is_directory(out_dir, ec))
+        throw std::runtime_error("export folder does not exist: " + to_utf8(out_dir));
+
+    StagedFiles staged(out_dir);
+    for (const ExportFile& file : export_files(sys, baked, table).files)
+        staged.add(from_utf8(file.name), file.bytes);
+    staged.commit();
 }
 
 } // namespace gs
