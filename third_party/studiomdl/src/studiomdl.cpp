@@ -1093,15 +1093,11 @@ int QcCompiler::find_vertex_normal_index(Model *pmodel, const Normal *pnormal)
 	const int16_t id = static_cast<int16_t>(pnormal->bone_id);
 	const int16_t sr = static_cast<int16_t>(pnormal->skinref);
 
-	const int8_t qx = static_cast<int8_t>(std::round(pnormal->pos[0] * 127.0f));
-	const int8_t qy = static_cast<int8_t>(std::round(pnormal->pos[1] * 127.0f));
-	const int8_t qz = static_cast<int8_t>(std::round(pnormal->pos[2] * 127.0f));
-
+	// ParticleMDL: keyed on the bone and the texture only, so every earlier normal of both is
+	// compared, in the order they came, as the original studiomdl does. With the direction in the
+	// key too, two normals under the blend angle apart that rounded differently were both kept.
 	const uint64_t key = (static_cast<uint64_t>(static_cast<uint16_t>(id)) << 48) |
-						 (static_cast<uint64_t>(static_cast<uint16_t>(sr)) << 32) |
-						 (static_cast<uint64_t>(static_cast<uint8_t>(qx)) << 24) |
-						 (static_cast<uint64_t>(static_cast<uint8_t>(qy)) << 16) |
-						 (static_cast<uint64_t>(static_cast<uint8_t>(qz)));
+						 (static_cast<uint64_t>(static_cast<uint16_t>(sr)) << 32);
 
 	auto it = unique_normals.find(key);
 	if (it != unique_normals.end())
