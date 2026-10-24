@@ -4,10 +4,10 @@ $cdtexture "."
 $scale 1.0
 $origin 0 0 0 -90
 
-$bbox -38.00 -34.00 -36.00 42.00 35.00 137.00
+$bbox -49.00 -51.00 -18.00 55.00 47.00 157.00
 
 $texrendermode "smoke.bmp" additive
 
 $body "studio" "smoke_ref"
 
-$sequence "idle" "smoke_anim" loop fps 15
+$sequence "idle" "smoke_anim" loop fps 60

@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 
 #include <algorithm>
+#include <array>
 #include <set>
 #include <string>
 
@@ -17,10 +18,8 @@ struct AcceptedWarning {
     std::string_view preset;
     std::string_view text;
 };
-constexpr AcceptedWarning kAccepted[] = {
-    // Tiny flakes drifting in a big volume: any static fix still streaks, and fewer flakes would change the effect.
-    {"Ambient Ash", "cannot hide a respawn"},
-};
+// None now: Ambient Ash, the last, streaked at each respawn until it folded its quads.
+constexpr std::array<AcceptedWarning, 0> kAccepted{};
 
 const AcceptedWarning* accepted_for(std::string_view preset)
 {

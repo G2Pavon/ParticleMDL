@@ -4,7 +4,7 @@ $cdtexture "."
 $scale 1.0
 $origin 0 0 0 -90
 
-$bbox -24.00 -24.00 -18.00 25.00 25.00 18.00
+$bbox -18.00 -18.00 -18.00 18.00 18.00 18.00
 
 $texrendermode "sun.bmp" additive
 
