@@ -472,6 +472,7 @@ void EditorApp::set_status(std::string text, StatusTone tone, std::string detail
     status_ = std::move(text);
     status_tone_ = tone;
     status_detail_ = std::move(detail);
+    status_frame_ = ImGui::GetFrameCount();
 }
 
 // ---------------------------------------------------------------------------
@@ -554,6 +555,13 @@ void EditorApp::finish_dialog(DialogPurpose purpose, const std::optional<std::fi
 
 void EditorApp::draw_frame(double delta)
 {
+    // A setting or a seed changed last frame: what the status said (an export, an error) is about
+    // the effect before it, so it goes, unless the change itself just said something.
+    if (dirty_ && status_frame_ != ImGui::GetFrameCount() - 1) {
+        status_.clear();
+        status_detail_.clear();
+        status_tone_ = StatusTone::Success;
+    }
     poll_texture();
     if (dirty_)
         rebuild();

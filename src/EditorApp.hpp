@@ -101,6 +101,7 @@ private:
     std::string status_;
     std::string status_detail_;   // the warnings, differences or compiler notes behind the status
     StatusTone status_tone_ = StatusTone::Success;
+    int status_frame_ = -1;   // the ImGui frame the status was set in
 
     FileDialog save_dialog_;
     FileDialog load_dialog_;
