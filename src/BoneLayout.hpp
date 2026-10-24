@@ -7,29 +7,36 @@ namespace gs {
 // The skeleton studiomdl is given: each particle's bone followed by its corner bones, in particle
 // order. A particle's bone is a root bone (no parent; the engine takes any number of them) and
 // carries its quads; with vertex-bone scaling each distinct corner of the quads has a bone of its
-// own, hung on the particle's, that moves the corner to scale the quads. There is no shared root,
-// which would carry nothing and cost a bone. Plain arithmetic: nothing is stored per bone.
+// own, hung on the particle's, that moves the corner to scale the quads. Without particle bones
+// (corner_bones_only() in Settings.hpp) the corner bones are the roots and carry the whole motion.
+// There is no shared root, which would carry nothing and cost a bone. Plain arithmetic: nothing
+// is stored per bone.
 class BoneLayout {
 public:
     BoneLayout() = default;
-    BoneLayout(int particles, int corners_per_particle) noexcept;
+    BoneLayout(int particles, int corners_per_particle, bool particle_bones = true) noexcept;
 
-    int count() const noexcept { return particles_ * stride(); }
+    int count() const noexcept { return particles_ * per_particle(); }
+    int per_particle() const noexcept { return (particle_bones_ ? 1 : 0) + corners_; }
     int particles() const noexcept { return particles_; }
     int corners_per_particle() const noexcept { return corners_; }   // 0 without vertex bones
     bool vertex_bones() const noexcept { return corners_ > 0; }
+    bool particle_bones() const noexcept { return particle_bones_; }
 
-    int particle_bone(int particle) const noexcept { return particle * stride(); }
-    int corner_bone(int particle, int corner) const noexcept { return particle_bone(particle) + 1 + corner; }
+    // The particle's own bone; only with particle_bones().
+    int particle_bone(int particle) const noexcept { return particle * per_particle(); }
+    int corner_bone(int particle, int corner) const noexcept
+    {
+        return particle * per_particle() + (particle_bones_ ? 1 : 0) + corner;
+    }
 
-    int parent(int bone) const noexcept;   // -1 for a particle's bone, which is a root
+    int parent(int bone) const noexcept;   // -1 for a root: a particle's bone, or any bone without them
     std::string name(int bone) const;      // "p_<bone>" or "c_<bone>", as in the SMD
 
 private:
-    int stride() const noexcept { return 1 + corners_; }   // bones of one particle
-
     int particles_ = 0;
     int corners_ = 0;
+    bool particle_bones_ = true;
 };
 
 } // namespace gs

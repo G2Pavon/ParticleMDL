@@ -43,10 +43,23 @@ TEST_CASE("the quads of a box share eight corners, the other geometries share no
 
 TEST_CASE("bones per particle count the shared corners once")
 {
-    CHECK(bones_per_particle(Geometry::VolumetricBox, ScaleMode::VertexBone) == 9);
-    CHECK(bones_per_particle(Geometry::VolumetricBox, ScaleMode::Static) == 1);
-    CHECK(bones_per_particle(Geometry::TriPlanarQuads, ScaleMode::VertexBone) == 13);
-    CHECK(max_particles(Geometry::VolumetricBox, ScaleMode::VertexBone) == 14);
+    CHECK(bones_per_particle(Geometry::VolumetricBox, ScaleMode::VertexBone, 10) == 9);
+    CHECK(bones_per_particle(Geometry::VolumetricBox, ScaleMode::Static, 10) == 1);
+    CHECK(bones_per_particle(Geometry::TriPlanarQuads, ScaleMode::VertexBone, 9) == 13);
+}
+
+TEST_CASE("past the count the particle's bone fits, the corner bones carry the particle alone")
+{
+    // 127 bones: 14 boxes of 1 + 8 bones, or 15 of 8 corner bones alone.
+    CHECK_FALSE(corner_bones_only(Geometry::VolumetricBox, ScaleMode::VertexBone, 14));
+    CHECK(corner_bones_only(Geometry::VolumetricBox, ScaleMode::VertexBone, 15));
+    CHECK(bones_per_particle(Geometry::VolumetricBox, ScaleMode::VertexBone, 15) == 8);
+    CHECK_FALSE(corner_bones_only(Geometry::VolumetricBox, ScaleMode::Static, 127));
+    CHECK(max_particles(Geometry::VolumetricBox, ScaleMode::VertexBone) == 15);
+    CHECK(max_particles(Geometry::SingleQuad, ScaleMode::VertexBone) == 31);
+    CHECK(max_particles(Geometry::CrossedQuads, ScaleMode::VertexBone) == 15);
+    CHECK(max_particles(Geometry::TriPlanarQuads, ScaleMode::VertexBone) == 10);
+    CHECK(max_particles(Geometry::SingleQuad, ScaleMode::Static) == 127);
 }
 
 TEST_CASE("every vertex of every quad maps to the corner at its position")

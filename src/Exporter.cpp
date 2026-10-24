@@ -299,6 +299,19 @@ AnimationTable animation_table(const ParticleSystem& sys, const BakedPoses& bake
         for (int i = 0; i < sys.num_particles(); ++i) {
             // Every bone in every frame: studiomdl puts a missing bone at the origin.
             const ParticlePose& pose = baked.at(frame, i);
+            if (!bones.particle_bones()) {
+                // Each corner bone carries the whole motion: it moves its corner from where the mesh
+                // has it to where the particle puts it, without turning.
+                for (int corner = 0; corner < bones.corners_per_particle(); ++corner) {
+                    const Vec3 rest = sys.corners()[static_cast<std::size_t>(corner)];
+                    const Vec3 at = pose.pos + ParticleSystem::apply_static_rotation(rest * pose.scale, pose.rot.x,
+                                                                                     pose.rot.y, pose.rot.z);
+                    const Vec3 move = at - rest;
+                    t.values[static_cast<std::size_t>(frame) * t.bones + bones.corner_bone(i, corner)] = {move.x, move.y, move.z,
+                                                                                                         0.0, 0.0, 0.0};
+                }
+                continue;
+            }
             const Vec3 rot = sys.has_micro_rotation() ? studio_angles(pose.rot) : Vec3{};
             t.values[static_cast<std::size_t>(frame) * t.bones + bones.particle_bone(i)] = {pose.pos.x, pose.pos.y, pose.pos.z,
                                                                                             rot.x, rot.y, rot.z};
@@ -485,7 +498,7 @@ ExportReport analyze_export(const ParticleSystem& sys, const AnimationTable& tab
         if (sys.bones().vertex_bones())
             message += std::format(" Vertex-bone scaling uses {} bones per particle: turning it off or using fewer "
                                    "quads saves the most.",
-                                   1 + sys.bones().corners_per_particle());
+                                   sys.bones().per_particle());
         r.blockers.push_back({ExportBlocker::Kind::SequenceTooLarge, std::move(message)});
     }
     if (r.vertices > kMaxStudioVertices) {

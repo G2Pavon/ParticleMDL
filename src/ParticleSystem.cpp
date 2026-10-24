@@ -136,10 +136,11 @@ ParticleSystem::ParticleSystem(const Settings& settings) : settings_(validated(s
     }
 
     const bool vertex_bones = s.scale_mode == ScaleMode::VertexBone;
-    const int num_particles = std::min(s.count, kMaxBones / bones_per_particle(s.geometry, s.scale_mode));
-    bones_ = BoneLayout(num_particles, vertex_bones ? static_cast<int>(corners_.size()) : 0);
+    const int num_particles = std::min(s.count, max_particles(s.geometry, s.scale_mode));
+    bones_ = BoneLayout(num_particles, vertex_bones ? static_cast<int>(corners_.size()) : 0,
+                        !corner_bones_only(s.geometry, s.scale_mode, num_particles));
     // bones_per_particle() is what the settings are checked with before there is a system.
-    assert(1 + bones_.corners_per_particle() == bones_per_particle(s.geometry, s.scale_mode));
+    assert(bones_.per_particle() == bones_per_particle(s.geometry, s.scale_mode, num_particles));
 
     // Deterministic pseudo-random seeds: the same settings always give the same effect.
     particles_.reserve(num_particles);

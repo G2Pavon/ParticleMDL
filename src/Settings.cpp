@@ -22,14 +22,21 @@ int corners_for(Geometry g) noexcept
     return g == Geometry::VolumetricBox ? 8 : quads_for(g) * 4;
 }
 
-int bones_per_particle(Geometry g, ScaleMode s) noexcept
+bool corner_bones_only(Geometry g, ScaleMode s, int count) noexcept
 {
-    return s == ScaleMode::VertexBone ? 1 + corners_for(g) : 1;
+    return s == ScaleMode::VertexBone && count > kMaxBones / (1 + corners_for(g));
+}
+
+int bones_per_particle(Geometry g, ScaleMode s, int count) noexcept
+{
+    if (s != ScaleMode::VertexBone)
+        return 1;
+    return corners_for(g) + (corner_bones_only(g, s, count) ? 0 : 1);
 }
 
 int max_particles(Geometry g, ScaleMode s) noexcept
 {
-    return kMaxBones / bones_per_particle(g, s);
+    return kMaxBones / (s == ScaleMode::VertexBone ? corners_for(g) : 1);
 }
 
 void enforce_bone_limits(Settings& s) noexcept

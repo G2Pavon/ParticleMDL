@@ -209,9 +209,16 @@ bool round_whole_values(Settings& s) noexcept;
 int quads_for(Geometry g) noexcept;
 // Distinct corner positions of a geometry. The six quads of a box share eight; the others share none.
 int corners_for(Geometry g) noexcept;
-// Bones of one particle: its own, and with vertex bones one for each corner. The settings are
-// checked with this before there is a system; ParticleSystem builds its BoneLayout to agree.
-int bones_per_particle(Geometry g, ScaleMode s) noexcept;
+// With vertex bones a particle has its own bone, which carries its motion, and a bone for each
+// corner that moves the corner to scale the quads. For more particles than that fits in kMaxBones
+// the particle's own bone is left out and each corner bone carries the whole motion: more
+// particles fit, but every corner moves on all three axes (more animation data) and does not
+// turn, so the normals stay as in the mesh (an Additive entity does not use them).
+bool corner_bones_only(Geometry g, ScaleMode s, int count) noexcept;
+// Bones of one particle when there are `count`: its own unless corner_bones_only(), and with vertex
+// bones one for each corner. The settings are checked with this before there is a system;
+// ParticleSystem builds its BoneLayout to agree.
+int bones_per_particle(Geometry g, ScaleMode s, int count) noexcept;
 int max_particles(Geometry g, ScaleMode s) noexcept;
 void enforce_bone_limits(Settings& s) noexcept;
 

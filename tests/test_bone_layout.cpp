@@ -49,6 +49,21 @@ TEST_CASE("with corner bones each particle's corners follow its own bone and han
     CHECK(b.name(9) == "c_9");
 }
 
+TEST_CASE("without particle bones every corner bone is a root")
+{
+    const BoneLayout b(2, 4, false);
+    CHECK(b.count() == 8);
+    CHECK(b.per_particle() == 4);
+    CHECK_FALSE(b.particle_bones());
+    CHECK(b.corner_bone(0, 0) == 0);
+    CHECK(b.corner_bone(1, 3) == 7);
+    for (int bone = 0; bone < 8; ++bone) {
+        CHECK(b.parent(bone) == -1);
+        CHECK(b.name(bone) == "c_" + std::to_string(bone));
+    }
+    CHECK(BoneLayout(3, 0, false).particle_bones());   // static particles always have their bone
+}
+
 TEST_CASE("the layout of a system agrees with bones_per_particle and the bone limit")
 {
     for (const Geometry g : {Geometry::SingleQuad, Geometry::CrossedQuads, Geometry::TriPlanarQuads, Geometry::VolumetricBox})
@@ -62,8 +77,8 @@ TEST_CASE("the layout of a system agrees with bones_per_particle and the bone li
             const ParticleSystem sys(s);
             const BoneLayout& b = sys.bones();
             CHECK(b.particles() == sys.num_particles());
-            CHECK(1 + b.corners_per_particle() == bones_per_particle(g, mode));
-            CHECK(b.count() == sys.num_particles() * bones_per_particle(g, mode));
+            CHECK(b.per_particle() == bones_per_particle(g, mode, sys.num_particles()));
+            CHECK(b.count() == sys.num_particles() * b.per_particle());
             CHECK(b.count() <= kMaxBones);   // studiomdl refuses 128
             // The last particle's last bone is the last bone.
             const int last = sys.num_particles() - 1;

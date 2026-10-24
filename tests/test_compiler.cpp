@@ -240,21 +240,25 @@ TEST_CASE("the animated model moves where the preview shows it")
     // box of the preview's animation, for each geometry and scaling, spinning and not.
     for (Geometry g : {Geometry::SingleQuad, Geometry::CrossedQuads, Geometry::TriPlanarQuads, Geometry::VolumetricBox})
         for (ScaleMode mode : {ScaleMode::Static, ScaleMode::VertexBone})
-            for (bool spin : {false, true}) {
+            for (bool spin : {false, true})
+                for (bool most : {false, true}) {   // the most: corner bones alone with vertex bones
                 CAPTURE(static_cast<int>(g));
                 CAPTURE(static_cast<int>(mode));
                 CAPTURE(spin);
+                CAPTURE(most);
                 Settings s = wide_effect();
                 s.geometry = g;
                 s.scale_mode = mode;
-                s.count = 8;
+                s.count = most ? max_particles(g, mode) : 8;
                 s.scale_start = 2.0;
                 s.scale_end = 0.5;
                 if (spin)
                     s.particle_spin = {40, 70, 90};
                 const ParticleSystem sys(s);
+                REQUIRE(sys.bones().particle_bones() == !(most && mode == ScaleMode::VertexBone));
                 const BakedPoses baked = bake(sys);
                 const MdlInfo info = read_mdl(compile_model(export_files(sys)).mdl);
+                CHECK(compare_with_export(info, sys).empty());
                 const ParticleSystem::Bounds b = animation_bounds(sys, baked);
                 const MdlSequence& seq = info.sequences.at(0);
                 CHECK(seq.bbmin[0] == doctest::Approx(b.min.x).epsilon(0.002));
