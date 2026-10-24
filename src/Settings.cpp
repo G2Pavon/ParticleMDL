@@ -27,8 +27,15 @@ bool corner_bones_only(Geometry g, ScaleMode s, int count) noexcept
     return s == ScaleMode::VertexBone && count > kMaxBones / (1 + corners_for(g));
 }
 
+bool folds(Geometry g) noexcept
+{
+    return g == Geometry::SingleQuad || g == Geometry::CrossedQuads;
+}
+
 int bones_per_particle(Geometry g, ScaleMode s, int count) noexcept
 {
+    if (s == ScaleMode::Folding)
+        return 2;
     if (s != ScaleMode::VertexBone)
         return 1;
     return corners_for(g) + (corner_bones_only(g, s, count) ? 0 : 1);
@@ -36,7 +43,7 @@ int bones_per_particle(Geometry g, ScaleMode s, int count) noexcept
 
 int max_particles(Geometry g, ScaleMode s) noexcept
 {
-    return kMaxBones / (s == ScaleMode::VertexBone ? corners_for(g) : 1);
+    return kMaxBones / (s == ScaleMode::VertexBone ? corners_for(g) : s == ScaleMode::Folding ? 2 : 1);
 }
 
 void enforce_bone_limits(Settings& s) noexcept
@@ -128,7 +135,11 @@ bool validate(Settings& s)
     changed |= clamp_value(s.floor_height, -kMaxFloorHeight, kMaxFloorHeight);
     changed |= clamp_value(s.cluster_size, 1, kMaxClusterSize);
     changed |= clamp_value(s.cluster_radius, 0.0, kMaxClusterRadius);
-    if (s.scale_mode == ScaleMode::VertexBone && s.cluster_size != 1) {
+    if (s.scale_mode == ScaleMode::Folding && !folds(s.geometry)) {
+        s.scale_mode = ScaleMode::Static;   // the quads of a tri-planar or a box do not fold along one line
+        changed = true;
+    }
+    if (s.scale_mode != ScaleMode::Static && s.cluster_size != 1) {
         s.cluster_size = 1;   // the corners of a quad are bones; a cluster's copies would each need their own
         changed = true;
     }

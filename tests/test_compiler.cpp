@@ -239,7 +239,7 @@ TEST_CASE("the animated model moves where the preview shows it")
     // studiomdl measures the box of the sequence from the vertices in every frame: it must be the
     // box of the preview's animation, for each geometry and scaling, spinning and not.
     for (Geometry g : {Geometry::SingleQuad, Geometry::CrossedQuads, Geometry::TriPlanarQuads, Geometry::VolumetricBox})
-        for (ScaleMode mode : {ScaleMode::Static, ScaleMode::VertexBone})
+        for (ScaleMode mode : {ScaleMode::Static, ScaleMode::VertexBone, ScaleMode::Folding})
             for (bool spin : {false, true})
                 for (bool most : {false, true}) {   // the most: corner bones alone with vertex bones
                 CAPTURE(static_cast<int>(g));

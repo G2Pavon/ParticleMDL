@@ -75,6 +75,10 @@ float as_read_by_studiomdl(double v);
 // its quantization and run-length coding of the values as written to the SMD.
 std::size_t sequence_bytes(const AnimationTable& table);
 std::size_t sequence_bytes(const ParticleSystem& sys);
+// All the values studiomdl writes, what MdlSequence::value_bytes reads back. The measure above
+// is these and the last bone's 12 bytes of offsets when that bone holds the most, as a particle's
+// last bone usually does; a fold bone holds less than its offsets, and the measure then peaks earlier.
+std::size_t sequence_value_bytes(const AnimationTable& table);
 
 // A limit that studiomdl enforces. An export that hits one cannot be compiled,
 // so it is refused instead of written.

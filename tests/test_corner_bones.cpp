@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cctype>
 #include <set>
 #include <sstream>
@@ -143,4 +144,86 @@ TEST_CASE("the reference mesh of a box names the shared corner bones, and no bon
     CHECK(bones_in_triangles.size() == 3 * 8);
     CHECK(*bones_in_triangles.begin() == 1);
     CHECK(*bones_in_triangles.rbegin() == 3 * 9 - 1);
+}
+
+TEST_CASE("folding quads take two bones each and only single or crossed quads fold")
+{
+    CHECK(folds(Geometry::SingleQuad));
+    CHECK(folds(Geometry::CrossedQuads));
+    CHECK_FALSE(folds(Geometry::TriPlanarQuads));
+    CHECK_FALSE(folds(Geometry::VolumetricBox));
+    CHECK(bones_per_particle(Geometry::SingleQuad, ScaleMode::Folding, 10) == 2);
+    CHECK(max_particles(Geometry::CrossedQuads, ScaleMode::Folding) == 63);
+
+    Settings box;
+    box.geometry = Geometry::VolumetricBox;
+    box.scale_mode = ScaleMode::Folding;
+    CHECK(validate(box));
+    CHECK(box.scale_mode == ScaleMode::Static);
+    Settings cluster;
+    cluster.scale_mode = ScaleMode::Folding;
+    cluster.cluster_size = 5;
+    CHECK(validate(cluster));
+    CHECK(cluster.cluster_size == 1);
+}
+
+TEST_CASE("a folding quad has no area on both sides of every jump, so none is drawn")
+{
+    // Every end behavior; the frames around each rebirth (and, hiding, each death) are folded flat.
+    for (int e = 0; e < static_cast<int>(enum_names<EndBehavior>().size()); ++e)
+        for (Geometry g : {Geometry::SingleQuad, Geometry::CrossedQuads}) {
+            CAPTURE(e);
+            Settings s;
+            s.geometry = g;
+            s.scale_mode = ScaleMode::Folding;
+            s.end_behavior = static_cast<EndBehavior>(e);
+            s.count = 30;
+            s.duration = 2.0;
+            s.fps = 15;
+            const ParticleSystem sys(s);
+            const BakedPoses b = bake(sys);
+            const int steps = sys.loop_steps();
+            int drawn_jumps = 0, folds_seen = 0;
+            for (int i = 0; i < sys.num_particles(); ++i) {
+                auto drawn = [](const ParticlePose& p) { return p.visible && ParticleSystem::has_area(p.scale, p.fold); };
+                auto step = [&](int f) {
+                    const Vec3 d = b.at((f + 1) % steps, i).pos - b.at(f, i).pos;
+                    return std::hypot(d.x, d.y, d.z);
+                };
+                // A jump is a step far longer than the particle's own usual one (a fall is fast but usual).
+                std::vector<double> usual;
+                for (int f = 0; f < steps; ++f)
+                    if (drawn(b.at(f, i)) && drawn(b.at((f + 1) % steps, i)))
+                        usual.push_back(step(f));
+                if (usual.empty())
+                    continue;
+                std::ranges::nth_element(usual, usual.begin() + static_cast<std::ptrdiff_t>(usual.size() / 2));
+                const double limit = 3 * usual[usual.size() / 2] + s.quad_height;
+                for (int f = 0; f < steps; ++f) {
+                    folds_seen += b.at(f, i).fold == 1.0 ? 1 : 0;
+                    // Drawn at both ends of a jump: what the engine would show as a streak.
+                    if (step(f) > limit && drawn(b.at(f, i)) && drawn(b.at((f + 1) % steps, i)))
+                        ++drawn_jumps;
+                }
+            }
+            CHECK(drawn_jumps == 0);
+            CHECK(folds_seen > 0);
+        }
+}
+
+TEST_CASE("a fold moves the top corners down and the bottom corners up to the quad's middle line")
+{
+    Settings s;
+    s.scale_mode = ScaleMode::Folding;
+    s.quad_height = 10;
+    const ParticleSystem sys(s);
+    const Quad& q = sys.quads().front();
+    for (int k = 0; k < 4; ++k)
+        CHECK(sys.fold_offset(k, 0.0) == Vec3{});
+    // Folded flat, corners 3 and 0 (and 2 and 1) meet half way.
+    const Vec3 top = q[3].pos + sys.fold_offset(3, 1.0), bottom = q[0].pos + sys.fold_offset(0, 1.0);
+    CHECK(top.z == doctest::Approx(bottom.z));
+    CHECK(top.z == doctest::Approx((q[3].pos.z + q[0].pos.z) / 2));
+    Settings plain;
+    CHECK(ParticleSystem(plain).fold_offset(2, 1.0) == Vec3{});
 }

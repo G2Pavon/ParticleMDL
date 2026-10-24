@@ -65,7 +65,7 @@ TEST_CASE("validate replaces out-of-range enum values with the defaults")
     s.end_behavior = static_cast<EndBehavior>(-1);
     s.texture.pattern = static_cast<TexPattern>(1000);
     s.texture.color_mode = static_cast<ColorMode>(2);
-    s.scale_mode = static_cast<ScaleMode>(2);
+    s.scale_mode = static_cast<ScaleMode>(3);
     CHECK(validate(s));
     CHECK(s.geometry == defaults.geometry);
     CHECK(s.end_behavior == defaults.end_behavior);

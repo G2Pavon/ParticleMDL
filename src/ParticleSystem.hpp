@@ -50,6 +50,7 @@ struct ParticlePose {
     Vec3 rot;              // euler angles for ParticleSystem::apply_static_rotation
     double scale = 1.0;    // quad scale (vertex bones); 0 collapses the quad
     bool visible = true;   // false: parked out of sight by its end behavior
+    double fold = 0.0;     // Folding: 0 open, 1 folded flat onto its middle line (fold_offset())
 };
 
 // The particle simulation: deterministic particle seeds, a bounds
@@ -114,8 +115,17 @@ public:
     // bones, else the particle's.
     int vertex_bone(int particle, int quad, int vertex) const noexcept
     {
+        if (bones_.fold_bones())
+            return vertex >= 2 ? bones_.fold_bone(particle) : bones_.particle_bone(particle);   // the top corners fold
         return bones_.vertex_bones() ? bones_.corner_bone(particle, corner_of(quad, vertex)) : bones_.particle_bone(particle);
     }
+    // Folding: where vertex `vertex` of a quad moves, in the mesh before the particle's size, for a
+    // fold of `fold`. The top corners (2, 3) move half way down to the bottom ones (1, 0) and those
+    // half way up, so a fold of 1 leaves the quad a line through its middle; every quad of the
+    // geometry folds along the same vector. Zero without Folding.
+    Vec3 fold_offset(int vertex, double fold) const noexcept { return fold_vector_ * ((vertex >= 2 ? 0.5 : -0.5) * fold); }
+    // A pose's quad has some area: it is not collapsed, nor folded flat.
+    static bool has_area(double scale, double fold) noexcept { return scale > 0.0 && fold < 1.0; }
 
     double loop_duration() const noexcept { return settings_.duration; }
     double export_fps() const noexcept { return export_fps_; }
@@ -155,6 +165,7 @@ private:
     BoneLayout bones_;
     std::vector<Vec3> corners_;
     std::vector<std::array<int, 4>> corner_of_;   // per quad and vertex
+    Vec3 fold_vector_;                              // Folding: a quad's top edge to its bottom edge
     double export_fps_ = 30.0;
     int loop_steps_ = 1;
     std::vector<Quad> quads_;

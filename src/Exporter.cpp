@@ -204,12 +204,12 @@ std::vector<StillQuad> still_quads(const ParticleSystem& sys, const BakedPoses& 
     const double time = sys.frame_time(frame);
     for (int i = 0; i < sys.num_particles(); ++i) {
         const SampledPose pose = baked.sample(i, time);
-        if (!pose.visible || pose.scale <= 0.0)   // hidden, or a vertex-bone quad of no size
+        if (!pose.visible || !ParticleSystem::has_area(pose.scale, pose.fold))   // hidden, collapsed or folded flat
             continue;
         for (const Quad& q : sys.quads_of(i)) {
             StillQuad still{};
             for (int k = 0; k < 4; ++k)
-                still[static_cast<std::size_t>(k)] = {pose.pos + rotate(pose.rot, q[k].pos * pose.scale),
+                still[static_cast<std::size_t>(k)] = {pose.pos + rotate(pose.rot, (q[k].pos + sys.fold_offset(k, pose.fold)) * pose.scale),
                                                       rotate(pose.rot, q[k].normal), q[k].u, q[k].v};
             out.push_back(still);
         }
@@ -361,8 +361,17 @@ AnimationTable animation_table(const ParticleSystem& sys, const BakedPoses& bake
                 continue;
             }
             const Vec3 rot = sys.has_micro_rotation() ? studio_angles(pose.rot) : Vec3{};
-            t.values[static_cast<std::size_t>(frame) * t.bones + bones.particle_bone(i)] = {pose.pos.x, pose.pos.y, pose.pos.z,
-                                                                                            rot.x, rot.y, rot.z};
+            Vec3 at = pose.pos;
+            if (bones.fold_bones()) {
+                // The particle's bone carries the bottom corners and the fold bone, hung on it, the top
+                // ones: the bone moves the bottom corners their share of the fold, and the fold bone
+                // the top corners the rest of it, in the particle's own axes.
+                const Vec3 bottom = sys.fold_offset(0, pose.fold) * pose.scale;
+                at = at + ParticleSystem::apply_static_rotation(bottom, pose.rot.x, pose.rot.y, pose.rot.z);
+                const Vec3 fold = (sys.fold_offset(2, pose.fold) * pose.scale) - bottom;
+                t.values[static_cast<std::size_t>(frame) * t.bones + bones.fold_bone(i)] = {fold.x, fold.y, fold.z, 0.0, 0.0, 0.0};
+            }
+            t.values[static_cast<std::size_t>(frame) * t.bones + bones.particle_bone(i)] = {at.x, at.y, at.z, rot.x, rot.y, rot.z};
             // Corner bones shift each corner so the quad appears scaled.
             for (int corner = 0; corner < bones.corners_per_particle(); ++corner) {
                 const Vec3 offset = sys.corners()[static_cast<std::size_t>(corner)] * (pose.scale - 1.0);
@@ -374,7 +383,14 @@ AnimationTable animation_table(const ParticleSystem& sys, const BakedPoses& bake
     return t;
 }
 
-std::size_t sequence_bytes(const AnimationTable& table)
+namespace {
+
+struct SequenceSize {
+    std::size_t measure = 0;   // sequence_bytes()
+    std::size_t values = 0;    // sequence_value_bytes()
+};
+
+SequenceSize sequence_size(const AnimationTable& table)
 {
     constexpr double kPiD = 3.14159265358979323846;   // studiomdl's Q_PI
     constexpr std::size_t kOffsetEntry = 6 * sizeof(std::uint16_t);          // per bone
@@ -419,7 +435,19 @@ std::size_t sequence_bytes(const AnimationTable& table)
         // The limit is checked after each bone, from that bone's offset entry.
         worst = std::max(worst, kOffsetEntry * static_cast<std::size_t>(table.bones - bone) + data_bytes);
     }
-    return worst;
+    return {worst, data_bytes};
+}
+
+} // namespace
+
+std::size_t sequence_bytes(const AnimationTable& table)
+{
+    return sequence_size(table).measure;
+}
+
+std::size_t sequence_value_bytes(const AnimationTable& table)
+{
+    return sequence_size(table).values;
 }
 
 std::size_t sequence_bytes(const ParticleSystem& sys)
@@ -578,15 +606,18 @@ ExportReport analyze_export(const ParticleSystem& sys, const AnimationTable& tab
     for (int i = 0; i < baked.particles(); ++i) {
         bool drawn = false;
         for (int f = 0; f < baked.stored_frames() && !drawn; ++f)
-            drawn = baked.at(f, i).visible && baked.at(f, i).scale > 0.0;
+            drawn = baked.at(f, i).visible && ParticleSystem::has_area(baked.at(f, i).scale, baked.at(f, i).fold);
         never_drawn += drawn ? 0 : 1;
     }
     if (never_drawn > 0) {
         std::string message = std::format("{} of {} particles are never drawn", never_drawn, baked.particles());
-        message += s.scale_mode == ScaleMode::VertexBone
-                       ? ": their lives are too short for the frame rate (Vertex Bone scaling collapses a quad on the "
-                         "frames around its birth and its death). Raise Lifespan or FPS."
-                       : ". Raise Lifespan or FPS.";
+        message += s.scale_mode == ScaleMode::VertexBone ? ": their lives are too short for the frame rate (Vertex Bone "
+                                                           "scaling collapses a quad on the frames around its birth and its "
+                                                           "death). Raise Lifespan or FPS."
+                   : s.scale_mode == ScaleMode::Folding ? ": their lives are too short for the frame rate (Folding folds a "
+                                                          "quad flat on the frames around its birth and its death). Raise "
+                                                          "Lifespan or FPS."
+                                                        : ". Raise Lifespan or FPS.";
         r.warnings.push_back(std::move(message));
     }
 
@@ -626,8 +657,8 @@ std::vector<std::string> compare_with_export(const MdlInfo& mdl, const ParticleS
         if (((seq.flags & kMdlSequenceLooping) != 0) != sys.looping())
             problems.push_back(sys.looping() ? "the sequence does not loop" : "the sequence loops, the export does not");
         if (!seq.external) {
-            const std::size_t measured = seq.value_bytes + 12;   // studiomdl's measure: from the last offset entry
-            const std::size_t predicted = sequence_bytes(sys);
+            const std::size_t measured = seq.value_bytes;
+            const std::size_t predicted = sequence_value_bytes(animation_table(sys));
             if (measured != predicted)
                 problems.push_back(std::format("studiomdl wrote {} bytes of animation values where the editor predicted {}",
                                                measured, predicted));
@@ -719,7 +750,7 @@ int particles_on_frame(const ParticleSystem& sys, const BakedPoses& baked, int f
     int shown = 0;
     for (int i = 0; i < sys.num_particles(); ++i) {
         const SampledPose pose = baked.sample(i, sys.frame_time(frame));
-        if (pose.visible && pose.scale > 0.0)
+        if (pose.visible && ParticleSystem::has_area(pose.scale, pose.fold))
             ++shown;
     }
     return shown;

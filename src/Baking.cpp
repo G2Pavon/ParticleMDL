@@ -75,6 +75,7 @@ BakedPoses bake(const ParticleSystem& sys)
             b.at_mut(f, i) = sys.pose_at(sys.particles()[i], sys.frame_time(f));
 
     const bool vertex_bones = s.scale_mode == ScaleMode::VertexBone;
+    const bool folding = s.scale_mode == ScaleMode::Folding;
     const bool dives = s.end_behavior == EndBehavior::HideUnderground || s.end_behavior == EndBehavior::DropThroughFloor;
     const double hide_z = sys.hide_z();
 
@@ -83,12 +84,11 @@ BakedPoses bake(const ParticleSystem& sys)
         if (seams.empty())
             continue;
 
-        if (vertex_bones) {
-            // Collapsed on both sides of the jump, so nothing is drawn across it.
-            for (const Seam& seam : seams) {
-                b.at_mut(seam.from, i).scale = 0.0;
-                b.at_mut(seam.to, i).scale = 0.0;
-            }
+        if (vertex_bones || folding) {
+            // Collapsed (or folded flat) on both sides of the jump, so nothing is drawn across it.
+            for (const Seam& seam : seams)
+                for (const int f : {seam.from, seam.to})
+                    (vertex_bones ? b.at_mut(f, i).scale : b.at_mut(f, i).fold) = vertex_bones ? 0.0 : 1.0;
             continue;
         }
 
@@ -178,6 +178,7 @@ SampledPose BakedPoses::sample(int particle, double loop_time) const
     SampledPose out;
     out.pos = a.pos + (c.pos - a.pos) * t;
     out.scale = a.scale + (c.scale - a.scale) * t;
+    out.fold = a.fold + (c.fold - a.fold) * t;
     out.rot = slerp(quat_from_euler(a.rot.x, a.rot.y, a.rot.z), quat_from_euler(c.rot.x, c.rot.y, c.rot.z), t);
     out.visible = a.visible || c.visible;
     return out;
@@ -191,9 +192,9 @@ ParticleSystem::Bounds animation_bounds(const ParticleSystem& sys, const BakedPo
         for (int i = 0; i < baked.particles(); ++i) {
             const ParticlePose& pose = baked.at(f, i);
             for (const Quad& q : sys.quads_of(i)) {
-                for (const QuadVertex& v : q) {
-                    const Vec3 c = pose.pos + ParticleSystem::apply_static_rotation(v.pos * pose.scale, pose.rot.x,
-                                                                                    pose.rot.y, pose.rot.z);
+                for (int k = 0; k < 4; ++k) {
+                    const Vec3 at = (q[static_cast<std::size_t>(k)].pos + sys.fold_offset(k, pose.fold)) * pose.scale;
+                    const Vec3 c = pose.pos + ParticleSystem::apply_static_rotation(at, pose.rot.x, pose.rot.y, pose.rot.z);
                     b.min = {std::min(b.min.x, c.x), std::min(b.min.y, c.y), std::min(b.min.z, c.z)};
                     b.max = {std::max(b.max.x, c.x), std::max(b.max.y, c.y), std::max(b.max.z, c.z)};
                 }

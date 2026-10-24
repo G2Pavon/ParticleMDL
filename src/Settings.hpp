@@ -215,6 +215,11 @@ int corners_for(Geometry g) noexcept;
 // particles fit, but every corner moves on all three axes (more animation data) and does not
 // turn, so the normals stay as in the mesh (an Additive entity does not use them).
 bool corner_bones_only(Geometry g, ScaleMode s, int count) noexcept;
+// Folding scaling keeps static quads but hides a rebirth like vertex bones do: a second bone per
+// particle carries the top corners of its quads and folds them onto the bottom ones, so the quad
+// has no area while it jumps. That needs every quad to fold along the same line: a single quad
+// or crossed quads, without a cluster.
+bool folds(Geometry g) noexcept;
 // Bones of one particle when there are `count`: its own unless corner_bones_only(), and with vertex
 // bones one for each corner. The settings are checked with this before there is a system;
 // ParticleSystem builds its BoneLayout to agree.

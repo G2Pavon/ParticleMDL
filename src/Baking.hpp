@@ -14,6 +14,7 @@ struct SampledPose {
     Quat rot;
     double scale = 1.0;
     bool visible = true;
+    double fold = 0.0;   // blended straight, as the fold bone's position is
 };
 
 // What the exported sequence holds: every particle's pose at every frame of one

@@ -12,7 +12,7 @@ enum class Geometry { SingleQuad, CrossedQuads, TriPlanarQuads, VolumetricBox };
 enum class EndBehavior { DropThroughFloor, HideUnderground, HideInCore, StopAndStay, EndlessLoop };
 enum class TexPattern { RadialOrb, HollowRing, SharpStar, SoftCloud, FlowerPetals, Snowflake, RainDrop };
 enum class ColorMode { Solid, Gradient };
-enum class ScaleMode { Static, VertexBone };
+enum class ScaleMode { Static, VertexBone, Folding };
 
 // An enum value with its id in settings files and its label in the editor.
 template <typename E>
@@ -73,6 +73,7 @@ struct EnumTable<ScaleMode> {
     static constexpr std::array names{
         EnumName<ScaleMode>{ScaleMode::Static, "static", "Static"},
         EnumName<ScaleMode>{ScaleMode::VertexBone, "vertex_bone", "Vertex Bone"},
+        EnumName<ScaleMode>{ScaleMode::Folding, "folding", "Folding"},
     };
 };
 

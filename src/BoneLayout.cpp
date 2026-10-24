@@ -7,6 +7,13 @@ BoneLayout::BoneLayout(int particles, int corners_per_particle, bool particle_bo
 {
 }
 
+BoneLayout BoneLayout::folding(int particles) noexcept
+{
+    BoneLayout b(particles, 0);
+    b.fold_ = true;
+    return b;
+}
+
 int BoneLayout::parent(int bone) const noexcept
 {
     if (!particle_bones_)
@@ -17,7 +24,8 @@ int BoneLayout::parent(int bone) const noexcept
 
 std::string BoneLayout::name(int bone) const
 {
-    return (particle_bones_ && bone % per_particle() == 0 ? "p_" : "c_") + std::to_string(bone);
+    const char* kind = particle_bones_ && bone % per_particle() == 0 ? "p_" : fold_ ? "f_" : "c_";
+    return kind + std::to_string(bone);
 }
 
 } // namespace gs

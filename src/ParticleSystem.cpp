@@ -137,8 +137,13 @@ ParticleSystem::ParticleSystem(const Settings& settings) : settings_(validated(s
 
     const bool vertex_bones = s.scale_mode == ScaleMode::VertexBone;
     const int num_particles = std::min(s.count, max_particles(s.geometry, s.scale_mode));
-    bones_ = BoneLayout(num_particles, vertex_bones ? static_cast<int>(corners_.size()) : 0,
-                        !corner_bones_only(s.geometry, s.scale_mode, num_particles));
+    if (s.scale_mode == ScaleMode::Folding) {
+        bones_ = BoneLayout::folding(num_particles);
+        fold_vector_ = quads_.front()[1].pos - quads_.front()[2].pos;   // the same for every quad (see folds())
+    } else {
+        bones_ = BoneLayout(num_particles, vertex_bones ? static_cast<int>(corners_.size()) : 0,
+                            !corner_bones_only(s.geometry, s.scale_mode, num_particles));
+    }
     // bones_per_particle() is what the settings are checked with before there is a system.
     assert(bones_.per_particle() == bones_per_particle(s.geometry, s.scale_mode, num_particles));
 
@@ -284,7 +289,8 @@ int ParticleSystem::normals_of(int particle) const
     const std::vector<Quad>& quads = quads_of(particle);
     for (int qi = 0; qi < static_cast<int>(quads.size()); ++qi)
         for (int k = 0; k < 4; ++k) {
-            const int bone = bones_.vertex_bones() ? corner_of(qi, k) : 0;   // which of this particle's bones
+            // Which of this particle's bones: with folding the top corners are on the fold bone.
+            const int bone = bones_.vertex_bones() ? corner_of(qi, k) : bones_.fold_bones() && k >= 2 ? 1 : 0;
             const Vec3 n = quads[static_cast<std::size_t>(qi)][static_cast<std::size_t>(k)].normal;
             const bool known = std::ranges::any_of(kept, [&](const std::pair<int, Vec3>& e) {
                 return e.first == bone && e.second.x * n.x + e.second.y * n.y + e.second.z * n.z > same;
@@ -369,21 +375,23 @@ ParticlePose ParticleSystem::pose_at(const Particle& p, double loop_time) const
 {
     const LifeState st = life_state(p, loop_time);
     const bool vertex_bones = settings_.scale_mode == ScaleMode::VertexBone;
-    if (st.unborn())
-        return {{0.0, 0.0, hide_z_}, {}, vertex_bones ? 0.0 : p.size, false};   // waits out of sight, whatever the end behavior
+    const bool folding = settings_.scale_mode == ScaleMode::Folding;
+    const double out_of_sight = folding ? 1.0 : 0.0;   // folded flat while it is away
+    if (st.unborn())   // waits out of sight, whatever the end behavior
+        return {{0.0, 0.0, hide_z_}, {}, vertex_bones ? 0.0 : p.size, false, out_of_sight};
     if (st.moved_by_motion())
         return {position_at(p, st.eval_time), rotation_at(p, st.eval_time),
                 vertex_bones ? scale_factor_at(p, st.eval_time, st.past_lifespan()) * p.size : p.size, true};
 
-    // Parked out of sight. Bones have no scale, so only vertex-bone quads can
-    // collapse; static quads rely on where they are parked. The quad keeps the turn it
+    // Parked out of sight. Bones have no scale, so only vertex-bone quads can collapse and
+    // folding ones fold; static quads rely on where they are parked. The quad keeps the turn it
     // died with, so it does not turn on its way down (and a constant costs little to store).
     const double death = p.lifespan * loop_duration();
-    ParticlePose hidden{{0.0, 0.0, hide_z_}, rotation_at(p, death), vertex_bones ? 0.0 : p.size, false};
+    ParticlePose hidden{{0.0, 0.0, hide_z_}, rotation_at(p, death), vertex_bones ? 0.0 : p.size, false, out_of_sight};
     switch (settings_.end_behavior) {
     case EndBehavior::HideInCore:
         hidden.pos = {};
-        hidden.visible = !vertex_bones;   // a static quad stays visible at the center
+        hidden.visible = !vertex_bones && !folding;   // a static quad stays visible at the center
         return hidden;
     case EndBehavior::DropThroughFloor: {
         const Vec3 at_death = position_at(p, death);

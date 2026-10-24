@@ -64,10 +64,24 @@ TEST_CASE("without particle bones every corner bone is a root")
     CHECK(BoneLayout(3, 0, false).particle_bones());   // static particles always have their bone
 }
 
+TEST_CASE("a folding layout hangs a fold bone on each particle's bone")
+{
+    const BoneLayout b = BoneLayout::folding(3);
+    CHECK(b.count() == 6);
+    CHECK(b.fold_bones());
+    CHECK_FALSE(b.vertex_bones());
+    CHECK(b.particle_bone(1) == 2);
+    CHECK(b.fold_bone(1) == 3);
+    CHECK(b.parent(2) == -1);
+    CHECK(b.parent(3) == 2);
+    CHECK(b.name(2) == "p_2");
+    CHECK(b.name(3) == "f_3");
+}
+
 TEST_CASE("the layout of a system agrees with bones_per_particle and the bone limit")
 {
     for (const Geometry g : {Geometry::SingleQuad, Geometry::CrossedQuads, Geometry::TriPlanarQuads, Geometry::VolumetricBox})
-        for (const ScaleMode mode : {ScaleMode::Static, ScaleMode::VertexBone}) {
+        for (const ScaleMode mode : {ScaleMode::Static, ScaleMode::VertexBone, ScaleMode::Folding}) {
             CAPTURE(enum_id(g));
             CAPTURE(enum_id(mode));
             Settings s;
@@ -77,13 +91,16 @@ TEST_CASE("the layout of a system agrees with bones_per_particle and the bone li
             const ParticleSystem sys(s);
             const BoneLayout& b = sys.bones();
             CHECK(b.particles() == sys.num_particles());
-            CHECK(b.per_particle() == bones_per_particle(g, mode, sys.num_particles()));
+            // Folding falls back to Static for geometry that does not fold.
+            CHECK(sys.settings().scale_mode == (mode == ScaleMode::Folding && !folds(g) ? ScaleMode::Static : mode));
+            CHECK(b.per_particle() == bones_per_particle(g, sys.settings().scale_mode, sys.num_particles()));
             CHECK(b.count() == sys.num_particles() * b.per_particle());
             CHECK(b.count() <= kMaxBones);   // studiomdl refuses 128
             // The last particle's last bone is the last bone.
             const int last = sys.num_particles() - 1;
-            CHECK((b.vertex_bones() ? b.corner_bone(last, b.corners_per_particle() - 1) : b.particle_bone(last)) ==
-                  b.count() - 1);
+            CHECK((b.vertex_bones() ? b.corner_bone(last, b.corners_per_particle() - 1)
+                   : b.fold_bones() ? b.fold_bone(last)
+                                    : b.particle_bone(last)) == b.count() - 1);
         }
 }
 

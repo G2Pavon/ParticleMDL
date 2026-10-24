@@ -78,8 +78,8 @@ void add_particles(Scene& out, const ParticleSystem& sys, const BakedPoses& bake
 {
     for (int i = 0; i < sys.num_particles(); ++i) {
         const SampledPose pose = baked.sample(i, time);
-        // A quad of no size (a collapsed vertex-bone quad) draws nothing.
-        if (!pose.visible || pose.scale <= 0.0)
+        // A quad of no area (a collapsed vertex-bone quad, or one folded flat) draws nothing.
+        if (!pose.visible || !ParticleSystem::has_area(pose.scale, pose.fold))
             continue;
         const Vec3 pos = pose.pos;
         // Vertex bones scale the quad; the texture itself never changes.
@@ -91,7 +91,7 @@ void add_particles(Scene& out, const ParticleSystem& sys, const BakedPoses& bake
             bool visible = true;
             for (int k = 0; k < 4; ++k) {
                 const QuadVertex& v = q[k];
-                const Vec3 local = rotate(pose.rot, v.pos * scale_factor);
+                const Vec3 local = rotate(pose.rot, (v.pos + sys.fold_offset(k, pose.fold)) * scale_factor);
                 const auto projected = cam.project(pos + local, center);
                 if (!projected) {
                     visible = false;

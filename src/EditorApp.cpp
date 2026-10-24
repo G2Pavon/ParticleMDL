@@ -1157,8 +1157,15 @@ void EditorApp::draw_right_panel()
 
     group_label("Scaling");
     changed |= enum_combo("Mode", s.scale_mode);
+    ImGui::SetItemTooltip(
+        "Static: every quad keeps its size, one bone per particle (the most particles). A rebirth is drawn as a\n"
+        "streak, or as a dive with Hide Underground.\n"
+        "Vertex Bone: each quad grows from Start to End over its life, a bone per corner. It shrinks to nothing\n"
+        "around a rebirth, so no jump is drawn; with Start or End at 0 the loop has no seam at all.\n"
+        "Folding: static quads that fold flat around a rebirth, so no jump is drawn: two bones per particle.\n"
+        "Single and crossed quads only, without a cluster.");
     if (s.scale_mode == ScaleMode::VertexBone) {
-        changed |= reset_slider("scale_start", "Start", s.scale_start, 0.1, 5.0, 1.0, "%.2f");
+        changed |= reset_slider("scale_start", "Start", s.scale_start, 0.0, 5.0, 1.0, "%.2f");
         changed |= reset_slider("scale_end", "End", s.scale_end, 0.0, 5.0, 1.0, "%.2f");
     }
 
@@ -1170,8 +1177,9 @@ void EditorApp::draw_right_panel()
     ImGui::SetItemTooltip("Each particle is up to this fraction larger or smaller, at random");
     changed |= ImGui::Checkbox("Double Sided", &s.double_sided);
     {
-        Locked lock(s.scale_mode == ScaleMode::VertexBone,
-                    "Needs Static scaling: vertex bones scale each quad on its own");
+        Locked lock(s.scale_mode != ScaleMode::Static,
+                    s.scale_mode == ScaleMode::VertexBone ? "Needs Static scaling: vertex bones scale each quad on its own"
+                                                          : "Needs Static scaling: the fold bone folds one quad's copies only");
         changed |= reset_slider("cluster_size", "Cluster Size", s.cluster_size, 1, kMaxClusterSize, 1,
                                 ImGuiSliderFlags_AlwaysClamp);
         ImGui::SetItemTooltip("Copies of the geometry on each particle, spread at random inside the radius below and turned\n"
