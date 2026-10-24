@@ -4,7 +4,9 @@
 // (Sven Co-op's studiomdl.exe, run under Wine). It prints "sequences N bytes" for a model it
 // accepts and `sequence "idle" is greate than 64K` for one it refuses. These cases keep the
 // prediction of sequence_bytes() and the 64 KB blocker honest: they cannot be checked against
-// the compiler in CI, so the compiler's answers are recorded here.
+// the compiler in CI, so the compiler's answers are recorded here. They were compiled again on
+// 2026-10-23 when the export lost its shared root bone and its +90 deg correction ($origin's
+// fourth value now turns nothing).
 #include <doctest/doctest.h>
 
 #include <algorithm>
@@ -34,34 +36,39 @@ struct Verdict {
 };
 
 constexpr Verdict kVerdicts[] = {
-    {"small", R"({"model_name":"a1","count":20,"duration":2.0,"fps":15})", 3654, 21, true, 4176},
+    {"small", R"({"model_name":"a1","count":20,"duration":2.0,"fps":15})", 3650, 20, true, 4160},
     {"spin and turbulence",
-     R"({"model_name":"a2","count":64,"duration":3.0,"fps":30,"turbulence":40,"particle_spin":[30,40,90]})", 62322, 65, true,
-     63372},
+     R"({"model_name":"a2","count":64,"duration":3.0,"fps":30,"turbulence":40,"particle_spin":[30,40,90]})", 62318, 64, true,
+     63356},
     {"vertex bones",
      R"({"model_name":"a3","count":25,"duration":2.0,"fps":15,"scale_mode":"vertex_bone","scale_start":2,"scale_end":0.2,"geometry":"single_quad"})",
-     15456, 126, true, 17236},
+     15452, 125, true, 17220},
     {"most bones",
-     R"({"model_name":"a4","count":126,"duration":2.0,"fps":15,"geometry":"single_quad","particle_spin":[60,30,10]})", 45522,
-     127, true, 47316},
+     R"({"model_name":"a4","count":126,"duration":2.0,"fps":15,"geometry":"single_quad","particle_spin":[60,30,10]})", 45518,
+     126, true, 47300},
     {"66 particles", R"({"model_name":"b66","count":66,"duration":3.0,"fps":30,"turbulence":40,"particle_spin":[30,40,90]})",
-     64254, 67, true, 65328},
+     64250, 66, true, 65312},
     // The compiler's own total is already above 65535 here: the limit is on the measure sequence_bytes() takes.
     {"67 particles", R"({"model_name":"b67","count":67,"duration":3.0,"fps":30,"turbulence":40,"particle_spin":[30,40,90]})",
-     65232, 68, true, 66316},
+     65228, 67, true, 66300},
     {"68 particles", R"({"model_name":"b68","count":68,"duration":3.0,"fps":30,"turbulence":40,"particle_spin":[30,40,90]})",
-     66212, 69, false, 0},
+     66208, 68, false, 0},
     {"70 particles", R"({"model_name":"b70","count":70,"duration":3.0,"fps":30,"turbulence":40,"particle_spin":[30,40,90]})",
-     68130, 71, false, 0},
-    {"one under the limit",
-     R"({"model_name":"t65534","geometry":"single_quad","count":115,"duration":2.18,"fps":36,"turbulence":8,"particle_spin":[0,0,53]})",
-     65534, 116, true, 67196},
+     68126, 70, false, 0},
+    // The measure counts 12-byte tables and 2-byte values, so it is even: 65534 is the largest
+    // accepted and 65536 the smallest refused.
+    {"turning, at the limit",
+     R"({"model_name":"t65534t","geometry":"single_quad","count":92,"duration":3.52,"fps":28,"turbulence":1,"particle_spin":[0,0,53]})",
+     65534, 92, true, 66908},
+    {"at the limit",
+     R"({"model_name":"t65534","geometry":"single_quad","count":93,"duration":4.73,"fps":28,"turbulence":8,"particle_spin":[0,0,0]})",
+     65534, 93, true, 66920},
     {"turning, one over the limit",
-     R"({"model_name":"t65536t","geometry":"single_quad","count":115,"duration":2.17,"fps":36,"turbulence":16,"particle_spin":[0,0,53]})",
-     65536, 116, false, 0},
+     R"({"model_name":"t65536t","geometry":"single_quad","count":87,"duration":4.38,"fps":24,"turbulence":1,"particle_spin":[0,0,53]})",
+     65536, 87, false, 0},
     {"one over the limit",
-     R"({"model_name":"t65536","geometry":"single_quad","count":96,"duration":4.58,"fps":28,"turbulence":1,"particle_spin":[0,0,0]})",
-     65536, 97, false, 0},
+     R"({"model_name":"t65536","geometry":"single_quad","count":107,"duration":3.17,"fps":36,"turbulence":1,"particle_spin":[0,0,0]})",
+     65536, 107, false, 0},
 };
 
 } // namespace
@@ -96,7 +103,7 @@ TEST_CASE("the 64 KB blocker agrees with the models studiomdl accepted and refus
 
 TEST_CASE("the limit is on the predicted measure, not on the total studiomdl writes")
 {
-    // 67 particles are accepted although studiomdl writes 66312 bytes of sequence data.
+    // 67 particles are accepted although studiomdl writes 66300 bytes of sequence data.
     bool above_limit_but_accepted = false;
     for (const Verdict& v : kVerdicts)
         if (v.accepted && v.compiler_total > kMaxSequenceBytes)

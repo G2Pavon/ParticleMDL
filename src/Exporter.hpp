@@ -27,7 +27,7 @@ inline constexpr int kMaxModelNameLength = kMaxTextureNameLength - 4;
 
 // SMD bone angles that make a particle bone end up with rotation `r` in game
 // (r as applied by ParticleSystem::apply_static_rotation, R = Rx * Ry * Rz),
-// including the correction for studiomdl's +90 deg root rotation.
+// in the engine's order of angles.
 Vec3 studio_angles(Vec3 r);
 
 // model_name with spaces -> '_' and a trailing ".mdl" (any case) removed.
@@ -39,7 +39,7 @@ std::string safe_model_name(const std::string& model_name);
 std::optional<std::string> model_name_problem(std::string_view name);
 
 // The six values written for every bone in every exported frame - position
-// x, y, z and rotation x, y, z, after the -90 deg correction. Bone 0 is the root.
+// x, y, z and rotation x, y, z.
 struct AnimationTable {
     int frames = 0;
     int bones = 0;
@@ -126,10 +126,10 @@ struct ExportFiles {
 };
 
 // The files of an export, in memory: the texture, the QC and the two SMDs, for the compiler.
-// Geometry and animation are pre-rotated by -90 deg around Z to cancel the +90 deg studiomdl
-// applies on import. `baked` and `table` must be those of `sys` (the editor builds them for every
-// change of a setting); std::invalid_argument is thrown when their shape shows they are not. Throws std::invalid_argument for an unusable model
-// name and ExportBlocked for an export over studiomdl's limits.
+// The QC sets studiomdl's root turn to 0, so geometry and animation are written as the preview
+// has them. `baked` and `table` must be those of `sys` (the editor builds them for every change
+// of a setting); std::invalid_argument is thrown when their shape shows they are not, and for an
+// unusable model name. Throws ExportBlocked for an export over studiomdl's limits.
 ExportFiles export_files(const ParticleSystem& sys, const BakedPoses& baked, const AnimationTable& table);
 // The same, baking `sys` first.
 ExportFiles export_files(const ParticleSystem& sys);

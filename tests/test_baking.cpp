@@ -388,14 +388,14 @@ TEST_CASE("the exported animation is built from the baked frames")
     const AnimationTable direct = animation_table(sys);
     CHECK(via_baked.values == direct.values);
 
-    // A collapsed frame puts the corner bones at -vertex, in the exporter's rotated axes.
+    // A collapsed frame puts the corner bones at -vertex.
     bool found = false;
     for (int f = 0; f < baked.steps() && !found; ++f)
         if (baked.at(f, 0).scale == 0.0) {
             const Vec3 corner = sys.quads()[0][0].pos;
             const auto& row = via_baked.at(f, sys.bones().corner_bone(0, 0));
-            CHECK(row[0] == doctest::Approx(-corner.y));
-            CHECK(row[1] == doctest::Approx(corner.x));
+            CHECK(row[0] == doctest::Approx(-corner.x));
+            CHECK(row[1] == doctest::Approx(-corner.y));
             CHECK(row[2] == doctest::Approx(-corner.z));
             found = true;
         }

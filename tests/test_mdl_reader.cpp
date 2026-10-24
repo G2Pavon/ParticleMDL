@@ -46,6 +46,17 @@ void put32(std::vector<std::uint8_t>& bytes, std::size_t at, std::uint32_t value
 // Offsets of the header fields the tests patch.
 constexpr std::size_t kLength = 72, kNumBones = 140, kBoneIndex = 144, kSeqIndex = 168, kTextureIndex = 184;
 
+std::uint32_t get32(const std::vector<std::uint8_t>& bytes, std::size_t at)
+{
+    return static_cast<std::uint32_t>(bytes[at] | bytes[at + 1] << 8 | bytes[at + 2] << 16 | bytes[at + 3] << 24);
+}
+
+// Where the first sequence's animation starts: its table of offsets for bone 0.
+std::size_t anim_start(const std::vector<std::uint8_t>& bytes)
+{
+    return get32(bytes, get32(bytes, kSeqIndex) + 124);   // mstudioseqdesc_t.animindex
+}
+
 } // namespace
 
 TEST_CASE("a model compiled by studiomdl is read back")
@@ -53,14 +64,14 @@ TEST_CASE("a model compiled by studiomdl is read back")
     const MdlInfo m = read_mdl(read_bytes(kFixtures / "crossed_static.mdl"));
     CHECK(m.version == 10);
     CHECK(m.name == "a1.mdl");
-    CHECK(m.length == 17172);
+    CHECK(m.length == 17044);
 
-    REQUIRE(m.bones.size() == 21);
-    CHECK(m.bones[0].name == "root");
+    REQUIRE(m.bones.size() == 20);   // one root bone per particle
+    CHECK(m.bones[0].name == "p_0");
     CHECK(m.bones[0].parent == -1);
     CHECK(m.bones[1].name == "p_1");
-    CHECK(m.bones[1].parent == 0);
-    CHECK(m.bones[20].name == "p_20");
+    CHECK(m.bones[1].parent == -1);
+    CHECK(m.bones[19].name == "p_19");
 
     REQUIRE(m.sequences.size() == 1);
     const MdlSequence& seq = m.sequences[0];
@@ -70,8 +81,8 @@ TEST_CASE("a model compiled by studiomdl is read back")
     CHECK((seq.flags & kMdlSequenceLooping) != 0);
     CHECK(seq.blends == 1);
     CHECK_FALSE(seq.external);
-    CHECK(seq.offset_bytes == 21 * 12);
-    CHECK(seq.value_bytes == 3642);
+    CHECK(seq.offset_bytes == 20 * 12);
+    CHECK(seq.value_bytes == 3638);
 
     REQUIRE(m.textures.size() == 1);
     CHECK(m.textures[0].name == "a1.bmp");
@@ -88,14 +99,14 @@ TEST_CASE("a model compiled by studiomdl is read back")
 TEST_CASE("corner bones of a vertex-bone model hang on their particle's bone")
 {
     const MdlInfo m = read_mdl(read_bytes(kFixtures / "vertex_bones.mdl"));
-    REQUIRE(m.bones.size() == 126);
-    CHECK(m.bones[1].name == "p_1");
-    CHECK(m.bones[2].name == "c_2");
-    CHECK(m.bones[2].parent == 1);
-    CHECK(m.bones[5].parent == 1);
-    CHECK(m.bones[6].name == "p_6");
-    CHECK(m.bones[6].parent == 0);
-    CHECK(m.sequences[0].value_bytes == 15444);
+    REQUIRE(m.bones.size() == 125);
+    CHECK(m.bones[0].name == "p_0");
+    CHECK(m.bones[1].name == "c_1");
+    CHECK(m.bones[1].parent == 0);
+    CHECK(m.bones[4].parent == 0);
+    CHECK(m.bones[5].name == "p_5");
+    CHECK(m.bones[5].parent == -1);
+    CHECK(m.sequences[0].value_bytes == 15440);
 }
 
 TEST_CASE("the animation size in a real model is exactly what sequence_bytes predicted")
@@ -136,7 +147,7 @@ TEST_CASE("compare_with_export names what differs")
         return false;
     };
 
-    CHECK(mentions(problems_with([](Settings& s) { s.count = 21; }), "21 bones, the export has 22"));
+    CHECK(mentions(problems_with([](Settings& s) { s.count = 21; }), "20 bones, the export has 21"));
     CHECK(mentions(problems_with([](Settings& s) { s.fps = 30; }), "frames"));
     CHECK(mentions(problems_with([](Settings& s) { s.duration = 3.0; }), "31 frames, the export has 46"));
     CHECK(mentions(problems_with([](Settings& s) { s.geometry = Geometry::SingleQuad; }),
@@ -151,13 +162,13 @@ TEST_CASE("describe_mdl gives a short summary")
 {
     const std::string text = describe_mdl(read_mdl(read_bytes(kFixtures / "crossed_static.mdl")));
     CHECK(text.find("idle: 31 frames at 15 fps") != std::string::npos);
-    CHECK(text.find("21 bones") != std::string::npos);
+    CHECK(text.find("20 bones") != std::string::npos);
     CHECK(text.find("1 texture (additive)") != std::string::npos);
 }
 
 TEST_CASE("read_mdl_file reads a file and reports one that is missing")
 {
-    CHECK(read_mdl_file(kFixtures / "crossed_static.mdl").bones.size() == 21);
+    CHECK(read_mdl_file(kFixtures / "crossed_static.mdl").bones.size() == 20);
     CHECK_THROWS_AS(read_mdl_file(kFixtures / "no_such.mdl"), std::runtime_error);
 }
 
@@ -189,7 +200,7 @@ TEST_CASE("a header that disagrees with the file size is refused")
         read_mdl(bytes);
         FAIL("a cut file should be refused");
     } catch (const MdlError& e) {
-        CHECK(std::string(e.what()).find("17172") != std::string::npos);
+        CHECK(std::string(e.what()).find("17044") != std::string::npos);
     }
 }
 
@@ -212,37 +223,35 @@ TEST_CASE("inconsistent counts and offsets are refused")
     CHECK(refused_with([](auto& b) { put32(b, kNumBones, 5000); }).find("bones") != std::string::npos);
     CHECK(refused_with([](auto& b) { put32(b, kBoneIndex, 0x7FFFFFFF); }).find("ends inside") != std::string::npos);
     CHECK(refused_with([](auto& b) { put32(b, kSeqIndex, 0x80000000u); }).find("negative") != std::string::npos);
-    // The parent of bone 1 is 77 and there are 21 bones.
+    // The parent of bone 1 is 77 and there are 20 bones.
     CHECK(refused_with([](auto& b) { put32(b, 244 + 112 + 32, 77); }).find("parent 77") != std::string::npos);
     // A run of no frames would make the reader loop for ever.
     CHECK(refused_with([](auto& b) {
-              const std::size_t anim = 3236;   // where the animation of this model starts
-              const std::uint16_t first = static_cast<std::uint16_t>(b[anim + 12] | b[anim + 13] << 8);
-              // bone 1's first animated channel: find one with an offset and zero its frame count
+              const std::size_t anim = anim_start(b);
+              // bone 0's first animated channel: find one with an offset and zero its frame count
               for (std::size_t c = 0; c < 6; ++c) {
-                  const std::size_t at = anim + 12 + c * 2;
+                  const std::size_t at = anim + c * 2;
                   const std::uint16_t off = static_cast<std::uint16_t>(b[at] | b[at + 1] << 8);
                   if (off != 0) {
-                      b[anim + 12 + off + 1] = 0;
+                      b[anim + off + 1] = 0;
                       break;
                   }
               }
-              (void)first;
           }).find("run of no frames") != std::string::npos);
 }
 
 namespace {
 
-// Where the first run of bone 1's first animated channel is in crossed_static.mdl.
+// Where the first run of bone 0's first animated channel is in crossed_static.mdl.
 std::size_t first_run(const std::vector<std::uint8_t>& b)
 {
-    const std::size_t table = 3236 + 12;   // the animation starts at 3236; bone 1's offsets follow bone 0's
+    const std::size_t table = anim_start(b);   // bone 0's offsets come first
     for (std::size_t c = 0; c < 6; ++c) {
         const std::size_t at = table + c * 2;
         if (const std::uint16_t off = static_cast<std::uint16_t>(b[at] | b[at + 1] << 8); off != 0)
             return table + off;
     }
-    FAIL("bone 1 has no animated channel");
+    FAIL("bone 0 has no animated channel");
     return 0;
 }
 
@@ -341,12 +350,12 @@ TEST_CASE("a box with vertex bones compiles with shared corner bones")
 {
     // 14 particles of nine bones each: the particle and the eight corners its six quads share.
     const MdlInfo m = read_mdl(read_bytes(kFixtures / "box_vertex_bones.mdl"));
-    REQUIRE(m.bones.size() == 1 + 14 * 9);
-    CHECK(m.bones[1].name == "p_1");
-    CHECK(m.bones[9].name == "c_9");
-    CHECK(m.bones[9].parent == 1);
-    CHECK(m.bones[10].name == "p_10");
-    CHECK(m.bones[10].parent == 0);
+    REQUIRE(m.bones.size() == 14 * 9);
+    CHECK(m.bones[0].name == "p_0");
+    CHECK(m.bones[8].name == "c_8");
+    CHECK(m.bones[8].parent == 0);
+    CHECK(m.bones[9].name == "p_9");
+    CHECK(m.bones[9].parent == -1);
 
     // studiomdl keeps a normal for each bone a face touches: three faces meet at each of the 8 corners.
     REQUIRE(m.models.size() == 1);

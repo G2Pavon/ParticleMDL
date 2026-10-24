@@ -209,10 +209,10 @@ TEST_CASE("aligned effects export within the limits and with no jump drawn")
     // The exporter turns the bone with angles that studiomdl reads back as the same rotation.
     const BakedPoses baked = bake(sys);
     const AnimationTable table = animation_table(sys, baked);
-    CHECK(table.bones == 1 + 25 * 5);
+    CHECK(table.bones == 25 * 5);
     for (int f = 0; f < baked.steps(); ++f)
         for (int i = 0; i < baked.particles(); ++i)
-            for (const double value : table.at(f, 1 + i * 5))
+            for (const double value : table.at(f, i * 5))
                 CHECK(std::isfinite(value));
 }
 

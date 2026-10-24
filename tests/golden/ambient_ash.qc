@@ -2,6 +2,7 @@ $modelname "ambient_ash.mdl"
 $cd "."
 $cdtexture "."
 $scale 1.0
+$origin 0 0 0 -90
 
 $bbox -101.00 -108.00 -95.00 131.00 132.00 168.00
 

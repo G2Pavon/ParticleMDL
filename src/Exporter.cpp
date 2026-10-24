@@ -35,6 +35,11 @@ void write_nodes(std::string& out, const ParticleSystem& sys)
     out += "end\n";
 }
 
+// studiomdl turns the animation of every root bone by its Z rotation, 90 deg unless $origin's
+// fourth value says otherwise (the angle given plus 90), and never the mesh. -90 makes it 0: the
+// model is written as the preview has it, and no root bone carries a constant turn.
+const char kNoTurn[] = "$origin 0 0 0 -90\n\n";
+
 // A number for the .qc: as few digits as it needs, with at least one decimal ("1.0", "0.25").
 std::string qc_number(double v)
 {
@@ -48,7 +53,8 @@ std::string make_qc(const ParticleSystem& sys, const BakedPoses& baked, const st
                     const std::string& tex_ref)
 {
     std::string out;
-    emit(out, "$modelname \"{}.mdl\"\n$cd \".\"\n$cdtexture \".\"\n$scale {}\n\n", safe, qc_number(sys.settings().model_scale));
+    emit(out, "$modelname \"{}.mdl\"\n$cd \".\"\n$cdtexture \".\"\n$scale {}\n", safe, qc_number(sys.settings().model_scale));
+    out += kNoTurn;
 
     // The exact extent of the animation with a unit of margin. studiomdl
     // computes the sequence box (used for culling) itself, scaled; this is the header box, which
@@ -80,12 +86,11 @@ std::string make_ref_smd(const ParticleSystem& sys, const std::string& tex_ref)
         emit(out, "    {} 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000\n", bone);
     out += "end\ntriangles\n";
 
-    // Pre-rotate by -90 deg around Z to cancel studiomdl's +90 deg: (x, y) -> (y, -x).
     // Static quads have their size in the mesh; with vertex bones the mesh is at scale 1 and the bones scale it.
     double size = 1.0;
     auto write_vertex = [&](int bone, const QuadVertex& v) {
-        emit(out, "  {} {:.6f} {:.6f} {:.6f} {:.6f} {:.6f} {:.6f} {} {}\n", bone, v.pos.y * size, -v.pos.x * size,
-             v.pos.z * size, v.normal.y, -v.normal.x, v.normal.z, v.u, v.v);
+        emit(out, "  {} {:.6f} {:.6f} {:.6f} {:.6f} {:.6f} {:.6f} {} {}\n", bone, v.pos.x * size, v.pos.y * size,
+             v.pos.z * size, v.normal.x, v.normal.y, v.normal.z, v.u, v.v);
     };
     auto write_tri = [&](int b0, const QuadVertex& v0, int b1, const QuadVertex& v1, int b2, const QuadVertex& v2) {
         out += tex_ref;
@@ -185,7 +190,8 @@ std::string make_still_qc(const ParticleSystem& sys, const std::vector<StillQuad
     hi = hi * scale;
 
     std::string out;
-    emit(out, "$modelname \"{}.mdl\"\n$cd \".\"\n$cdtexture \".\"\n$scale {}\n\n", stem, qc_number(scale));
+    emit(out, "$modelname \"{}.mdl\"\n$cd \".\"\n$cdtexture \".\"\n$scale {}\n", stem, qc_number(scale));
+    out += kNoTurn;
     emit(out, "$bbox {:.2f} {:.2f} {:.2f} {:.2f} {:.2f} {:.2f}\n\n", std::floor(lo.x) - 1, std::floor(lo.y) - 1,
          std::floor(lo.z) - 1, std::ceil(hi.x) + 1, std::ceil(hi.y) + 1, std::ceil(hi.z) + 1);
     emit(out, "$texrendermode \"{}\" additive\n\n", tex_ref);
@@ -200,13 +206,12 @@ std::string make_still_ref_smd(const ParticleSystem& sys, const std::vector<Stil
     out.reserve(quads.size() * 4 * (tex_ref.size() + 1 + 3 * 80) + 256);
     out += kStillNodes;
     out += "triangles\n";
-    // Pre-rotated by -90 deg around Z like the animated export, to cancel studiomdl's +90 deg.
     auto write_tri = [&](const StillVertex& a, const StillVertex& b, const StillVertex& c) {
         out += tex_ref;
         out += '\n';
         for (const StillVertex* v : {&a, &b, &c})
-            emit(out, "  0 {:.6f} {:.6f} {:.6f} {:.6f} {:.6f} {:.6f} {} {}\n", v->pos.y, -v->pos.x, v->pos.z, v->normal.y,
-                 -v->normal.x, v->normal.z, v->u, v->v);
+            emit(out, "  0 {:.6f} {:.6f} {:.6f} {:.6f} {:.6f} {:.6f} {} {}\n", v->pos.x, v->pos.y, v->pos.z, v->normal.x,
+                 v->normal.y, v->normal.z, v->u, v->v);
     };
     const bool back_faces = sys.settings().double_sided && sys.settings().geometry != Geometry::VolumetricBox;
     for (const StillQuad& q : quads) {
@@ -289,20 +294,19 @@ AnimationTable animation_table(const ParticleSystem& sys, const BakedPoses& bake
     t.frames = sys.export_frames();
     const BoneLayout& bones = sys.bones();
     t.bones = bones.count();
-    t.values.assign(static_cast<std::size_t>(t.frames) * t.bones, {});   // root stays at zero
+    t.values.assign(static_cast<std::size_t>(t.frames) * t.bones, {});
     for (int frame = 0; frame < t.frames; ++frame) {
         for (int i = 0; i < sys.num_particles(); ++i) {
             // Every bone in every frame: studiomdl puts a missing bone at the origin.
             const ParticlePose& pose = baked.at(frame, i);
             const Vec3 rot = sys.has_micro_rotation() ? studio_angles(pose.rot) : Vec3{};
-            // Same -90 deg Z correction for translations as for the geometry.
-            t.values[static_cast<std::size_t>(frame) * t.bones + bones.particle_bone(i)] = {pose.pos.y, -pose.pos.x, pose.pos.z,
+            t.values[static_cast<std::size_t>(frame) * t.bones + bones.particle_bone(i)] = {pose.pos.x, pose.pos.y, pose.pos.z,
                                                                                             rot.x, rot.y, rot.z};
             // Corner bones shift each corner so the quad appears scaled.
             for (int corner = 0; corner < bones.corners_per_particle(); ++corner) {
                 const Vec3 offset = sys.corners()[static_cast<std::size_t>(corner)] * (pose.scale - 1.0);
                 const int bone = bones.corner_bone(i, corner);
-                t.values[static_cast<std::size_t>(frame) * t.bones + bone] = {offset.y, -offset.x, offset.z, 0.0, 0.0, 0.0};
+                t.values[static_cast<std::size_t>(frame) * t.bones + bone] = {offset.x, offset.y, offset.z, 0.0, 0.0, 0.0};
             }
         }
     }
@@ -312,7 +316,6 @@ AnimationTable animation_table(const ParticleSystem& sys, const BakedPoses& bake
 std::size_t sequence_bytes(const AnimationTable& table)
 {
     constexpr double kPiD = 3.14159265358979323846;   // studiomdl's Q_PI
-    constexpr float kRootRotate = static_cast<float>(90.0 * kPiD / 180.0);   // default $rotate
     constexpr std::size_t kOffsetEntry = 6 * sizeof(std::uint16_t);          // per bone
 
     const std::size_t frames = static_cast<std::size_t>(table.frames);
@@ -328,9 +331,7 @@ std::size_t sequence_bytes(const AnimationTable& table)
         for (std::size_t f = 0; f < frames; ++f) {
             const std::array<double, 6>& row = table.at(static_cast<int>(f), bone);
             for (std::size_t k = 0; k < 6; ++k) {
-                float x = as_read_by_studiomdl(row[k]);
-                if (bone == 0 && k == 5)
-                    x += kRootRotate;   // $rotate turns the root bone
+                float x = as_read_by_studiomdl(row[k]);   // the QC turns no root bone ($origin)
                 if (k >= 3) {           // rotations wrapped to [-pi, pi)
                     // studiomdl compares the float with a double pi, so this does too.
                     if (static_cast<double>(x) >= kPiD)
@@ -365,18 +366,16 @@ std::size_t sequence_bytes(const ParticleSystem& sys)
     return sequence_bytes(animation_table(sys));
 }
 
-// studiomdl rotates the root bone by +90 deg about Z, so a child bone's
-// rotation must be M = Rz(-90) * R * Rz(90) to end up as R in game, and the
-// engine reads SMD angles (x, y, z) as Rz(z) * Ry(y) * Rx(x). Swapping single
-// angles only works for rotations about one axis; this goes through the matrix.
+// The particle's rotation is R = Rx * Ry * Rz (apply_static_rotation) and the engine reads SMD
+// angles (x, y, z) as Rz(z) * Ry(y) * Rx(x): the same angles would turn the other way round, so
+// this goes through the matrix. (No +90 deg correction: the QC turns no root bone.)
 Vec3 studio_angles(Vec3 r)
 {
     auto R = [&](Vec3 v) { return ParticleSystem::apply_static_rotation(v, r.x, r.y, r.z); };
-    auto rz_minus_90 = [](Vec3 v) { return Vec3{v.y, -v.x, v.z}; };
-    // Columns of M: M * e = Rz(-90) * R * (Rz(90) * e).
-    const Vec3 c0 = rz_minus_90(R({0, 1, 0}));    // Rz(90) * x = y
-    const Vec3 c1 = rz_minus_90(R({-1, 0, 0}));   // Rz(90) * y = -x
-    const Vec3 c2 = rz_minus_90(R({0, 0, 1}));
+    // Columns of M = R.
+    const Vec3 c0 = R({1, 0, 0});
+    const Vec3 c1 = R({0, 1, 0});
+    const Vec3 c2 = R({0, 0, 1});
     // M = Rz(z) * Ry(y) * Rx(x): M[2][0] = -sin(y), M[2][1] = cos(y) sin(x),
     // M[2][2] = cos(y) cos(x), M[1][0] = cos(y) sin(z), M[0][0] = cos(y) cos(z).
     const double y = std::asin(std::clamp(-c0.z, -1.0, 1.0));

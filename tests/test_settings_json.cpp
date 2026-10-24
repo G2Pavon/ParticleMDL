@@ -174,7 +174,7 @@ TEST_CASE("loading validates, reports what changed and leaves the base alone")
         settings_from_json(json{{"duration", 1000}, {"fps", 0}, {"count", 100000}, {"texture_size", 100}}, base);
     CHECK(loaded.settings.duration == kMaxDuration);
     CHECK(loaded.settings.fps == kMinFps);
-    CHECK(loaded.settings.count == 126);
+    CHECK(loaded.settings.count == 127);
     CHECK(loaded.settings.texture.size == 128);
     CHECK(loaded.warnings.size() == 4);
     CHECK(has_warning(loaded.warnings, "duration"));

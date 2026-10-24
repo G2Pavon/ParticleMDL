@@ -103,8 +103,8 @@ public:
     // Which of corners() the given vertex of the given quad is.
     int corner_of(int quad, int vertex) const noexcept { return corner_of_[static_cast<std::size_t>(quad)][static_cast<std::size_t>(vertex)]; }
     int num_particles() const noexcept { return static_cast<int>(particles_.size()); }
-    // The exported skeleton: the root, each particle's bone and, with vertex bones, one bone for
-    // each of corners() after it.
+    // The exported skeleton: each particle's bone (a root bone) and, with vertex bones, one bone
+    // for each of corners() after it.
     const BoneLayout& bones() const noexcept { return bones_; }
     // The bone vertex `vertex` of quad `quad` of a particle hangs on: its corner's bone with vertex
     // bones, else the particle's.

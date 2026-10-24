@@ -12,43 +12,41 @@
 
 using namespace gs;
 
-TEST_CASE("a static layout is the root and one bone per particle")
+TEST_CASE("a static layout is one root bone per particle")
 {
     const BoneLayout b(3, 0);
-    CHECK(b.count() == 4);
+    CHECK(b.count() == 3);
     CHECK_FALSE(b.vertex_bones());
-    CHECK(b.particle_bone(0) == 1);
-    CHECK(b.particle_bone(2) == 3);
-    CHECK(b.parent(0) == -1);
-    for (int bone = 1; bone < 4; ++bone) {
-        CHECK(b.parent(bone) == 0);
+    CHECK(b.particle_bone(0) == 0);
+    CHECK(b.particle_bone(2) == 2);
+    for (int bone = 0; bone < 3; ++bone) {
+        CHECK(b.parent(bone) == -1);   // no shared root: each particle's bone is one
         CHECK(b.name(bone) == "p_" + std::to_string(bone));
     }
-    CHECK(b.name(0) == "root");
 }
 
 TEST_CASE("with corner bones each particle's corners follow its own bone and hang on it")
 {
     const BoneLayout b(2, 4);   // two single quads with vertex bones
-    CHECK(b.count() == 1 + 2 * 5);
+    CHECK(b.count() == 2 * 5);
     CHECK(b.vertex_bones());
-    CHECK(b.particle_bone(0) == 1);
-    CHECK(b.corner_bone(0, 0) == 2);
-    CHECK(b.corner_bone(0, 3) == 5);
-    CHECK(b.particle_bone(1) == 6);
-    CHECK(b.corner_bone(1, 0) == 7);
-    CHECK(b.corner_bone(1, 3) == 10);
+    CHECK(b.particle_bone(0) == 0);
+    CHECK(b.corner_bone(0, 0) == 1);
+    CHECK(b.corner_bone(0, 3) == 4);
+    CHECK(b.particle_bone(1) == 5);
+    CHECK(b.corner_bone(1, 0) == 6);
+    CHECK(b.corner_bone(1, 3) == 9);
 
-    CHECK(b.parent(1) == 0);
-    CHECK(b.parent(6) == 0);
+    CHECK(b.parent(0) == -1);
+    CHECK(b.parent(5) == -1);
     for (int c = 0; c < 4; ++c) {
-        CHECK(b.parent(b.corner_bone(0, c)) == 1);
-        CHECK(b.parent(b.corner_bone(1, c)) == 6);
+        CHECK(b.parent(b.corner_bone(0, c)) == 0);
+        CHECK(b.parent(b.corner_bone(1, c)) == 5);
     }
-    CHECK(b.name(1) == "p_1");
-    CHECK(b.name(2) == "c_2");
-    CHECK(b.name(6) == "p_6");
-    CHECK(b.name(10) == "c_10");
+    CHECK(b.name(0) == "p_0");
+    CHECK(b.name(1) == "c_1");
+    CHECK(b.name(5) == "p_5");
+    CHECK(b.name(9) == "c_9");
 }
 
 TEST_CASE("the layout of a system agrees with bones_per_particle and the bone limit")
@@ -60,13 +58,13 @@ TEST_CASE("the layout of a system agrees with bones_per_particle and the bone li
             Settings s;
             s.geometry = g;
             s.scale_mode = mode;
-            s.count = 126;   // as many as the bones allow
+            s.count = kMaxBones;   // as many as the bones allow
             const ParticleSystem sys(s);
             const BoneLayout& b = sys.bones();
             CHECK(b.particles() == sys.num_particles());
             CHECK(1 + b.corners_per_particle() == bones_per_particle(g, mode));
-            CHECK(b.count() == 1 + sys.num_particles() * bones_per_particle(g, mode));
-            CHECK(b.count() <= 1 + kMaxBones);   // studiomdl refuses 128
+            CHECK(b.count() == sys.num_particles() * bones_per_particle(g, mode));
+            CHECK(b.count() <= kMaxBones);   // studiomdl refuses 128
             // The last particle's last bone is the last bone.
             const int last = sys.num_particles() - 1;
             CHECK((b.vertex_bones() ? b.corner_bone(last, b.corners_per_particle() - 1) : b.particle_bone(last)) ==

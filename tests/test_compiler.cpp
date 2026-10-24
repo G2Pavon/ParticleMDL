@@ -233,3 +233,35 @@ TEST_CASE("the still's name gives up the end of a long model name to its frame n
     CHECK(name.size() == static_cast<std::size_t>(kMaxModelNameLength));
     CHECK(name.ends_with("_f1234"));
 }
+
+TEST_CASE("the animated model moves where the preview shows it")
+{
+    // studiomdl measures the box of the sequence from the vertices in every frame: it must be the
+    // box of the preview's animation, for each geometry and scaling, spinning and not.
+    for (Geometry g : {Geometry::SingleQuad, Geometry::CrossedQuads, Geometry::TriPlanarQuads, Geometry::VolumetricBox})
+        for (ScaleMode mode : {ScaleMode::Static, ScaleMode::VertexBone})
+            for (bool spin : {false, true}) {
+                CAPTURE(static_cast<int>(g));
+                CAPTURE(static_cast<int>(mode));
+                CAPTURE(spin);
+                Settings s = wide_effect();
+                s.geometry = g;
+                s.scale_mode = mode;
+                s.count = 8;
+                s.scale_start = 2.0;
+                s.scale_end = 0.5;
+                if (spin)
+                    s.particle_spin = {40, 70, 90};
+                const ParticleSystem sys(s);
+                const BakedPoses baked = bake(sys);
+                const MdlInfo info = read_mdl(compile_model(export_files(sys)).mdl);
+                const ParticleSystem::Bounds b = animation_bounds(sys, baked);
+                const MdlSequence& seq = info.sequences.at(0);
+                CHECK(seq.bbmin[0] == doctest::Approx(b.min.x).epsilon(0.002));
+                CHECK(seq.bbmin[1] == doctest::Approx(b.min.y).epsilon(0.002));
+                CHECK(seq.bbmin[2] == doctest::Approx(b.min.z).epsilon(0.002));
+                CHECK(seq.bbmax[0] == doctest::Approx(b.max.x).epsilon(0.002));
+                CHECK(seq.bbmax[1] == doctest::Approx(b.max.y).epsilon(0.002));
+                CHECK(seq.bbmax[2] == doctest::Approx(b.max.z).epsilon(0.002));
+            }
+}

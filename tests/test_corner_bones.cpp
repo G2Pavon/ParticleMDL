@@ -92,7 +92,7 @@ TEST_CASE("the exported animation moves a shared corner by the same offset for e
     const ParticleSystem sys(s);
     const BakedPoses baked = bake(sys);
     const AnimationTable table = animation_table(sys, baked);
-    CHECK(table.bones == 1 + 3 * 9);
+    CHECK(table.bones == 3 * 9);
 
     for (int frame : {0, 10, 20}) {
         const double scale = baked.at(frame, 0).scale;
@@ -100,9 +100,8 @@ TEST_CASE("the exported animation moves a shared corner by the same offset for e
             for (int k = 0; k < 4; ++k) {
                 const Vec3 v = sys.quads()[static_cast<std::size_t>(qi)][static_cast<std::size_t>(k)].pos;
                 const auto& row = table.at(frame, sys.vertex_bone(0, qi, k));
-                // the SMD axes of the exporter: (y, -x, z)
-                CHECK(row[0] == doctest::Approx(v.y * (scale - 1.0)));
-                CHECK(row[1] == doctest::Approx(-v.x * (scale - 1.0)));
+                CHECK(row[0] == doctest::Approx(v.x * (scale - 1.0)));
+                CHECK(row[1] == doctest::Approx(v.y * (scale - 1.0)));
                 CHECK(row[2] == doctest::Approx(v.z * (scale - 1.0)));
             }
     }
@@ -129,6 +128,6 @@ TEST_CASE("the reference mesh of a box names the shared corner bones, and no bon
 
     // 3 particles x 8 corners; the particle bones themselves hold no vertex with vertex bones.
     CHECK(bones_in_triangles.size() == 3 * 8);
-    CHECK(*bones_in_triangles.begin() == 2);
-    CHECK(*bones_in_triangles.rbegin() == 1 + 3 * 9 - 1);
+    CHECK(*bones_in_triangles.begin() == 1);
+    CHECK(*bones_in_triangles.rbegin() == 3 * 9 - 1);
 }

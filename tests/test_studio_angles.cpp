@@ -16,9 +16,9 @@ Vec3 rot_z(Vec3 v, double a) { return {v.x * std::cos(a) - v.y * std::sin(a), v.
 // How the engine turns SMD angles into a rotation: Rz(z) * Ry(y) * Rx(x).
 Vec3 engine_rotation(Vec3 a, Vec3 v) { return rot_z(rot_y(rot_x(v, a.x), a.y), a.z); }
 
-// A bone's rotation as it ends up in game: the child rotation `a`, seen from
-// the world, with studiomdl's root turned by +90 degrees about Z.
-Vec3 in_game(Vec3 a, Vec3 v) { return rot_z(engine_rotation(a, rot_z(v, -kPi / 2)), kPi / 2); }
+// A bone's rotation as it ends up in game: the QC sets studiomdl's root turn to 0, so it is the
+// engine's reading of the angles.
+Vec3 in_game(Vec3 a, Vec3 v) { return engine_rotation(a, v); }
 
 void check_near(Vec3 a, Vec3 b, double eps = 1e-9)
 {
@@ -53,11 +53,10 @@ TEST_CASE("studio_angles of a rotation about Z stays a rotation about Z")
     check_near(a, {0, 0, radians(30)});
 }
 
-TEST_CASE("studio_angles turns a rotation about X into one about -Y")
+TEST_CASE("studio_angles keeps a rotation about X about X")
 {
-    // Rz(-90) maps the X axis to -Y, so the engine has to rotate about -Y.
     const Vec3 a = studio_angles({0.3, 0, 0});
-    check_near(a, {0, -0.3, 0});
+    check_near(a, {0.3, 0, 0});
 }
 
 TEST_CASE("studio_angles round trips single-axis rotations")
@@ -83,12 +82,12 @@ TEST_CASE("studio_angles round trips general rotations")
 
 TEST_CASE("studio_angles round trips at gimbal lock")
 {
-    // R = Rx(+-90): the engine's middle angle reaches +-90 degrees.
+    // R = Ry(+-90): the engine's middle angle reaches +-90 degrees.
     for (double sign : {1.0, -1.0}) {
-        const Vec3 r{sign * kPi / 2, 0, 0};
+        const Vec3 r{0, sign * kPi / 2, 0};
         check_round_trip(r);
-        check_round_trip({r.x, 0, radians(25)});
-        check_round_trip({r.x, 0, radians(-140)});
+        check_round_trip({radians(25), r.y, 0});
+        check_round_trip({radians(-140), r.y, radians(60)});
 
         const Vec3 a = studio_angles(r);
         CHECK(std::abs(a.y) == doctest::Approx(kPi / 2));

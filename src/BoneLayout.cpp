@@ -9,17 +9,13 @@ BoneLayout::BoneLayout(int particles, int corners_per_particle) noexcept
 
 int BoneLayout::parent(int bone) const noexcept
 {
-    if (bone == 0)
-        return -1;
-    const int within = (bone - 1) % stride();   // 0 for the particle's bone, else its corners
-    return within == 0 ? 0 : bone - within;
+    const int within = bone % stride();   // 0 for the particle's bone, else its corners
+    return within == 0 ? -1 : bone - within;
 }
 
 std::string BoneLayout::name(int bone) const
 {
-    if (bone == 0)
-        return "root";
-    return ((bone - 1) % stride() == 0 ? "p_" : "c_") + std::to_string(bone);
+    return (bone % stride() == 0 ? "p_" : "c_") + std::to_string(bone);
 }
 
 } // namespace gs

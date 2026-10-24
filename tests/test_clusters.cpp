@@ -170,8 +170,7 @@ TEST_CASE("the reference mesh holds every copy on its particle's bone")
 
     // 4 particles x 3 copies x 1 quad x 4 triangles (double sided) x 3 vertex lines
     CHECK(vertex_lines == 4 * 3 * 4 * 3);
-    CHECK(per_bone[0] == 0);
-    for (int bone = 1; bone <= 4; ++bone)
+    for (int bone = 0; bone < 4; ++bone)
         CHECK(per_bone[static_cast<std::size_t>(bone)] == 3 * 4 * 3);
 }
 

@@ -130,9 +130,9 @@ TEST_CASE("validate limits the particle count to the bone budget")
         ScaleMode scale;
         int max;
     };
-    // One bone per particle, or one plus four per quad with vertex bones; 126 in all.
-    for (const Case c : {Case{Geometry::SingleQuad, ScaleMode::Static, 126},
-                         Case{Geometry::VolumetricBox, ScaleMode::Static, 126},
+    // One bone per particle, or one plus four per quad with vertex bones; 127 in all.
+    for (const Case c : {Case{Geometry::SingleQuad, ScaleMode::Static, 127},
+                         Case{Geometry::VolumetricBox, ScaleMode::Static, 127},
                          Case{Geometry::SingleQuad, ScaleMode::VertexBone, 25},
                          Case{Geometry::CrossedQuads, ScaleMode::VertexBone, 14},
                          Case{Geometry::TriPlanarQuads, ScaleMode::VertexBone, 9},
@@ -183,7 +183,7 @@ TEST_CASE("validated is validate on a copy and is idempotent")
 
     const Settings fixed = validated(bad);
     CHECK(std::isnan(bad.duration));   // the argument was a copy
-    CHECK(fixed.count == 126);
+    CHECK(fixed.count == 127);
 
     Settings again = fixed;
     CHECK_FALSE(validate(again));

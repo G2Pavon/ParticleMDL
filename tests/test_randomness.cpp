@@ -277,10 +277,10 @@ TEST_CASE("the mesh of a static quad is drawn at the size of its particle")
         int bone;
         double x, y, z;
         if (triangles && std::sscanf(line.c_str(), " %d %lf %lf %lf", &bone, &x, &y, &z) == 4)
-            extent[static_cast<std::size_t>(bone)] = std::max({extent[static_cast<std::size_t>(bone)], std::abs(x), std::abs(z)});
+            extent[static_cast<std::size_t>(bone)] = std::max({extent[static_cast<std::size_t>(bone)], std::abs(y), std::abs(z)});
     }
     for (std::size_t i = 0; i < sys.particles().size(); ++i)
-        CHECK(extent[i + 1] == doctest::Approx(5.0 * sys.particles()[i].size).epsilon(1e-5));
+        CHECK(extent[i] == doctest::Approx(5.0 * sys.particles()[i].size).epsilon(1e-5));
 }
 
 TEST_CASE("the bounding box and the hiding height make room for the largest particle")

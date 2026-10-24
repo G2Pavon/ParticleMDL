@@ -95,7 +95,7 @@ TEST_CASE("too much animation data is a blocker even with few frames")
     CHECK_FALSE(has_kind(r, ExportBlocker::Kind::TooManyFrames));
     REQUIRE(has_kind(r, ExportBlocker::Kind::SequenceTooLarge));
     CHECK(mentions(r, "301 frames"));
-    CHECK(mentions(r, "127 bones"));
+    CHECK(mentions(r, "126 bones"));
     CHECK(mentions(r, "64.0 KB"));
     CHECK_FALSE(mentions(r, "Vertex-bone"));   // no vertex bones here
 }
