@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(ParticleMDL VERSION 3.0 LANGUAGES C CXX)
+project(ParticleMDL VERSION 6.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -193,7 +193,7 @@ add_executable(particlemdl
     src/GlTexture.cpp
     src/FileDialog.cpp)
 target_link_libraries(particlemdl PRIVATE particles_editor_support imgui gs_flags)
-target_compile_definitions(particlemdl PRIVATE GS_VERSION="${PROJECT_VERSION}")
+target_compile_definitions(particlemdl PRIVATE GS_VERSION="${PROJECT_VERSION}" GS_VERSION_MAJOR="${PROJECT_VERSION_MAJOR}")
 if(WIN32)
     # GUI subsystem: double-clicking the exe opens no console window.
     set_target_properties(particlemdl PROPERTIES WIN32_EXECUTABLE TRUE)

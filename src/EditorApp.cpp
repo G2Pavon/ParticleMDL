@@ -799,9 +799,8 @@ void EditorApp::draw_about_dialog()
     if (!ImGui::BeginPopupModal("About##dialog", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
         return;
 
-    ImGui::TextColored(kAccent, "ParticleMDL");
-    ImGui::SameLine();
-    ImGui::TextDisabled("version %s", GS_VERSION);
+    ImGui::TextColored(kAccent, "ParticleMDL v" GS_VERSION_MAJOR);
+    ImGui::SetItemTooltip("Version %s", GS_VERSION);
     ImGui::TextWrapped("Bakes particle effects into GoldSrc studio models: every particle is a bone, the motion one "
                        "animation, compiled to a .mdl by the built-in studiomdl.");
     ImGui::TextLinkOpenURL("github.com/G2Pavon/ParticleMDL", "https://github.com/G2Pavon/ParticleMDL");
