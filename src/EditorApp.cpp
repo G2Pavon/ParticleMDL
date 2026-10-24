@@ -277,8 +277,10 @@ void EditorApp::export_frame()
         std::string summary = std::to_string(particles_on_frame(sys, baked_, frame)) + " particles";
         try {
             const MdlInfo info = read_mdl(model.mdl);
-            if (!info.models.empty())
-                summary += ", " + std::to_string(info.models.front().vertices) + " vertices";
+            int vertices = 0;
+            for (const MdlModel& part : info.models)
+                vertices += part.vertices;
+            summary += ", " + std::to_string(vertices) + " vertices";
         } catch (const std::exception& e) {
             summary += "; the model could not be read back: " + std::string(e.what());
         }
@@ -1170,10 +1172,13 @@ void EditorApp::draw_right_panel()
     {
         Locked lock(s.scale_mode == ScaleMode::VertexBone,
                     "Needs Static scaling: vertex bones scale each quad on its own");
-        changed |= reset_slider("cluster_size", "Cluster Size", s.cluster_size, 1, 16, 1, ImGuiSliderFlags_AlwaysClamp);
+        changed |= reset_slider("cluster_size", "Cluster Size", s.cluster_size, 1, kMaxClusterSize, 1,
+                                ImGuiSliderFlags_AlwaysClamp);
         ImGui::SetItemTooltip("Copies of the geometry on each particle, spread at random inside the radius below and turned\n"
-                              "at random: many quads for one bone. studiomdl accepts 2048 vertices in a model.\n"
-                              "Needs Static scaling (vertex bones scale each quad on its own).");
+                              "at random: many quads for one bone. A body part of the model holds 2048 vertices, and the\n"
+                              "mesh is dealt over up to %d of them (%d vertices).\n"
+                              "Needs Static scaling (vertex bones scale each quad on its own).",
+                              kMaxBodyParts, kMaxBodyParts * kMaxStudioVertices);
         if (s.cluster_size > 1)
             changed |= whole_slider("cluster_radius", "Cluster Radius", s.cluster_radius, 0, 200, 20);
     }

@@ -279,6 +279,12 @@ std::string describe_mdl(const MdlInfo& info)
                         info.textures.size() == 1 ? "" : "s");
     if (info.textures.size() == 1)
         text += (info.textures[0].flags & kMdlTextureAdditive) != 0 ? " (additive)" : " (not additive)";
+    if (info.body_parts > 1) {
+        int vertices = 0;
+        for (const MdlModel& part : info.models)
+            vertices += part.vertices;
+        text += std::format(", {} vertices in {} body parts", vertices, info.body_parts);
+    }
     return text;
 }
 

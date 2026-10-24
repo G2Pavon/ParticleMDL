@@ -22,6 +22,10 @@ inline constexpr int kMaxStudioFrames = 2048;
 inline constexpr int kMaxStudioVertices = 2048;   // MAXSTUDIOVERTS: "too many vertices in model" above this
 inline constexpr int kMaxStudioNormals = 2048;    // MAXSTUDIOVERTS too: "too many normals in model" above this
 inline constexpr int kMaxTextureNameLength = 63;  // MAXTEXTURENAMELENGTH minus the terminator
+// The vertex and normal limits are per model, and every body part is a model of its own that the
+// engine draws, so a mesh that needs more is dealt over several body parts. 32 is the SDK's
+// MAXSTUDIOBODYPARTS; neither studiomdl nor the engine checks it, so it is kept to.
+inline constexpr int kMaxBodyParts = 32;
 // The texture is "<model name>.bmp", so the name leaves room for the extension.
 inline constexpr int kMaxModelNameLength = kMaxTextureNameLength - 4;
 
@@ -86,10 +90,14 @@ struct ExportReport {
     std::size_t sequence_bytes = 0;        // as studiomdl will measure it
     int vertices = 0;                      // as studiomdl will count them
     int normals = 0;                       // likewise
+    int body_parts = 0;                    // the models the mesh is dealt over (body_part_starts)
     std::vector<ExportBlocker> blockers;   // fatal, frame limit first
     std::vector<std::string> warnings;     // advisory
 };
 ExportReport analyze_export(const ParticleSystem& sys);
+// The first particle of each body part: the particles are dealt in order, each part taking as many
+// whole particles as fit in kMaxStudioVertices and kMaxStudioNormals. Empty without particles.
+std::vector<int> body_part_starts(const ParticleSystem& sys);
 // The same for the baked frames and the table of `sys` already at hand; throws std::invalid_argument
 // if their shape shows they were built from another system.
 ExportReport analyze_export(const ParticleSystem& sys, const AnimationTable& table, const BakedPoses& baked);

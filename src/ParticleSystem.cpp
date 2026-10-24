@@ -255,37 +255,44 @@ ParticleSystem::ParticleSystem(const Settings& settings) : settings_(validated(s
 
 int ParticleSystem::vertex_count() const noexcept
 {
+    return num_particles() * vertices_of(0);
+}
+
+int ParticleSystem::vertices_of(int) const noexcept
+{
     const int copies = cluster_quads_.empty() ? 1 : settings_.cluster_size;
-    return num_particles() * copies * corners_for(settings_.geometry);
+    return copies * corners_for(settings_.geometry);
 }
 
 int ParticleSystem::normal_count() const
+{
+    if (cluster_quads_.empty())
+        return num_particles() * normals_of(0);   // every particle has the same quads on its own bones
+    int total = 0;
+    for (int i = 0; i < num_particles(); ++i)
+        total += normals_of(i);
+    return total;
+}
+
+int ParticleSystem::normals_of(int particle) const
 {
     // studiomdl keeps a normal for each bone and direction, in the order it reads them, and takes a
     // direction less than 2 degrees from one it has on the same bone for that one (Sven Co-op's
     // studiomdl: 1.9 degrees apart gives one normal, 2.1 two). A back face reuses its front's normal.
     const double same = std::cos(radians(2.0));
     std::vector<std::pair<int, Vec3>> kept;
-    auto count = [&](const std::vector<Quad>& quads) {
-        kept.clear();
-        for (int qi = 0; qi < static_cast<int>(quads.size()); ++qi)
-            for (int k = 0; k < 4; ++k) {
-                const int bone = bones_.vertex_bones() ? corner_of(qi, k) : 0;   // which of this particle's bones
-                const Vec3 n = quads[static_cast<std::size_t>(qi)][static_cast<std::size_t>(k)].normal;
-                const bool known = std::ranges::any_of(kept, [&](const std::pair<int, Vec3>& e) {
-                    return e.first == bone && e.second.x * n.x + e.second.y * n.y + e.second.z * n.z > same;
-                });
-                if (!known)
-                    kept.emplace_back(bone, n);
-            }
-        return static_cast<int>(kept.size());
-    };
-    if (cluster_quads_.empty())
-        return num_particles() * count(quads_);   // every particle has the same quads on its own bones
-    int total = 0;
-    for (const std::vector<Quad>& quads : cluster_quads_)
-        total += count(quads);
-    return total;
+    const std::vector<Quad>& quads = quads_of(particle);
+    for (int qi = 0; qi < static_cast<int>(quads.size()); ++qi)
+        for (int k = 0; k < 4; ++k) {
+            const int bone = bones_.vertex_bones() ? corner_of(qi, k) : 0;   // which of this particle's bones
+            const Vec3 n = quads[static_cast<std::size_t>(qi)][static_cast<std::size_t>(k)].normal;
+            const bool known = std::ranges::any_of(kept, [&](const std::pair<int, Vec3>& e) {
+                return e.first == bone && e.second.x * n.x + e.second.y * n.y + e.second.z * n.z > same;
+            });
+            if (!known)
+                kept.emplace_back(bone, n);
+        }
+    return static_cast<int>(kept.size());
 }
 
 Vec3 ParticleSystem::apply_static_rotation(Vec3 p, double rad_x, double rad_y, double rad_z)

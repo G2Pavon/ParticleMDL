@@ -103,10 +103,8 @@ int largest_that_exports(Settings s, int Settings::*field, int lo, int hi)
     double share = 1.0;
     if (at_hi.sequence_bytes > kMaxSequenceBytes)
         share = std::min(share, static_cast<double>(kMaxSequenceBytes) / static_cast<double>(at_hi.sequence_bytes));
-    if (at_hi.vertices > kMaxStudioVertices)
-        share = std::min(share, static_cast<double>(kMaxStudioVertices) / at_hi.vertices);
-    if (at_hi.normals > kMaxStudioNormals)
-        share = std::min(share, static_cast<double>(kMaxStudioNormals) / at_hi.normals);
+    if (at_hi.body_parts > kMaxBodyParts)
+        share = std::min(share, static_cast<double>(kMaxBodyParts) / at_hi.body_parts);
 
     // good fits (or is lo, the least there is); bad does not fit.
     int good = lo, bad = hi;

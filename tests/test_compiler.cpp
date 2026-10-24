@@ -269,3 +269,27 @@ TEST_CASE("the animated model moves where the preview shows it")
                 CHECK(seq.bbmax[2] == doctest::Approx(b.max.z).epsilon(0.002));
             }
 }
+
+TEST_CASE("a still of more faces than a body part holds is dealt over several")
+{
+    Settings s = wide_effect();
+    s.geometry = Geometry::TriPlanarQuads;
+    s.cluster_size = 64;
+    s.cluster_radius = 40;
+    const ParticleSystem sys(s);
+    const BakedPoses baked = bake(sys);
+    const int frame = 7;
+    const MdlInfo info = read_mdl(compile_model(export_frame_files(sys, baked, frame)).mdl);
+    const int faces = particles_on_frame(sys, baked, frame) * 64 * 3;
+    CHECK(info.body_parts == (faces + 511) / 512);   // 512 faces of 4 vertices fill one
+    REQUIRE(info.body_parts > 1);
+    int vertices = 0;
+    for (const MdlModel& part : info.models) {
+        CHECK(part.vertices <= kMaxStudioVertices);
+        vertices += part.vertices;
+    }
+    CHECK(vertices == faces * 4);
+    const auto [lo, hi] = preview_box(sys, baked, frame);
+    CHECK(info.sequences.at(0).bbmin[0] == doctest::Approx(lo.x).epsilon(0.002));
+    CHECK(info.sequences.at(0).bbmax[2] == doctest::Approx(hi.z).epsilon(0.002));
+}

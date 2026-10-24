@@ -206,30 +206,55 @@ TEST_CASE("the preview draws every copy")
     CHECK(scene.faces.size() == 6 * 4);
 }
 
-TEST_CASE("too many vertices is a blocker, exactly above 2048, and says what to lower")
+TEST_CASE("the mesh is dealt over body parts, and too many vertices for 32 is a blocker")
 {
-    const ExportReport at_limit = analyze_export(ParticleSystem(clustered(64, 8, 30)));
-    CHECK(at_limit.vertices == 2048);
-    CHECK(at_limit.blockers.empty());
+    // 2048 vertices fit one body part; 2080 take two.
+    const ExportReport one = analyze_export(ParticleSystem(clustered(64, 8, 30)));
+    CHECK(one.vertices == 2048);
+    CHECK(one.body_parts == 1);
+    CHECK(one.blockers.empty());
+    const ExportReport two = analyze_export(ParticleSystem(clustered(65, 8, 30)));
+    CHECK(two.vertices == 2080);
+    CHECK(two.body_parts == 2);
+    CHECK(two.blockers.empty());
 
-    const ExportReport over = analyze_export(ParticleSystem(clustered(65, 8, 30)));
-    CHECK(over.vertices == 2080);
+    // Tri-planar clusters of 64 are 768 vertices a particle, two to a body part: 64 particles fill
+    // the 32 body parts, and the 65th is over.
+    const ExportReport full = analyze_export(ParticleSystem(clustered(64, 64, 60, Geometry::TriPlanarQuads)));
+    CHECK(full.vertices == 64 * 768);
+    CHECK(full.body_parts == kMaxBodyParts);
+    CHECK(full.blockers.empty());
+    const ExportReport over = analyze_export(ParticleSystem(clustered(65, 64, 60, Geometry::TriPlanarQuads)));
+    CHECK(over.body_parts == kMaxBodyParts + 1);
     REQUIRE(over.blockers.size() == 1);
     CHECK(over.blockers[0].kind == ExportBlocker::Kind::TooManyVertices);
-    CHECK(over.blockers[0].message.find("2080 vertices") != std::string::npos);
-    CHECK(over.blockers[0].message.find("2048") != std::string::npos);
+    CHECK(over.blockers[0].message.find(std::to_string(65 * 768) + " vertices") != std::string::npos);
+    CHECK(over.blockers[0].message.find("32 body parts") != std::string::npos);
     CHECK(over.blockers[0].message.find("Cluster Size") != std::string::npos);
+    CHECK_THROWS_AS(export_files(ParticleSystem(clustered(65, 64, 60, Geometry::TriPlanarQuads))), ExportBlocked);
+}
 
-    // Without a cluster there is nothing about clusters to say, and the real maximum is far below the limit.
-    Settings tri;
-    tri.count = 126;
-    tri.geometry = Geometry::TriPlanarQuads;
-    const ExportReport no_cluster = analyze_export(ParticleSystem(tri));
-    CHECK(no_cluster.vertices == 1512);
-    CHECK(no_cluster.blockers.empty());
-
-    // the export refuses it
-    CHECK_THROWS_AS(export_files(ParticleSystem(clustered(65, 8, 30))), ExportBlocked);
+TEST_CASE("each body part has a reference mesh of its own particles, and every bone")
+{
+    const ParticleSystem sys(clustered(65, 8, 30));
+    const ExportFiles files = export_files(sys);
+    const std::string& qc = files.bytes_of(".qc");
+    CHECK(qc.find("$body \"studio\" \"custom_particles_ref\"") != std::string::npos);
+    CHECK(qc.find("$body \"studio2\" \"custom_particles_ref2\"") != std::string::npos);
+    CHECK(qc.find("studio3") == std::string::npos);
+    // The first part holds the first 64 particles (2048 vertices), the second the last.
+    const std::string& second = files.bytes_of("_ref2.smd");
+    CHECK(second.find("  64 \"p_64\" -1") != std::string::npos);   // every part names every bone
+    CHECK(second.find("\n  0 ") != std::string::npos);            // in the skeleton, not in the triangles
+    std::istringstream in(second.substr(second.find("triangles")));
+    std::string line;
+    std::set<int> bones;
+    while (std::getline(in, line)) {
+        int bone = 0;
+        if (std::sscanf(line.c_str(), " %d %*f %*f %*f %*f %*f %*f %*d %*d", &bone) == 1)
+            bones.insert(bone);
+    }
+    CHECK(bones == std::set<int>{64});
 }
 
 TEST_CASE("the cluster settings are saved and old files have none")

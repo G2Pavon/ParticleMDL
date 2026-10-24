@@ -40,6 +40,50 @@ void write_nodes(std::string& out, const ParticleSystem& sys)
 // model is written as the preview has it, and no root bone carries a constant turn.
 const char kNoTurn[] = "$origin 0 0 0 -90\n\n";
 
+// A body part's name in the QC and the suffix of its reference SMD: the first is "studio" and
+// "_ref", as a model of one body part has always been, the next "studio2" and "_ref2" and so on.
+std::string body_name(std::size_t part)
+{
+    return part == 0 ? "studio" : "studio" + std::to_string(part + 1);
+}
+
+std::string ref_suffix(std::size_t part)
+{
+    return part == 0 ? "_ref" : "_ref" + std::to_string(part + 1);
+}
+
+void write_bodies(std::string& out, const std::string& stem, std::size_t parts)
+{
+    for (std::size_t k = 0; k < parts; ++k)
+        emit(out, "$body \"{}\" \"{}{}\"\n", body_name(k), stem, ref_suffix(k));
+    out += '\n';
+}
+
+// The particles of each body part, from body_part_starts(), as [first, end) ranges.
+std::vector<std::pair<int, int>> part_ranges(const std::vector<int>& starts, int particles)
+{
+    std::vector<std::pair<int, int>> out;
+    for (std::size_t k = 0; k < starts.size(); ++k)
+        out.emplace_back(starts[k], k + 1 < starts.size() ? starts[k + 1] : particles);
+    return out;
+}
+
+// Deals particles to body parts (see body_part_starts) from their vertex and normal counts.
+std::vector<int> deal_body_parts(const std::vector<int>& vertices, const std::vector<int>& normals)
+{
+    std::vector<int> starts;
+    int in_part_v = 0, in_part_n = 0;
+    for (std::size_t i = 0; i < vertices.size(); ++i) {
+        if (starts.empty() || in_part_v + vertices[i] > kMaxStudioVertices || in_part_n + normals[i] > kMaxStudioNormals) {
+            starts.push_back(static_cast<int>(i));
+            in_part_v = in_part_n = 0;
+        }
+        in_part_v += vertices[i];
+        in_part_n += normals[i];
+    }
+    return starts;
+}
+
 // A number for the .qc: as few digits as it needs, with at least one decimal ("1.0", "0.25").
 std::string qc_number(double v)
 {
@@ -50,7 +94,7 @@ std::string qc_number(double v)
 }
 
 std::string make_qc(const ParticleSystem& sys, const BakedPoses& baked, const std::string& safe,
-                    const std::string& tex_ref)
+                    const std::string& tex_ref, std::size_t parts)
 {
     std::string out;
     emit(out, "$modelname \"{}.mdl\"\n$cd \".\"\n$cdtexture \".\"\n$scale {}\n", safe, qc_number(sys.settings().model_scale));
@@ -67,16 +111,17 @@ std::string make_qc(const ParticleSystem& sys, const BakedPoses& baked, const st
 
     // The game adds the texture's colour to what is behind it.
     emit(out, "$texrendermode \"{}\" additive\n\n", tex_ref);
-    emit(out, "$body \"studio\" \"{}_ref\"\n\n", safe);
+    write_bodies(out, safe, parts);
     emit(out, "$sequence \"idle\" \"{}_anim\"{} fps {}\n", safe, sys.looping() ? " loop" : "", static_cast<int>(sys.export_fps()));
     return out;
 }
 
-std::string make_ref_smd(const ParticleSystem& sys, const std::string& tex_ref)
+// The reference mesh of particles [first, end): one body part. Every part names every bone.
+std::string make_ref_smd(const ParticleSystem& sys, const std::string& tex_ref, int first, int end)
 {
     // Up to 4 triangles per quad, each a material line and three ~80-byte vertex lines.
     std::size_t quads = 0;
-    for (int i = 0; i < sys.num_particles(); ++i)
+    for (int i = first; i < end; ++i)
         quads += sys.quads_of(i).size();
     std::string out;
     out.reserve(quads * 4 * (tex_ref.size() + 1 + 3 * 80) + 4096);
@@ -102,7 +147,7 @@ std::string make_ref_smd(const ParticleSystem& sys, const std::string& tex_ref)
 
     const bool vertex_bones = sys.bones().vertex_bones();
     const bool back_faces = sys.settings().double_sided && sys.settings().geometry != Geometry::VolumetricBox;
-    for (int pi = 0; pi < sys.num_particles(); ++pi) {
+    for (int pi = first; pi < end; ++pi) {
         const Particle& p = sys.particles()[static_cast<std::size_t>(pi)];
         const std::vector<Quad>& quads_of_p = sys.quads_of(pi);
         size = vertex_bones ? 1.0 : p.size;
@@ -175,6 +220,9 @@ std::vector<StillQuad> still_quads(const ParticleSystem& sys, const BakedPoses& 
 const char kStillNodes[] = "version 1\nnodes\n  0 \"particles\" -1\nend\nskeleton\n  time 0\n"
                            "    0 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000\nend\n";
 
+// A still's faces per body part: 4 vertices and at most 4 normals each, so 512 fill a model.
+constexpr std::size_t kStillQuadsPerPart = kMaxStudioVertices / 4;
+
 std::string make_still_qc(const ParticleSystem& sys, const std::vector<StillQuad>& quads, const std::string& stem,
                           const std::string& tex_ref)
 {
@@ -195,12 +243,12 @@ std::string make_still_qc(const ParticleSystem& sys, const std::vector<StillQuad
     emit(out, "$bbox {:.2f} {:.2f} {:.2f} {:.2f} {:.2f} {:.2f}\n\n", std::floor(lo.x) - 1, std::floor(lo.y) - 1,
          std::floor(lo.z) - 1, std::ceil(hi.x) + 1, std::ceil(hi.y) + 1, std::ceil(hi.z) + 1);
     emit(out, "$texrendermode \"{}\" additive\n\n", tex_ref);
-    emit(out, "$body \"studio\" \"{}_ref\"\n\n", stem);
+    write_bodies(out, stem, (quads.size() + kStillQuadsPerPart - 1) / kStillQuadsPerPart);
     emit(out, "$sequence \"idle\" \"{}_anim\" fps 1\n", stem);
     return out;
 }
 
-std::string make_still_ref_smd(const ParticleSystem& sys, const std::vector<StillQuad>& quads, const std::string& tex_ref)
+std::string make_still_ref_smd(const ParticleSystem& sys, std::span<const StillQuad> quads, const std::string& tex_ref)
 {
     std::string out;
     out.reserve(quads.size() * 4 * (tex_ref.size() + 1 + 3 * 80) + 256);
@@ -479,8 +527,14 @@ ExportReport analyze_export(const ParticleSystem& sys, const AnimationTable& tab
     ExportReport r;
     r.frames = table.frames;
     r.sequence_bytes = sequence_bytes(table);
-    r.vertices = sys.vertex_count();
-    r.normals = sys.normal_count();
+    std::vector<int> vertices(static_cast<std::size_t>(sys.num_particles())), normals(vertices.size());
+    for (int i = 0; i < sys.num_particles(); ++i) {
+        vertices[static_cast<std::size_t>(i)] = sys.vertices_of(i);
+        normals[static_cast<std::size_t>(i)] = sys.normals_of(i);
+        r.vertices += vertices[static_cast<std::size_t>(i)];
+        r.normals += normals[static_cast<std::size_t>(i)];
+    }
+    r.body_parts = static_cast<int>(deal_body_parts(vertices, normals).size());
 
     if (r.frames > kMaxStudioFrames) {
         // Frames are lround(duration * fps) + 1, so this many steps fit.
@@ -501,19 +555,21 @@ ExportReport analyze_export(const ParticleSystem& sys, const AnimationTable& tab
                                    sys.bones().per_particle());
         r.blockers.push_back({ExportBlocker::Kind::SequenceTooLarge, std::move(message)});
     }
-    if (r.vertices > kMaxStudioVertices) {
-        std::string message = std::format("{} vertices: studiomdl accepts at most {} in a model. Lower Particle Count",
-                                          r.vertices, kMaxStudioVertices);
+    if (r.body_parts > kMaxBodyParts) {
+        // Which runs out: the vertices alone already need too many body parts, or the normals do.
+        // studiomdl keeps a normal for each direction on each bone: with vertex bones a corner shared
+        // by several faces has one for each of them.
+        const bool by_vertices =
+            deal_body_parts(vertices, std::vector<int>(vertices.size(), 0)).size() > static_cast<std::size_t>(kMaxBodyParts);
+        std::string message =
+            std::format("{} {}: studiomdl takes at most {} in a body part, and a model of {} body parts holds {}. "
+                        "Lower Particle Count",
+                        by_vertices ? r.vertices : r.normals, by_vertices ? "vertices" : "normals",
+                        by_vertices ? kMaxStudioVertices : kMaxStudioNormals, kMaxBodyParts,
+                        kMaxBodyParts * (by_vertices ? kMaxStudioVertices : kMaxStudioNormals));
         message += s.cluster_size > 1 ? ", Cluster Size or use geometry with fewer quads." : " or use geometry with fewer quads.";
-        r.blockers.push_back({ExportBlocker::Kind::TooManyVertices, std::move(message)});
-    }
-    if (r.normals > kMaxStudioNormals) {
-        // studiomdl keeps a normal for each direction on each bone: with vertex bones a corner
-        // shared by several faces has one for each of them.
-        std::string message = std::format("{} normals: studiomdl accepts at most {} in a model. Lower Particle Count",
-                                          r.normals, kMaxStudioNormals);
-        message += s.cluster_size > 1 ? ", Cluster Size or use geometry with fewer quads." : " or use geometry with fewer quads.";
-        r.blockers.push_back({ExportBlocker::Kind::TooManyNormals, std::move(message)});
+        r.blockers.push_back({by_vertices ? ExportBlocker::Kind::TooManyVertices : ExportBlocker::Kind::TooManyNormals,
+                              std::move(message)});
     }
 
     // A particle drawn in none of the frames: with vertex bones the frames around a birth and a death
@@ -631,8 +687,10 @@ ExportFiles export_files_over_limits(const ParticleSystem& sys, const BakedPoses
     const std::vector<std::uint8_t> bmp = encode_indexed_bmp(export_texture(sys.settings().texture));
     ExportFiles out{safe, {}};
     out.files.push_back({tex_ref, std::string(bmp.begin(), bmp.end())});
-    out.files.push_back({safe + ".qc", make_qc(sys, baked, safe, tex_ref)});
-    out.files.push_back({safe + "_ref.smd", make_ref_smd(sys, tex_ref)});
+    const auto parts = part_ranges(body_part_starts(sys), sys.num_particles());
+    out.files.push_back({safe + ".qc", make_qc(sys, baked, safe, tex_ref, parts.size())});
+    for (std::size_t k = 0; k < parts.size(); ++k)
+        out.files.push_back({safe + ref_suffix(k) + ".smd", make_ref_smd(sys, tex_ref, parts[k].first, parts[k].second)});
     out.files.push_back({safe + "_anim.smd", make_anim_smd(sys, table)});
     return out;
 }
@@ -680,6 +738,11 @@ ExportFiles export_frame_files(const ParticleSystem& sys, const BakedPoses& bake
     const std::vector<StillQuad> quads = still_quads(sys, baked, frame);
     if (quads.empty())
         throw std::invalid_argument("no particle is shown on frame " + std::to_string(frame));
+    const std::size_t parts = (quads.size() + kStillQuadsPerPart - 1) / kStillQuadsPerPart;
+    if (parts > static_cast<std::size_t>(kMaxBodyParts))
+        throw std::invalid_argument(std::format("frame {} shows {} faces: a still holds at most {} ({} body parts of {})",
+                                                frame, quads.size(), kMaxBodyParts * kStillQuadsPerPart, kMaxBodyParts,
+                                                kStillQuadsPerPart));
 
     const std::string stem = frame_model_name(sys.settings().model_name, frame);
     const std::string tex_ref = stem + ".bmp";
@@ -687,9 +750,23 @@ ExportFiles export_frame_files(const ParticleSystem& sys, const BakedPoses& bake
     ExportFiles out{stem, {}};
     out.files.push_back({tex_ref, std::string(bmp.begin(), bmp.end())});
     out.files.push_back({stem + ".qc", make_still_qc(sys, quads, stem, tex_ref)});
-    out.files.push_back({stem + "_ref.smd", make_still_ref_smd(sys, quads, tex_ref)});
+    for (std::size_t k = 0; k < parts; ++k) {
+        const std::size_t first = k * kStillQuadsPerPart;
+        const std::span<const StillQuad> part(quads.data() + first, std::min(kStillQuadsPerPart, quads.size() - first));
+        out.files.push_back({stem + ref_suffix(k) + ".smd", make_still_ref_smd(sys, part, tex_ref)});
+    }
     out.files.push_back({stem + "_anim.smd", std::string(kStillNodes)});
     return out;
+}
+
+std::vector<int> body_part_starts(const ParticleSystem& sys)
+{
+    std::vector<int> vertices, normals;
+    for (int i = 0; i < sys.num_particles(); ++i) {
+        vertices.push_back(sys.vertices_of(i));
+        normals.push_back(sys.normals_of(i));
+    }
+    return deal_body_parts(vertices, normals);
 }
 
 } // namespace gs

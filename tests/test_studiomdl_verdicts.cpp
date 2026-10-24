@@ -163,8 +163,11 @@ TEST_CASE("the frame blocker is exactly where studiomdl starts to cut the sequen
 }
 
 // ---------------------------------------------------------------------------
-// Vertices. studiomdl prints "(N vertices, ...)" for a model it accepts and
-// `too many vertices in model` above 2048.
+// Vertices. studiomdl prints "(N vertices, ...)" for each model it compiles and refuses one of
+// more than 2048 (`too many vertices in model`). The limit is per model, and every body part is a
+// model of its own, so since 2026-10-23 a mesh over it is dealt over body parts; Sven Co-op's
+// studiomdl compiled the two cases over 2048 in two body parts (2048 + 32 and 2016 + 384
+// vertices) and 64 tri-planar clusters of 64 in 32 body parts of 1536.
 // ---------------------------------------------------------------------------
 
 namespace {
@@ -172,34 +175,37 @@ namespace {
 struct VertexVerdict {
     const char* name;
     const char* settings;
-    int vertices;      // what studiomdl counted, or what vertex_count() says for a model it refused
-    bool accepted;
+    int vertices;     // what studiomdl counted, over all body parts
+    int body_parts;   // the models it made
 };
 
 constexpr VertexVerdict kVertexVerdicts[] = {
-    {"crossed quads", R"({"model_name":"crossed","count":20,"duration":1.0,"fps":10})", 160, true},
+    {"crossed quads", R"({"model_name":"crossed","count":20,"duration":1.0,"fps":10})", 160, 1},
     {"static boxes (eight corners each)",
-     R"({"model_name":"boxstatic","count":8,"duration":1.0,"fps":10,"geometry":"volumetric_box"})", 64, true},
+     R"({"model_name":"boxstatic","count":8,"duration":1.0,"fps":10,"geometry":"volumetric_box"})", 64, 1},
     {"tri-planar quads",
-     R"({"model_name":"tri","count":10,"duration":1.0,"fps":10,"geometry":"tri_planar_quads"})", 120, true},
+     R"({"model_name":"tri","count":10,"duration":1.0,"fps":10,"geometry":"tri_planar_quads"})", 120, 1},
     {"boxes with shared corner bones",
      R"({"model_name":"boxvb","count":14,"duration":1.0,"fps":10,"geometry":"volumetric_box","scale_mode":"vertex_bone"})", 112,
-     true},
+     1},
     {"clusters of crossed quads",
      R"({"model_name":"clcross","count":30,"duration":1.0,"fps":10,"geometry":"crossed_quads","cluster_size":4,"cluster_radius":30})",
-     960, true},
+     960, 1},
     {"clusters of boxes",
      R"({"model_name":"clbox","count":20,"duration":1.0,"fps":10,"geometry":"volumetric_box","cluster_size":5,"cluster_radius":30})",
-     800, true},
+     800, 1},
     {"exactly 2048 vertices",
      R"({"model_name":"cl8","count":64,"duration":1.0,"fps":10,"geometry":"single_quad","cluster_size":8,"cluster_radius":30})",
-     2048, true},
+     2048, 1},
     {"2080 vertices",
      R"({"model_name":"cl8x","count":65,"duration":1.0,"fps":10,"geometry":"single_quad","cluster_size":8,"cluster_radius":30})",
-     2080, false},
+     2080, 2},
     {"2400 vertices",
      R"({"model_name":"clbigbox","count":50,"duration":1.0,"fps":10,"geometry":"volumetric_box","cluster_size":6,"cluster_radius":30})",
-     2400, false},
+     2400, 2},
+    {"32 body parts",
+     R"({"model_name":"tri64","count":64,"duration":1.0,"fps":10,"geometry":"tri_planar_quads","cluster_size":64,"cluster_radius":60})",
+     49152, 32},
 };
 
 } // namespace
@@ -214,16 +220,15 @@ TEST_CASE("vertex_count is the number of vertices the real studiomdl counts")
     }
 }
 
-TEST_CASE("the vertex blocker agrees with the models studiomdl accepted and refused")
+TEST_CASE("the mesh is dealt over the body parts studiomdl compiled")
 {
     for (const VertexVerdict& v : kVertexVerdicts) {
         CAPTURE(v.name);
         const SettingsLoad loaded = settings_from_json(nlohmann::json::parse(v.settings), Settings{});
         const ExportReport report = analyze_export(ParticleSystem(loaded.settings));
-        const bool blocked = std::ranges::any_of(
-            report.blockers, [](const ExportBlocker& b) { return b.kind == ExportBlocker::Kind::TooManyVertices; });
-        CHECK(blocked == !v.accepted);
+        CHECK(report.blockers.empty());
         CHECK(report.vertices == v.vertices);
+        CHECK(report.body_parts == v.body_parts);
     }
 }
 
@@ -281,22 +286,29 @@ TEST_CASE("normal_count is the number of normals the real studiomdl counts")
     }
 }
 
-TEST_CASE("the normal blocker names the normals over the limit")
+TEST_CASE("every body part keeps to studiomdl's vertex and normal limits")
 {
-    // Nothing reaches 2048 normals before 2048 vertices yet: six clusters of 64 boxes are over both.
+    // Clusters of boxes have many normals for their vertices: the parts are dealt by both counts.
     Settings s;
-    s.count = 6;
+    s.count = 127;
     s.geometry = Geometry::VolumetricBox;
     s.cluster_size = 64;
     const ParticleSystem sys(s);
-    REQUIRE(sys.normal_count() > kMaxStudioNormals);
-    CHECK(sys.normal_count() <= 6 * 64 * 6);
-    const ExportReport report = analyze_export(sys);
-    const auto it = std::ranges::find_if(report.blockers,
-                                         [](const ExportBlocker& b) { return b.kind == ExportBlocker::Kind::TooManyNormals; });
-    REQUIRE(it != report.blockers.end());
-    CHECK(it->message.find(std::to_string(sys.normal_count()) + " normals") != std::string::npos);
-    CHECK(it->message.find("Cluster Size") != std::string::npos);
+    const std::vector<int> starts = body_part_starts(sys);
+    REQUIRE(starts.size() > 1);
+    CHECK(starts.front() == 0);
+    for (std::size_t k = 0; k < starts.size(); ++k) {
+        const int end = k + 1 < starts.size() ? starts[k + 1] : sys.num_particles();
+        int vertices = 0, normals = 0;
+        for (int i = starts[k]; i < end; ++i) {
+            vertices += sys.vertices_of(i);
+            normals += sys.normals_of(i);
+        }
+        CHECK(vertices <= kMaxStudioVertices);
+        CHECK(normals <= kMaxStudioNormals);
+        if (end < sys.num_particles())   // the next particle did not fit
+            CHECK((vertices + sys.vertices_of(end) > kMaxStudioVertices || normals + sys.normals_of(end) > kMaxStudioNormals));
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -351,6 +363,27 @@ std::optional<long> reported(const Outcome& o, std::string_view line, std::strin
 
 } // namespace
 
+namespace {
+
+// The numbers after `marker` in every note that starts with `line`, added up: one per body part.
+long reported_sum(const Outcome& o, std::string_view line, std::string_view marker)
+{
+    long sum = 0;
+    for (std::string_view note : o.notes) {
+        if (!note.starts_with(line))
+            continue;
+        std::size_t at = note.find(marker) + marker.size();
+        while (at < note.size() && note[at] == ' ')
+            ++at;
+        long value = 0;
+        std::from_chars(note.data() + at, note.data() + note.size(), value);
+        sum += value;
+    }
+    return sum;
+}
+
+} // namespace
+
 TEST_CASE("the built-in compiler measures sequences like the real studiomdl")
 {
     for (const Verdict& v : kVerdicts) {
@@ -379,11 +412,9 @@ TEST_CASE("the built-in compiler counts vertices like the real studiomdl")
     for (const VertexVerdict& v : kVertexVerdicts) {
         CAPTURE(v.name);
         const Outcome o = compile_unchecked(system_of(v.settings));
-        CHECK(o.accepted == v.accepted);
-        if (v.accepted)
-            CHECK(reported(o, "vertices", "(").value_or(-1) == v.vertices);
-        else
-            CHECK(o.error.find("too many vertices") != std::string::npos);
+        REQUIRE(o.accepted);
+        CHECK(reported_sum(o, "vertices", "(") == v.vertices);
+        CHECK(std::ranges::count_if(o.notes, [](std::string_view n) { return n.starts_with("vertices"); }) == v.body_parts);
     }
 }
 
