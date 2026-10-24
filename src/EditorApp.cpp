@@ -896,6 +896,10 @@ void EditorApp::draw_left_panel()
     changed |= reset_slider("lifespan_variance", "Lifespan Variance", s.lifespan_variance, 0.0, 0.9, 0.0, "%.2f");
     ImGui::SetItemTooltip("Each particle lives up to this fraction shorter than the lifespan, at random");
     changed |= reset_slider("fps", "FPS", s.fps, kMinFps, kMaxFps, 30, ImGuiSliderFlags_AlwaysClamp);
+    ImGui::SetItemTooltip("Frames per second of the exported animation; the game blends between them.\n"
+                          "In the map, the entity's Framerate multiplies this speed: a cycler_sprite needs\n"
+                          "Framerate 1 (between 0 and 1 to slow it down), or its usual 10 plays the effect\n"
+                          "ten times too fast. Copy as entity sets it to 1.");
     changed |= enum_combo("End Behavior", s.end_behavior);
     ImGui::SetItemTooltip("What a particle does after its lifespan:\n"
                           "Drop Through Floor: falls, then hides below the effect\n"
