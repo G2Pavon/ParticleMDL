@@ -800,23 +800,41 @@ void EditorApp::draw_about_dialog()
         return;
 
     ImGui::TextColored(kAccent, "ParticleMDL");
-    ImGui::Text("Version %s", GS_VERSION);
+    ImGui::SameLine();
+    ImGui::TextDisabled("version %s", GS_VERSION);
+    ImGui::TextWrapped("Bakes particle effects into GoldSrc studio models: every particle is a bone, the motion one "
+                       "animation, compiled to a .mdl by the built-in studiomdl.");
+    ImGui::TextLinkOpenURL("github.com/G2Pavon/ParticleMDL", "https://github.com/G2Pavon/ParticleMDL");
+    ImGui::SetItemTooltip("Source, releases and issues: https://github.com/G2Pavon/ParticleMDL");
     ImGui::Dummy(ImVec2(0, ui::px(8)));
 
     ImGui::TextColored(kAccent, "Mouse");
     ImGui::BulletText("Drag in the preview to orbit the camera");
     ImGui::BulletText("Scroll over the preview to zoom");
     ImGui::BulletText("Ctrl+click a slider to type a value");
+    ImGui::BulletText("Hover a setting or a locked button to see what it does or why it is locked");
     ImGui::Dummy(ImVec2(0, ui::px(8)));
 
     ImGui::TextColored(kAccent, "Keyboard");
     ImGui::BulletText("Ctrl+N  New system");
     ImGui::BulletText("Ctrl+O  Load settings");
     ImGui::BulletText("Ctrl+S  Save settings");
+    ImGui::BulletText("Ctrl+E  Export .mdl");
+    ImGui::BulletText("Space  Play or pause (Playback on, over the preview)");
+    ImGui::BulletText("Left, Right  One frame back or forward");
     ImGui::Dummy(ImVec2(0, ui::px(8)));
 
-    ImGui::TextWrapped("Export .mdl compiles the effect with the built-in studiomdl and writes the .mdl into the "
-                       "models folder of the game folder set in Settings > Game Folder, or a folder inside it.");
+    ImGui::TextColored(kAccent, "In the game");
+    ImGui::TextWrapped("Export .mdl compiles the effect and writes the .mdl into the models folder of the game folder "
+                       "set in Settings > Game Folder, or a folder inside it. Copy as entity puts a cycler_sprite for it "
+                       "on the clipboard. The preview shows the effect as on an Additive entity (render mode 5, FX "
+                       "amount 255); keep the entity's Framerate at 1, or it plays too fast.");
+    ImGui::Dummy(ImVec2(0, ui::px(8)));
+
+    ImGui::TextColored(kAccent, "About");
+    ImGui::TextWrapped("Settings are kept in config.json beside the program. ParticleMDL is under the MIT license. "
+                       "Its built-in compiler, studiomdl++, is Half-Life 1 SDK code under Valve's SDK license: free to "
+                       "share, never to sell. Made with Dear ImGui, GLFW, nlohmann/json, stb_image and tinyfiledialogs.");
     ImGui::Dummy(ImVec2(0, ui::px(12)));
     if (ImGui::Button("Close", ImVec2(ui::px(90), 0)))
         ImGui::CloseCurrentPopup();
