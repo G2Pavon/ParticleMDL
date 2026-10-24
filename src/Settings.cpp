@@ -179,6 +179,9 @@ Settings blank_settings()
         .spread = 0,
         .gravity = 0,
         .texture = {.core_color = {255, 255, 255}},
+        // Folding hides every rebirth, so a new effect loops without a seam; Static fits twice
+        // the particles.
+        .scale_mode = ScaleMode::Folding,
         .geometry = Geometry::SingleQuad,
     };
 }

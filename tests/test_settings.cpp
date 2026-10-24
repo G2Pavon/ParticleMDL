@@ -30,6 +30,14 @@ TEST_CASE("validate leaves the blank settings untouched")
     CHECK_FALSE(validate(s));
 }
 
+TEST_CASE("a new effect folds its quads, to loop without a seam")
+{
+    const Settings s = blank_settings();
+    CHECK(s.scale_mode == ScaleMode::Folding);
+    CHECK(folds(s.geometry));   // so it does not fall back to Static
+    CHECK(Settings{}.scale_mode == ScaleMode::Static);   // files without a scale mode load as before
+}
+
 TEST_CASE("validate replaces non-finite numbers with the defaults")
 {
     const Settings defaults;
