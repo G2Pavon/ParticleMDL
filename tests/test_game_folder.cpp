@@ -152,3 +152,19 @@ TEST_CASE("the config is kept beside the program, and read from where it was unt
     CHECK(read_app_config(dir / "none" / "config.json", dir / "nothing.json").game_folder.empty());
     fs::remove_all(dir);
 }
+
+TEST_CASE("an exported model is named from the mod folder, and copied as a cycler_sprite")
+{
+    CHECK(mod_model_path("", "smoke.mdl") == "models/smoke.mdl");
+    CHECK(mod_model_path("fx\\smoke\\", "fire_f40.mdl") == "models/fx/smoke/fire_f40.mdl");
+    CHECK(mod_model_path(" mymodels/ ", "a.mdl") == "models/mymodels/a.mdl");
+    CHECK(cycler_sprite_entity("models/name.mdl") == "{\n"
+                                                     "\"classname\" \"cycler_sprite\"\n"
+                                                     "\"framerate\" \"1\"\n"
+                                                     "\"renderfx\" \"0\"\n"
+                                                     "\"rendermode\" \"0\"\n"
+                                                     "\"rendercolor\" \"0 0 0\"\n"
+                                                     "\"angles\" \"0 0 0\"\n"
+                                                     "\"model\" \"models/name.mdl\"\n"
+                                                     "}\n");
+}

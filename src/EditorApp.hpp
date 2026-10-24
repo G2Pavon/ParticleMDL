@@ -98,6 +98,7 @@ private:
     PreviewRenderer renderer_;
     Rgb canvas_bg_{0, 0, 0};
 
+    std::string exported_model_;   // the last model written, from the mod folder ("models/fx/smoke.mdl")
     std::string status_;
     std::string status_detail_;   // the warnings, differences or compiler notes behind the status
     StatusTone status_tone_ = StatusTone::Success;

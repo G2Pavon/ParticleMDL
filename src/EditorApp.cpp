@@ -275,6 +275,7 @@ void EditorApp::export_frame()
         std::filesystem::create_directories(folder);
         const std::string where = models_label(from_utf8(config_.game_folder)) + normalized_subfolder(models_subfolder_);
         const CompiledModel model = export_frame_mdl(sys, baked_, frame, folder);
+        exported_model_ = mod_model_path(models_subfolder_, frame_model_name(sys.settings().model_name, frame) + ".mdl");
         std::string summary = std::to_string(particles_on_frame(sys, baked_, frame)) + " particles";
         try {
             const MdlInfo info = read_mdl(model.mdl);
@@ -312,6 +313,7 @@ void EditorApp::export_data()
         const std::string where = models_label(from_utf8(config_.game_folder)) + normalized_subfolder(models_subfolder_);
         // The built-in compiler takes the files in memory: only the .mdl reaches the folder.
         const CompiledModel model = export_mdl(sys, baked_, table_, folder);
+        exported_model_ = mod_model_path(models_subfolder_, safe + ".mdl");
         // Read the model back: what the compiler made, and whether it is what was exported.
         std::string summary;
         std::vector<std::string> problems;
@@ -1084,21 +1086,33 @@ void EditorApp::draw_middle_panel()
         case ExportBlocker::Kind::TooManyVertices: label = "Blocked: too many vertices###export"; break;
         case ExportBlocker::Kind::TooManyNormals: label = "Blocked: too many normals###export"; break;
         }
-    // The animated model, and a still of the frame the playback is on.
-    const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
+    // The animated model, a still of the frame the playback is on, and the last model exported as
+    // an entity to paste into a map.
+    const float third = (ImGui::GetContentRegionAvail().x - 2 * ImGui::GetStyle().ItemSpacing.x) / 3.0f;
     {
         ui::Locked lock(!can_export(), "Fix what the messages above say first");
-        if (ImGui::Button(label, ImVec2(half, ui::px(40))))
+        if (ImGui::Button(label, ImVec2(third, ui::px(40))))
             export_data();
     }
     ImGui::SameLine();
     {
         const std::optional<std::string> problem = frame_export_problem();
         ui::Locked lock(problem.has_value(), problem ? problem->c_str() : nullptr);
-        if (ImGui::Button("Export frame .mdl", ImVec2(-1, ui::px(40))))
+        if (ImGui::Button("Export frame .mdl", ImVec2(third, ui::px(40))))
             export_frame();
         ImGui::SetItemTooltip("A still model of the frame on show: the particles where they are on that frame, without\n"
                               "animation, written as <name>_f<frame>.mdl beside the animated model.");
+    }
+    ImGui::SameLine();
+    {
+        ui::Locked lock(exported_model_.empty(), "Export a model first: this copies the last one exported");
+        if (ImGui::Button("Copy as entity", ImVec2(-1, ui::px(40)))) {
+            ImGui::SetClipboardText(cycler_sprite_entity(exported_model_).c_str());
+            set_status("Copied a cycler_sprite of " + exported_model_ + " to the clipboard", StatusTone::Success);
+        }
+        ImGui::SetItemTooltip("Copies the last exported model (%s) as a cycler_sprite entity, the text of a .map\n"
+                              "file, to paste into a map. Its path is relative to the mod folder.",
+                              exported_model_.c_str());
     }
 
     bottom_height_ = ImGui::GetCursorPosY() - bottom_start + ImGui::GetStyle().ItemSpacing.y;

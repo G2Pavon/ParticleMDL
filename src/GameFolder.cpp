@@ -201,4 +201,23 @@ void write_app_config(const fs::path& path, const AppConfig& config)
     write_file_atomically(path, j.dump(2) + "\n");
 }
 
+std::string mod_model_path(std::string_view subfolder, std::string_view file)
+{
+    const std::string sub = normalized_subfolder(subfolder);
+    return "models/" + (sub.empty() ? std::string() : sub + "/") + std::string(file);
+}
+
+std::string cycler_sprite_entity(std::string_view model_path)
+{
+    return "{\n"
+           "\"classname\" \"cycler_sprite\"\n"
+           "\"framerate\" \"1\"\n"
+           "\"renderfx\" \"0\"\n"
+           "\"rendermode\" \"0\"\n"
+           "\"rendercolor\" \"0 0 0\"\n"
+           "\"angles\" \"0 0 0\"\n"
+           "\"model\" \"" + std::string(model_path) + "\"\n"
+           "}\n";
+}
+
 } // namespace gs

@@ -37,6 +37,12 @@ std::string models_label(const std::filesystem::path& game);
 // is not inside it.
 std::optional<std::string> subfolder_within_models(const std::filesystem::path& game, const std::filesystem::path& chosen);
 
+// A model's path as the game names it, relative to the mod folder and with '/':
+// "models/<subfolder>/<file>", or "models/<file>" for the models folder itself.
+std::string mod_model_path(std::string_view subfolder, std::string_view file);
+// A cycler_sprite that shows `model_path` (from mod_model_path), as the text of a .map entity.
+std::string cycler_sprite_entity(std::string_view model_path);
+
 // What the editor keeps between sessions.
 struct AppConfig {
     std::string game_folder;   // UTF-8; empty until it is set
