@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
+#include <format>
 #include <fstream>
 
 #include <imgui_stdlib.h>
@@ -81,7 +82,7 @@ EditorApp::EditorApp()
         show_game_folder_ = true;
         game_folder_edit_.clear();
     }
-    apply_preset(0);   // Fountain
+    apply_preset(0);   // Seamless Loop
 }
 
 // ---------------------------------------------------------------------------
@@ -1156,7 +1157,17 @@ void EditorApp::draw_right_panel()
     changed |= int_combo("Resolution", s.texture.size, kTextureSizes);
 
     group_label("Scaling");
-    changed |= enum_combo("Mode", s.scale_mode);
+    if (const ScaleMode was = s.scale_mode; enum_combo("Mode", s.scale_mode)) {
+        if (s.scale_mode == ScaleMode::Folding && !folds(s.geometry)) {
+            s.scale_mode = was;   // it would only fall back to Static
+            set_status(std::format("Folding needs Single Quad or Crossed Quads geometry: the quads of {} do not fold "
+                                   "along one line. Vertex Bone hides their rebirths instead.",
+                                   enum_label(s.geometry)),
+                       StatusTone::Error);
+        } else {
+            changed = true;
+        }
+    }
     ImGui::SetItemTooltip(
         "Static: every quad keeps its size, one bone per particle (the most particles). A rebirth is drawn as a\n"
         "streak, or as a dive with Hide Underground.\n"
@@ -1170,7 +1181,14 @@ void EditorApp::draw_right_panel()
     }
 
     group_label("Geometry");
-    changed |= enum_combo("Type", s.geometry);
+    if (const Geometry was = s.geometry; enum_combo("Type", s.geometry)) {
+        changed = true;
+        if (s.scale_mode == ScaleMode::Folding && folds(was) && !folds(s.geometry))
+            set_status(std::format("{} does not fold: the scaling is Static now, so rebirths are drawn. Vertex Bone "
+                                   "hides them.",
+                                   enum_label(s.geometry)),
+                       StatusTone::Warning);
+    }
     changed |= whole_slider("quad_width", "Width", s.quad_width, 1, 100, 6);
     changed |= whole_slider("quad_height", "Height", s.quad_height, 1, 100, 6);
     changed |= reset_slider("size_variance", "Size Variance", s.size_variance, 0.0, 0.9, 0.0, "%.2f");
