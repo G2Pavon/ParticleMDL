@@ -9,6 +9,15 @@ std::span<const Preset> builtin_presets()
 {
     // clang-format off
     static const std::array kPresets = {
+        Preset{"Seamless Loop", {
+            .count = 63, .duration = 3.0, .lifespan = 1.0, .fps = 30, .end_behavior = EndBehavior::EndlessLoop,
+            .volume_width = 96, .volume_depth = 96, .volume_height = 192, .velocity = {0, 0, 0}, .spin = {0, 0, 0},
+            .emission_angle = 360, .spawn_radius = 24, .spawn_height = 0, .emitter_tilt = {0, 0, 0}, .hollow_ring = false,
+            .speed = 15, .burst = 25, .spread = 10, .gravity = 60, .turbulence = 20, .vortex_spin = 0, .vortex_pull = 0,
+            .texture = {.pattern = TexPattern::RadialOrb, .color_mode = ColorMode::Gradient, .core_color = {255, 255, 255}, .edge_color = {40, 160, 255}, .size = 64, .hardness = 0.8, .file = {}},
+            .scale_mode = ScaleMode::Folding, .scale_start = 1.0, .scale_end = 1.0,
+            .geometry = Geometry::CrossedQuads, .quad_width = 8, .quad_height = 8, .double_sided = true, .mesh_rotation = {0, 0, 0},
+            .particle_spin = {0, 0, 0}, .spin_spread = 0}},
         Preset{"Fountain", {
             .count = 63, .duration = 3.0, .lifespan = 0.85, .fps = 30, .end_behavior = EndBehavior::HideUnderground,
             .volume_width = 128, .volume_depth = 128, .volume_height = 256, .velocity = {0, 0, 0}, .spin = {0, 0, 0},
@@ -127,15 +136,6 @@ std::span<const Preset> builtin_presets()
             .scale_mode = ScaleMode::VertexBone, .scale_start = 2.0, .scale_end = 0.6,
             .geometry = Geometry::SingleQuad, .quad_width = 13, .quad_height = 6, .double_sided = true, .mesh_rotation = {0, 0, 0},
             .particle_spin = {0, 0, 176}, .spin_spread = 0}},
-        Preset{"Seamless Loop", {
-            .count = 63, .duration = 3.0, .lifespan = 1.0, .fps = 30, .end_behavior = EndBehavior::EndlessLoop,
-            .volume_width = 96, .volume_depth = 96, .volume_height = 192, .velocity = {0, 0, 0}, .spin = {0, 0, 0},
-            .emission_angle = 360, .spawn_radius = 24, .spawn_height = 0, .emitter_tilt = {0, 0, 0}, .hollow_ring = false,
-            .speed = 15, .burst = 25, .spread = 10, .gravity = 60, .turbulence = 20, .vortex_spin = 0, .vortex_pull = 0,
-            .texture = {.pattern = TexPattern::RadialOrb, .color_mode = ColorMode::Gradient, .core_color = {255, 255, 255}, .edge_color = {40, 160, 255}, .size = 64, .hardness = 0.8, .file = {}},
-            .scale_mode = ScaleMode::Folding, .scale_start = 1.0, .scale_end = 1.0,
-            .geometry = Geometry::CrossedQuads, .quad_width = 8, .quad_height = 8, .double_sided = true, .mesh_rotation = {0, 0, 0},
-            .particle_spin = {0, 0, 0}, .spin_spread = 0}},
     };
     // clang-format on
     return kPresets;
